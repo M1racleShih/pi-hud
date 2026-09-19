@@ -26,6 +26,7 @@ export function normalizeConfig(input = {}) {
   for (const key of Object.keys(input)) {
     if (!own(DEFAULT_CONFIG, key) && key !== "$schema") throw new Error(`Unknown configuration key: ${key.slice(0, 80)}`);
   }
+  if (own(input, "$schema") && typeof input.$schema !== "string") throw new Error("$schema must be a string");
   const result = { ...DEFAULT_CONFIG, ...input, git: { ...DEFAULT_CONFIG.git } };
   delete result.$schema;
   if (result.version !== 1) throw new Error("Unsupported configuration version");

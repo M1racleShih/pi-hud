@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-09-19T11:20:01.275Z",
+  "environment": {
+    "node": "v22.16.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD EPYC 9V74 80-Core Processor"
+  },
+  "methodology": "Local synthetic microbenchmarks, NOT a live Pi/provider/terminal A/B. Timing includes performance.now overhead; cached mean uses a bulk loop. No history traversal or I/O is included in observer hooks. toolPair measures start + end together.",
+  "hooks": {
+    "messageEnd": {
+      "samples": 12000,
+      "meanUs": 0.8905261666666278,
+      "p50Us": 0.5499999999969418,
+      "p95Us": 1.652999999997462,
+      "p99Us": 2.724000000000615
+    },
+    "toolPair": {
+      "samples": 12000,
+      "meanUs": 1.3026044166667317,
+      "p50Us": 0.8610000000004447,
+      "p95Us": 2.1729999999990923,
+      "p99Us": 4.086000000000922
+    }
+  },
+  "uncachedRender": {
+    "samples": 3000,
+    "meanUs": 207.82514833333298,
+    "p50Us": 182.15399999996862,
+    "p95Us": 237.61799999999766,
+    "p99Us": 890.9919999999829
+  },
+  "cachedRender": {
+    "frames": 1000000,
+    "identicalCacheHits": 1000000,
+    "meanUs": 0.01186057699999992
+  },
+  "structural": {
+    "perTokenSubscriptions": 0,
+    "runtimeDependencies": 0,
+    "burstToolEvents": 100000,
+    "pendingPublicationTimers": 1,
+    "burstPublications": 1,
+    "idleSyntheticMs": 60000,
+    "idleExtraPublications": 0,
+    "retainedToolsAfterBurst": 0,
+    "retainedRecentIdsAfterBurst": 128,
+    "defaultGitEnabled": false
+  },
+  "gates": {
+    "hookP99Us": 250,
+    "uncachedRenderP99Us": 5000,
+    "cachedRenderMeanUs": 5
+  },
+  "passed": true
+}

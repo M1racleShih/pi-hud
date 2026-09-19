@@ -32,7 +32,7 @@ export class FakeClock {
 
 export const MODEL = Object.freeze({ id: "test-model", name: "Test Model", provider: "mock", contextWindow: 200_000 });
 export const assistant = (overrides = {}) => ({
-  role: "assistant", stopReason: "stop", content: [],
+  role: "assistant", model: MODEL.id, provider: MODEL.provider, stopReason: "stop", content: [],
   usage: { input: 1_000, output: 300, cacheRead: 2_000, cacheWrite: 400, cost: { total: 0.012 } },
   ...overrides,
 });

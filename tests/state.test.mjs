@@ -90,3 +90,15 @@ test("reset starts a new honest observation epoch and drops all old counters", (
   s.reset("/tmp/new", MODEL, 500);
   assert.equal(s.since, 500); assert.equal(s.cost, 0); assert.equal(s.contextTokens, null); assert.equal(s.compactions, 0); assert.equal(s.project, "new");
 });
+
+test("late response from previous model counts usage but not current context", () => {
+  const state = new HudState("/tmp/project", MODEL, 0);
+  state.messageEnd(assistant({ model: MODEL.id, provider: MODEL.provider }), 1);
+  assert.equal(state.contextTokens, 3_700);
+  state.setModel({ ...MODEL, id: "new-model", contextWindow: 8_000 });
+  state.messageEnd(assistant({ model: MODEL.id, provider: MODEL.provider }), 2);
+  assert.equal(state.contextTokens, null);
+  assert.equal(state.output, 600);
+  state.messageEnd(assistant({ model: "new-model", provider: MODEL.provider }), 3);
+  assert.equal(state.contextTokens, 3_700);
+});

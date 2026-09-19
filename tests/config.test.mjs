@@ -19,6 +19,7 @@ test("configuration defaults are immutable and never enable Git", () => {
 });
 test("schema annotations are accepted, prototype keys are rejected", () => {
   assert.equal(normalizeConfig({ $schema: "./schema.json" }).version, 1);
+  assert.throws(() => normalizeConfig({ $schema: 42 }));
   assert.throws(() => normalizeConfig(JSON.parse('{"__proto__":{"enabled":false}}')));
 });
 test("configuration paths respect an absolute user override", () => {

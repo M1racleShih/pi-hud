@@ -66,7 +66,7 @@ export class HudController {
         case "session_compact": this.state.compact(); break;
         case "session_tree": this.resetEpoch(); break;
         case "model_select": this.state.setModel(event?.model ?? ctx.model); this.state.thinking = safeText(ctx.thinkingLevel, 16); break;
-        case "thinking_level_select": this.state.thinking = safeText(ctx.thinkingLevel, 16); break;
+        case "thinking_level_select": this.state.thinking = safeText(event?.level ?? ctx.thinkingLevel, 16); break;
         case "ui_prompt_start": this.state.waiting = true; break;
         case "ui_prompt_end": this.state.waiting = false; break;
         default: changed = false;

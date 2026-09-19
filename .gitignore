@@ -6,3 +6,5 @@ artifacts/
 *.zip
 *.bundle
 .DS_Store
+
+__pycache__/

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "enabled": true,
+  "preset": "balanced",
+  "placement": "belowEditor",
+  "language": "en",
+  "refreshMs": 250,
+  "color": true,
+  "ascii": false,
+  "showCost": true,
+  "showThinking": true,
+  "git": {
+    "enabled": false,
+    "ttlMs": 30000,
+    "timeoutMs": 500
+  }
+}

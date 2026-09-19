@@ -1,0 +1,23 @@
+name: Bug report
+description: Report a reproducible HUD, lifecycle, compatibility or performance issue.
+title: '[bug] '
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Pi version/package, Node version, OS, terminal, other UI extensions. No API keys.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction and expected result
+      description: Include sanitized config and /hud status. Do not include conversation content or sensitive file names.
+    validations:
+      required: true
+  - type: textarea
+    id: performance
+    attributes:
+      label: Performance evidence, when applicable
+      description: Compare the same fixture with PI_HUD_DISABLE=1 and with the HUD enabled; attach aggregate timings only.

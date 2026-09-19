@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pi-hud configuration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "preset": {
+      "enum": [
+        "minimal",
+        "balanced",
+        "full"
+      ],
+      "default": "balanced"
+    },
+    "placement": {
+      "enum": [
+        "aboveEditor",
+        "belowEditor"
+      ],
+      "default": "belowEditor"
+    },
+    "language": {
+      "enum": [
+        "en",
+        "zh-CN"
+      ],
+      "default": "en"
+    },
+    "refreshMs": {
+      "type": "integer",
+      "minimum": 250,
+      "maximum": 2000,
+      "default": 250
+    },
+    "color": {
+      "type": "boolean",
+      "default": true
+    },
+    "ascii": {
+      "type": "boolean",
+      "default": false
+    },
+    "showCost": {
+      "type": "boolean",
+      "default": true
+    },
+    "showThinking": {
+      "type": "boolean",
+      "default": true
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "ttlMs": {
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 600000,
+          "default": 30000
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 1000,
+          "default": 500
+        }
+      },
+      "default": {
+        "enabled": false,
+        "ttlMs": 30000,
+        "timeoutMs": 500
+      }
+    },
+    "$schema": {
+      "type": "string"
+    }
+  }
+}

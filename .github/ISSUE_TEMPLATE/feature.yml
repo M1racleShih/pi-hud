@@ -1,0 +1,16 @@
+name: Feature proposal
+description: Suggest a bounded, passive HUD feature.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: Data source and performance cost
+      description: Which native event or explicit bridge provides the data? Can this avoid polling, prompts and extra processes?
+    validations:
+      required: true

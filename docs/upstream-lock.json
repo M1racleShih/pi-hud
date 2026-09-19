@@ -1,0 +1,15 @@
+{
+  "reviewedAt": "2026-09-19",
+  "claudeHud": {
+    "repository": "https://github.com/jarrodwatts/claude-hud",
+    "commit": "939eb66485832dead1b0a28a954f76f7aa2bdb06"
+  },
+  "pi": {
+    "repository": "https://github.com/earendil-works/pi",
+    "release": "v0.85.1",
+    "releasedAt": "2026-09-05",
+    "package": "@earendil-works/pi-coding-agent",
+    "mainReviewed": "36b60d2e8985899743c4cf5bd5f8929832a3f05d"
+  },
+  "verification": "Public source review; actual SDK and PTY checks require the release package and are separate from local mock tests."
+}

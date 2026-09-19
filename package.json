@@ -1,0 +1,19 @@
+{
+  "name": "pi-hud",
+  "version": "0.1.0",
+  "description": "An event-driven, bounded-cost HUD extension for Pi. No token-stream listeners, polling, or runtime dependencies.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.19.0" },
+  "keywords": ["pi-package", "pi-extension", "hud", "terminal"],
+  "pi": { "extensions": ["./index.ts"] },
+  "files": ["index.ts", "src/", "README.md", "README.zh-CN.md", "LICENSE", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md", "docs/", "examples/"],
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "bench": "node bench/run.mjs",
+    "verify": "npm run check && npm test && npm run bench -- --check",
+    "demo": "node scripts/demo.mjs",
+    "package:check": "node scripts/package-check.mjs"
+  }
+}

@@ -79,6 +79,14 @@ export interface HudSnapshot {
   dropped: number;
   input: number;
   output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  /**
+   * Cache-hit rate of the most recent assistant response with valid usage:
+   * `cacheRead / (input + cacheRead + cacheWrite)`. `null` while the denominator
+   * is zero or the observation has been invalidated by reset, model switch or compaction.
+   */
+  cacheHit: number | null;
   cost: number;
   usageReports: number;
   costReports: number;
@@ -119,6 +127,9 @@ export class HudState {
   declare dropped: number;
   declare input: number;
   declare output: number;
+  declare cacheRead: number;
+  declare cacheWrite: number;
+  declare cacheHit: number | null;
   declare cost: number;
   declare usageReports: number;
   declare costReports: number;
@@ -151,6 +162,9 @@ export class HudState {
     this.dropped = 0;
     this.input = 0;
     this.output = 0;
+    this.cacheRead = 0;
+    this.cacheWrite = 0;
+    this.cacheHit = null;
     this.cost = 0;
     this.usageReports = 0;
     this.costReports = 0;
@@ -165,6 +179,8 @@ export class HudState {
     if (key !== this.modelKey) {
       this.contextTokens = null;
       this.contextAt = null;
+      // A cache-hit rate measured for another model is not applicable to this one.
+      this.cacheHit = null;
     }
     this.modelKey = key;
     this.model = safeText(model?.name || model?.id, 80) || "no model";
@@ -175,10 +191,19 @@ export class HudState {
     if (message?.role !== "assistant") return false;
     const usage = message.usage;
     if (!object(usage)) return false;
-    const input = number(usage.input) + number(usage.cacheRead) + number(usage.cacheWrite);
+    // Input, output and both cache counters stay separate: adding the cache counters to
+    // `input` again is exactly the double count the native footer avoids.
+    const input = number(usage.input);
     const output = number(usage.output);
+    const cacheRead = number(usage.cacheRead);
+    const cacheWrite = number(usage.cacheWrite);
+    // A provider that omits both cache counters reports no cache data at all; that is
+    // unknown, not a real 0% hit rate.
+    const hasCacheData = usage.cacheRead !== undefined || usage.cacheWrite !== undefined;
     this.input = add(this.input, input);
     this.output = add(this.output, output);
+    this.cacheRead = add(this.cacheRead, cacheRead);
+    this.cacheWrite = add(this.cacheWrite, cacheWrite);
     this.usageReports++;
     const costTotal = (usage.cost as { total?: unknown } | null | undefined)?.total;
     if (typeof costTotal === "number" && Number.isFinite(costTotal) && costTotal >= 0) {
@@ -193,9 +218,16 @@ export class HudState {
     if (mismatch || message.stopReason === "error" || message.stopReason === "aborted" || input + output <= 0) {
       this.contextTokens = null;
       this.contextAt = null;
+      // Partial usage is not a valid cache observation, so the previous valid rate stays
+      // authoritative rather than being replaced by a half-reported denominator.
     } else {
-      this.contextTokens = add(input, output);
+      // The last context snapshot keeps its previous meaning: every token the request
+      // processed (prompt + both cache counters) plus its output, now summed from
+      // separate fields instead of one already-merged input counter.
+      this.contextTokens = add(add(input, cacheRead), add(cacheWrite, output));
       this.contextAt = now;
+      const promptTokens = input + cacheRead + cacheWrite;
+      this.cacheHit = hasCacheData && promptTokens > 0 ? cacheRead / promptTokens : null;
     }
     return true;
   }
@@ -274,6 +306,9 @@ export class HudState {
     this.compactions++;
     this.contextTokens = null;
     this.contextAt = null;
+    // The host may rewrite the context on the next request; the previous prompt's
+    // cache-hit rate would then describe a context that no longer applies.
+    this.cacheHit = null;
   }
 
   bridge(payload: unknown, now: number) {
@@ -358,7 +393,8 @@ export class HudState {
       phase: this.waiting ? "waiting" : this.tools.size ? "tools" : this.phase,
       activeTools, activeCount: this.tools.size, done: this.done, errors: this.errors,
       interrupted: this.interrupted, dropped: this.dropped,
-      input: this.input, output: this.output, cost: this.cost,
+      input: this.input, output: this.output, cacheRead: this.cacheRead, cacheWrite: this.cacheWrite,
+      cacheHit: this.cacheHit, cost: this.cost,
       usageReports: this.usageReports, costReports: this.costReports,
       compactions: this.compactions, lastTool: this.lastTool,
       runningAgents, agentErrors, agentLabel,

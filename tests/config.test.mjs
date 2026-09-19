@@ -8,9 +8,16 @@ import { CONFIG_LIMIT, DEFAULT_CONFIG, configPath, isDisabled, normalizeConfig, 
 for (const value of [null, [], "x", 3, true]) {
   test(`rejects non-object config ${JSON.stringify(value)}`, () => assert.throws(() => normalizeConfig(value)));
 }
-for (const value of [{ version: 2 }, { surprise: true }, { enabled: 1 }, { color: "true" }, { preset: "maximum" }, { language: "zh" }, { palette: "rainbow" }, { palette: true }, { placement: "footer" }, { refreshMs: 249 }, { refreshMs: 2001 }, { refreshMs: NaN }, { git: null }, { git: { enabled: 1 } }, { git: { ttlMs: 9999 } }, { git: { timeoutMs: 1001 } }, { git: { shell: true } }]) {
+for (const value of [{ version: 2 }, { surprise: true }, { enabled: 1 }, { color: "true" }, { preset: "maximum" }, { surface: "statusline" }, { surface: true }, { language: "zh" }, { palette: "rainbow" }, { palette: true }, { placement: "footer" }, { refreshMs: 249 }, { refreshMs: 2001 }, { refreshMs: NaN }, { git: null }, { git: { enabled: 1 } }, { git: { ttlMs: 9999 } }, { git: { timeoutMs: 1001 } }, { git: { shell: true } }]) {
   test(`rejects invalid config ${JSON.stringify(value)}`, () => assert.throws(() => normalizeConfig(value)));
 }
+test("surface defaults to widget and accepts exactly widget and footer", () => {
+  assert.equal(normalizeConfig().surface, "widget");
+  assert.equal(DEFAULT_CONFIG.surface, "widget");
+  assert.equal(normalizeConfig({ surface: "widget" }).surface, "widget");
+  assert.equal(normalizeConfig({ surface: "footer" }).surface, "footer");
+  assert.ok(Object.isFrozen(normalizeConfig({ surface: "footer" })));
+});
 test("palette defaults to pastel and accepts exactly the three documented modes", () => {
   assert.equal(normalizeConfig().palette, "pastel");
   assert.equal(DEFAULT_CONFIG.palette, "pastel");

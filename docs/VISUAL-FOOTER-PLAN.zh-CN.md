@@ -1,6 +1,6 @@
 # 视觉层次与原生 footer 整合方案
 
-状态：P0（分字段配色与语义片段渲染）与 P2（活动表现）已实现并完成可执行验证，2026-09-20；P1（数据适配与 footer 接管）仍待实现。本文是优化设计，不代表未实现部分已经上线或性能已经验证。依据：用户对比截图、当前 pi-hud 源码、本地 Pi 0.85.1 SDK 的实际实现。
+状态：P0（分字段配色与语义片段渲染）、P2（活动表现）与 **P1 阶段 A（可选 footer 接管与基础数据适配）** 已实现并完成可执行验证，2026-09-20。P1 阶段 A 交付的是**显式启用**的 `surface: footer`：默认仍是 widget，尚未宣称与原生 footer 完全等价替换；原生 footer 的全会话合计、实时上下文估计、自动压缩/订阅标记与 provider 数量仍不在覆盖范围内。本文是优化设计，不代表默认行为已经切换。依据：用户对比截图、当前 pi-hud 源码、本地 Pi 0.85.1 SDK 的实际实现。
 
 ## 实施状态（2026-09-20）
 
@@ -21,9 +21,22 @@
 - 延续 pastel/theme/mono、`color: false`、ASCII、中英标签与主题切换行为；新增字段复用现有语义角色，未新增颜色 token。`docs/preview.txt` 与中英文 README/CONFIGURATION/ARCHITECTURE/PERFORMANCE/VERIFICATION 已同步。
 - 顺带修复渲染热点：`visibleWidth`/`clip` 对普通文本走逐码点快速路径，只有真正可能组成字素簇的字符（组合符、ZWJ、变体选择符、emoji、区域指示符）才回退 `Intl.Segmenter`；新增差分模糊测试断言快速路径与分段器参考实现一致。该优化使新增活动字段的净渲染成本为负（见下文证据）。
 
+### 本轮已实现（P1 阶段 A）
+
+- 新增 `surface: widget | footer`（默认 `widget`）与 `/hud surface widget|footer`；footer 模式使用正式 `ctx.ui.setFooter`，不挂载 HUD widget，`placement` 只对 widget 生效；宿主没有 `setFooter` 时回退 widget 并把原因写入 `/hud status`。
+- footer 生命周期完整：`/hud off` 在 HUD 仍拥有槽位时恢复原生 footer；surface 切换、reload、shutdown、会话切换都会释放视图、分支订阅与计时器并隔离旧回调；其他扩展覆盖 HUD footer 后，旧控制器不会在 off/dispose 时清除对方的 footer，也不会在普通刷新时抢回，只有显式 `/hud surface footer` 重新接管；宿主调用组件 dispose 与主动释放 surface 有明确区分，不会递归清理或重复恢复；非 TUI 模式零终端 UI 操作。
+- 身份信息：缓存工作目录（家目录缩写为 `~`）、模型、provider、thinking 与会话标题；标题在初始化与 `session_info_changed` 更新，render 不调用 `getSessionName` 也不读历史；Git 分支复用 `footerData.getGitBranch()`/`onBranchChange()`，不为显示分支启动额外 Git 进程，dirty 仍来自独立的 `git.enabled` 探测。
+- 分项用量：input、output、cacheRead、cacheWrite 分开累计与展示，避免缓存重复计数；`CH` 取最近一次有效 assistant 的 `cacheRead / (input + cacheRead + cacheWrite)`，分母为零或 provider 未报告缓存字段时显示 `?`；reset、模型切换与压缩清除不再适用的观察；上下文仍是明确标注的 `ctx(last)` 快照。`/hud status` 说明与原生 footer 的数据覆盖差异。
+- 其他扩展状态：在独立的、有界区域展示 `footerData.getExtensionStatuses()`，包括 pi-goal 的字符串状态，不解析字符串伪造进度；在同一 Map 原地修改的情况下，通过 render 内最多 8 条、每条 64 字符的值比较检测新增/修改/删除，无轮询、无宿主补丁；截断时保留 `+N` 与省略号提示，并安全处理控制字符与 ANSI。
+- 布局：widget 仍为 1/2/3 行；footer 主体 minimal 2 行、balanced 3 行、full 4 行，工具开始/完成/失败不改变主体行数；状态区最多 2 行，footer 总计最多 6 行；延续 pastel/theme/mono、`color: false`、ASCII、中英标签与主题切换；窄屏按优先级保留上下文百分比、当前活动与错误提示。
+
 ### 证据摘要（P0）
 
 126 项测试通过；`npm run verify`、`npm run package:check` 通过；8 组同机交替 A/B（修复后最终代码）显示未缓存渲染均值 −32.7%、p50 −40.6%、p95 −39.3%、缓存渲染均值 −8.8%，hook p99 在亚微秒噪声内，未缓存 p99 +40.5%（0.42 ms → 0.59 ms，门槛仍为 5 ms，未放宽）；锁定的 SDK 类型契约、真实 Pi RPC 与 PTY 检查均通过。详见 [验证记录](VERIFICATION.md) 与 [性能证据](PERFORMANCE.md)。
+
+### 证据摘要（P1 阶段 A）
+
+196 项测试通过；`npm run verify`、`npm run package:check` 通过。8 组同机交替 A/B（before 为 `af3a5e4`，probe 文件两侧一致）显示：含 usage 的 widget 渲染均值因新增分项用量与 CH 上升约 +0.47 µs（7.06 → 7.54 µs），缓存路径略降，hook p99 在噪声内（tool-pair 配对 +0.06 µs）；footer 场景为新场景无基线（full 均值 12.9 µs、p99 86.6 µs；40 列 8.8 µs），12 条状态下的缓存 footer 渲染 0.095 µs，新增门槛沿用 5 µs。锁定的 SDK 类型契约（新增 footer/status 合约）、真实 RPC 与真实 PTY 检查均通过；PTY 新增 footer 启停、原生恢复与独立扩展状态更新场景。原始数据见 [performance-phase3-ab.json](PERFORMANCE.md)。
 
 ### 证据摘要（P2）
 
@@ -31,10 +44,11 @@
 
 ### 尚未实现或尚未验证
 
-- P1：正式接管原生 footer（`setFooter`）、surface 生命周期、会话标题/provider/分项用量、宿主 Git 分支与标题缓存、其他扩展 `setStatus` 展示。当前默认仍是 widget，未改变数据获取路径。
-- 待人工验收：真实深色/浅色终端下 40/80/120/180 列的人工视觉检查，以及真实流式/工具/键盘 A/B。合成预览、单元测试和 PTY 冒烟不能替代人工视觉验收。
-- 真实终端下的原生工具分类：PTY 冒烟不发起模型调用也不执行工具，因此只验证挂载、桥接摘要行、palette、缩放与开关；原生工具分类仍需在真实工具调用会话中人工确认。
-- 范围边界保持不变：未接管 footer、未实现额度查询、未改变 usage 统计口径；零运行时依赖；render 不做 I/O；不新增网络、历史扫描、逐 token 监听、轮询或默认 Git 进程。
+- P1 仍未完成的部分：把 footer 设为默认（本轮不切换），以及原生 footer 的全会话合计、实时上下文估计、自动压缩/订阅/实验标记与 provider 数量。这些需要宿主提供缓存摘要或经核对的历史重建，本轮明确不实现。
+- 待人工验收：真实深色/浅色终端下 40/80/120/180 列的人工视觉检查（现在也包含 footer 接管模式与原生 footer 的并排比较），以及真实流式/工具/键盘 A/B。合成预览、单元测试和 PTY 冒烟不能替代人工视觉验收。
+- 待人工验收：真实宿主中两个 footer 扩展的覆盖顺序。所有权语义有确定性测试覆盖（假宿主镜像 Pi 的单一替换槽语义），但 PTY 检查没有加载第二个真实 footer 扩展。
+- 真实终端下的原生工具分类：PTY 冒烟不发起模型调用也不执行工具，因此只验证挂载、footer 启停与原生恢复、独立扩展状态更新、桥接摘要行、palette、缩放与开关；原生工具分类与真实 usage/CH 仍需在真实工具调用会话中人工确认。
+- 范围边界：footer 为显式启用、默认不接管；未实现额度查询；零运行时依赖；render 不做 I/O；不新增网络、历史扫描、逐 token 监听、轮询或默认 Git 进程。usage 统计口径按上文拆分为四个独立字段，`obs*` 明确标记为观察值。
 
 2026-09-20 调整：移除所有布局的最近完成摘要及专用状态；保留当前工具、分类统计、错误与中断提示。
 

@@ -2,7 +2,8 @@
 """Optional Linux/macOS real-Pi TUI smoke. No model requests or API credentials.
 
 Requires the isolated .tmp/sdk install used by CI. This is NOT a streaming
-performance A/B test. It checks real widget mounting, commands and resizing.
+performance A/B test. It checks real widget/footer mounting, surface ownership,
+native-footer restoration, extension status updates, commands and resizing.
 """
 import errno
 import fcntl
@@ -46,7 +47,8 @@ def main() -> None:
             os.chdir(home)
             os.execve(node, [node, str(cli), "--no-session", "--no-extensions",
                             "-e", str(root / "index.ts"),
-                            "-e", str(root / "examples/bridge-demo.ts")], env)
+                            "-e", str(root / "examples/bridge-demo.ts"),
+                            "-e", str(root / "examples/status-demo.ts")], env)
         alive = True
         seen = bytearray()
 
@@ -77,6 +79,10 @@ def main() -> None:
         # The full preset's summary row carries the explicitly synthetic demo label; the
         # balanced preset shows the same bridge data as a shorter `agents`/`tasks` field.
         demo_label = b"DEMO: build Pi HUD"
+        # Markers only the built-in Pi footer renders: the auto-compaction flag and its
+        # one-decimal context percentage. The HUD never prints either, in any surface.
+        native_footer = re.compile(rb"\(auto\)|\d+\.\d+%/")
+        demo_status = b"DEMO status"
 
         try:
             fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
@@ -102,11 +108,57 @@ def main() -> None:
             recolored = wait_for(b"ctx(last)")
             if not colored_context.search(recolored):
                 raise RuntimeError("pastel palette did not restore field colors")
+            # --- optional footer surface -------------------------------------------------
+            # The surface switch replaces the footer container, so the notify and the redraw
+            # land in the same PTY window; each window is checked for native-footer-only text.
+            os.write(fd, b"/hud surface footer\r")
+            footer_frame = wait_for(b"ctx(last)")
+            if b"pi-hud surface footer" not in footer_frame:
+                raise RuntimeError("the surface command did not run before the footer frame")
+            if native_footer.search(footer_frame):
+                raise RuntimeError("the native footer was still rendered after switching to the footer surface")
+            # A full repaint must not resurrect the native footer while the HUD owns the slot.
+            # The size really changes, because Pi only repaints the whole tree for a new size.
+            fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 101, 0, 0))
+            os.kill(pid, signal.SIGWINCH)
+            repaint = wait_for(b"ctx(last)")
+            if native_footer.search(repaint):
+                raise RuntimeError("the native footer reappeared during a footer-surface repaint")
+            # An independent extension's setStatus must reach the HUD footer with no HUD event.
+            # Pi redraws only the changed footer line, so the full frame is checked after a
+            # forced repaint that still carries the new status text.
+            os.write(fd, b"/hud-status-demo two\r")
+            wait_for(b"DEMO status two")
+            fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 102, 0, 0))
+            os.kill(pid, signal.SIGWINCH)
+            status = wait_for(b"DEMO status two")
+            if b"ctx(last)" not in status:
+                raise RuntimeError("the HUD footer disappeared while updating an extension status")
+            if native_footer.search(status):
+                raise RuntimeError("the native footer reappeared while updating an extension status")
+            # Switching back must restore the built-in footer: `(auto)` is native-footer only.
+            os.write(fd, b"/hud surface widget\r")
+            restored = wait_for(b"(auto)")
+            if b"ctx(last)" not in restored or b"pi-hud surface widget" not in restored:
+                raise RuntimeError("the widget surface did not return after switching back")
+            # Footer ownership: off must restore the native footer instead of leaving a gap.
+            os.write(fd, b"/hud surface footer\r")
+            back_to_footer = wait_for(b"ctx(last)")
+            if native_footer.search(back_to_footer):
+                raise RuntimeError("the native footer was still rendered in footer mode")
             os.write(fd, b"/hud off\r")
-            wait_for(b"pi-hud off")
+            off = wait_for(b"(auto)")
+            if b"pi-hud off" not in off:
+                raise RuntimeError("the off command did not run before the native footer returned")
             os.write(fd, b"/hud on\r")
-            wait_for(b"ctx(last)")
-            print("PASS: real Pi TUI mounts HUD, shows bridged activity, switches layout/palette, resizes, and toggles off/on without a model call")
+            on = wait_for(b"ctx(last)")
+            if b"pi-hud on" not in on:
+                raise RuntimeError("the on command did not reinstall the footer surface")
+            if native_footer.search(on):
+                raise RuntimeError("the native footer was still rendered after re-enabling the footer surface")
+            print("PASS: real Pi TUI mounts the HUD widget and footer, shows bridged activity and an "
+                  "independent extension status, switches surface, restores the native footer on "
+                  "surface switch and off, resizes, and switches layout/palette without a model call")
         finally:
             try:
                 os.kill(pid, signal.SIGTERM)

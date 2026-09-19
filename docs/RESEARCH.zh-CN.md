@@ -20,7 +20,7 @@ Claude HUD 借助 Claude Code 的原生 statusline：宿主传入 stdin JSON，�
 
 ## pi-hud 的实现边界
 
-使用 `ctx.ui.setWidget`，默认置于输入框下方。保留编辑器、快捷键、原生 footer 和其他扩展状态。最小、均衡、完整三个布局分别固定为一、二、三行，避免工具开始和结束造成明显上下跳动。
+使用 `ctx.ui.setWidget`，默认置于输入框下方。保留编辑器、快捷键、原生 footer 和其他扩展状态。**后续更新（第三阶段）**：Pi 0.85.1 的正式 `ctx.ui.setFooter` 使 footer 接管可行，现已作为显式的 `surface: footer` 选项提供；默认仍是 widget，且不复制原生 footer 的全会话合计（见 [架构说明](ARCHITECTURE.md) 与 [验证记录](VERIFICATION.md)）。最小、均衡、完整三个布局分别固定为一、二、三行，避免工具开始和结束造成明显上下跳动。
 
 只订阅低频的生命周期与完成事件，不订阅逐 token 的 `message_update` 或工具输出流的 `tool_execution_update`。事件处理器只更新有上限的内存状态并标记需要刷新；不等待 I/O，不处理完整工具输出，不向模型增加工具或提示词，也不改变工具调用、结果或上下文。
 

@@ -17,10 +17,30 @@ const allowedBuiltins = {
   "git.ts": new Set(["node:child_process"]),
   "text.ts": new Set(["node:util"]),
 };
-const forbidden = /\b(?:execSync|execFileSync|spawnSync|readFileSync|writeFileSync|setInterval|fetch)\s*\(|\.(?:getBranch|getEntries|getContextUsage|registerTool|sendMessage|sendUserMessage|appendEntry|setFooter|setEditorComponent|onTerminalInput)\s*\(|\bconsole\s*\./;
+// `setFooter` is a single-replacement host slot. The full forbidden-API group still applies
+// to every source file; only the dedicated surface module may call the slot, and only inside
+// its marked boundary section, so an accidental footer grab elsewhere still fails this check.
+const SURFACE_FILE = "footer.ts";
+const SURFACE_START = "/* surface-boundary:start */";
+const SURFACE_END = "/* surface-boundary:end */";
+const surfaceFileSource = existsSync(join("src", SURFACE_FILE)) ? readFileSync(join("src", SURFACE_FILE), "utf8") : "";
+const surfaceSection = surfaceFileSource.includes(SURFACE_START) && surfaceFileSource.includes(SURFACE_END)
+  ? surfaceFileSource.split(SURFACE_START)[1].split(SURFACE_END)[0]
+  : "";
+const countSurfaceCalls = (source) => (source.match(/\bsetFooter\s*\(/g) ?? []).length;
+assert.ok(surfaceSection.includes("setFooter"), `${SURFACE_FILE} must own the setFooter boundary`);
+assert.equal(
+  countSurfaceCalls(surfaceFileSource), countSurfaceCalls(surfaceSection),
+  "setFooter may only be called inside the marked surface boundary section",
+);
+assert.ok(surfaceSection.includes("typeof ui.setFooter !== \"function\""), "the surface boundary must keep its capability guard");
+assert.ok(surfaceSection.includes("installFooter") && surfaceSection.includes("releaseFooter"), "install and release must both live in the boundary");
+const forbiddenBase = /\b(?:execSync|execFileSync|spawnSync|readFileSync|writeFileSync|setInterval|fetch)\s*\(|\.(?:getBranch|getEntries|getContextUsage|registerTool|sendMessage|sendUserMessage|appendEntry|setEditorComponent|onTerminalInput)\s*\(|\bconsole\s*\./;
+const forbiddenSurface = /\bsetFooter\s*\(/;
 for (const file of readdirSync("src").filter((file) => file.endsWith(".ts"))) {
   const source = readFileSync(join("src", file), "utf8");
-  assert.ok(!forbidden.test(source), `Forbidden hot-path API or direct output in ${file}`);
+  assert.ok(!forbiddenBase.test(source), `Forbidden hot-path API or direct output in ${file}`);
+  if (file !== SURFACE_FILE) assert.ok(!forbiddenSurface.test(source), `setFooter is only allowed in the ${SURFACE_FILE} surface boundary`);
   for (const match of source.matchAll(/from\s+["'](node:[^"']+)["']/g)) {
     assert.ok(allowedBuiltins[file]?.has(match[1]), `Unexpected builtin import ${match[1]} in ${file}`);
   }

@@ -20,6 +20,13 @@
       ],
       "default": "balanced"
     },
+    "surface": {
+      "enum": [
+        "widget",
+        "footer"
+      ],
+      "default": "widget"
+    },
     "placement": {
       "enum": [
         "aboveEditor",

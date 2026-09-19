@@ -41,10 +41,21 @@ export function fakeHost(mode = "tui") {
   const handlers = new Map();
   const bus = new Map();
   const commands = new Map();
-  const calls = { widget: 0, paint: 0, notifications: [], disposed: 0 };
+  const calls = { widget: 0, paint: 0, notifications: [], disposed: 0, footerInstalls: 0, footerRestores: 0, footerDisposals: 0, branchReads: 0 };
   let widget;
+  let footer;
+  let sessionName;
   let idle = true;
   const theme = { fg: (_tone, text) => text };
+  const branchListeners = new Set();
+  const footerData = {
+    branch: "main",
+    statuses: new Map(),
+    getGitBranch() { calls.branchReads++; return footerData.branch; },
+    getExtensionStatuses() { return footerData.statuses; },
+    onBranchChange(callback) { branchListeners.add(callback); return () => { branchListeners.delete(callback); }; },
+  };
+  const tui = { requestRender: () => { calls.paint++; } };
   const ui = {
     theme,
     setWidget(key, factory, options) {
@@ -56,13 +67,30 @@ export function fakeHost(mode = "tui") {
         widget = factory({ requestRender: () => { calls.paint++; } }, theme);
       } else { widget = undefined; calls.disposed++; }
     },
+    // Mirrors the real host: the previously installed component is disposed first, then the
+    // new factory runs (or the built-in footer is restored).
+    setFooter(factory) {
+      footer?.dispose?.();
+      footer = undefined;
+      if (factory) { calls.footerInstalls++; footer = factory(tui, theme, footerData); }
+      else calls.footerRestores++;
+    },
     notify(message, level) { calls.notifications.push({ message, level }); },
   };
+  if (mode !== "tui" && mode !== "rpc") delete ui.setFooter;
   const ctx = {
     mode, hasUI: ["tui", "rpc"].includes(mode), cwd: "/tmp/my-project",
     model: MODEL, thinkingLevel: "high", ui, isIdle: () => idle,
     getContextUsage: () => { throw new Error("History/context scans forbidden"); },
-    sessionManager: new Proxy({}, { get() { throw new Error("No session history access permitted"); } }),
+    // Only the session name is readable; every other history access is a test failure.
+    sessionManager: new Proxy({
+      getSessionName: () => sessionName,
+    }, {
+      get(target, property) {
+        if (property in target) return target[property];
+        throw new Error(`No session history access permitted: ${String(property)}`);
+      },
+    }),
   };
   const pi = {
     on(name, handler) { const list = handlers.get(name) ?? []; list.push(handler); handlers.set(name, list); },
@@ -76,8 +104,23 @@ export function fakeHost(mode = "tui") {
     },
   };
   return {
-    pi, ctx, calls, handlers, bus, commands,
+    pi, ctx, calls, handlers, bus, commands, footerData,
     widget: () => widget,
+    footer: () => footer,
+    /** Simulate a different extension claiming the single footer slot. */
+    installOtherFooter(component) {
+      let disposed = false;
+      const other = component ?? { render: () => (disposed ? [] : ["other-footer"]), dispose() { disposed = true; calls.footerDisposals++; } };
+      ui.setFooter(() => other);
+      return other;
+    },
+    setBranch(branch) { footerData.branch = branch; for (const callback of branchListeners) callback(); },
+    /** Mirrors `setExtensionStatus`: in-place map mutation followed by a host render request. */
+    setStatus(key, value) {
+      if (value === undefined) footerData.statuses.delete(key); else footerData.statuses.set(key, value);
+      tui.requestRender();
+    },
+    setSessionName(name) { sessionName = name; },
     setIdle(value) { idle = value; },
     emit(name, payload = {}) { return (handlers.get(name) ?? []).map((handler) => handler(payload, ctx)); },
   };

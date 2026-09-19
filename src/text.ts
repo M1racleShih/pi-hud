@@ -25,6 +25,20 @@ export function baseName(value: unknown, limit = 48): string {
   return safeText(parts.at(-1), limit) || "/";
 }
 
+/**
+ * Abbreviate an absolute path for display without touching the filesystem. The home
+ * prefix becomes `~`; an over-long path keeps its tail (the innermost directory) because
+ * that is the part a reader can identify. Called at lifecycle boundaries, never in render.
+ */
+export function displayPath(value: unknown, home: unknown, limit = 72): string {
+  const raw = typeof value === "string" ? value.slice(0, 1_024).replace(/\\/g, "/") : "";
+  if (!raw) return "";
+  let candidate = raw;
+  const base = typeof home === "string" ? home.slice(0, 1_024).replace(/\\/g, "/").replace(/\/+$/, "") : "";
+  if (base && (raw === base || raw.startsWith(`${base}/`))) candidate = `~${raw.slice(base.length)}`;
+  return safeText(candidate.slice(-Math.max(1, limit) * 2), limit);
+}
+
 function wide(code: number): boolean {
   return code >= 0x1100 && (
     code <= 0x115f || code === 0x2329 || code === 0x232a ||

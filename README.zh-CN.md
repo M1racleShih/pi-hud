@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-为 [Pi](https://github.com/earendil-works/pi) 实现的被动、事件驱动 HUD，借鉴 [claude-hud](https://github.com/jarrodwatts/claude-hud) 的信息组织方式，而不是照搬它的 transcript 解析架构。显示模型、上下文快照、有界工具分类活动、已观察到的 token/费用，以及显式接入的子代理和任务进度；不替换 Pi 的编辑器或 footer。
+为 [Pi](https://github.com/earendil-works/pi) 实现的被动、事件驱动 HUD，借鉴 [claude-hud](https://github.com/jarrodwatts/claude-hud) 的信息组织方式，而不是照搬它的 transcript 解析架构。显示模型、上下文快照、有界工具分类活动、已观察到的 token/费用，以及显式接入的子代理和任务进度。默认仍是编辑器旁的命名 widget；可显式启用 **footer 接管模式**，用它替换 Pi 原生 footer，避免同一份信息重复显示。
 
 **零运行时依赖；不监听逐 token 事件；不扫描 transcript；不注入提示词；不发起网络请求。额外 Git 探测默认关闭。**
 
@@ -16,6 +16,24 @@
 ```
 
 `minimal` 一行、`balanced` 两行、`full` 三行。工具开始、结束、失败或收尾都不会改变选定布局的行数，避免额外的纵向跳动。窄终端按优先级省略片段：先保住上下文百分比、当前工具和错误提示，再折叠工具分类。上下文字段会先预留自己的宽度：长模型名只能被截断，不会让高占用警告消失。中文、emoji 和长路径按终端显示列宽（而非码元）测量、截断。全部预览见 [布局预览](docs/preview.txt)。
+
+## 显示位置：widget（默认）与 footer
+
+`surface` 决定 HUD 画在哪里，默认 `widget`，因此现有安装的行为不变。设为 `footer` 时使用 Pi 0.85.1 的正式 `ctx.ui.setFooter` 槽位替换内置 footer，并且**不再挂载 HUD widget**，从而消除模型、上下文、费用的重复显示：
+
+```text
+[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+ctx(last) ██░░░░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042
+● edit source.ts · interrupted 1 · errors 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
+```
+
+footer 主体固定为 **minimal 2 行、balanced 3 行、full 4 行**。其他扩展通过 `ctx.ui.setStatus` 发布的状态显示在独立的、有界区域内：最多 8 条、每条净化后 64 字符、最多 2 行，footer 总行数上限 6 行。状态变化在 footer 自己的 render 过程中被检测到，不需要轮询、HUD 事件或修改宿主。
+
+footer 还会显示 widget 没有的身份信息：工作目录（家目录缩写为 `~`）、模型、provider、thinking、会话标题，以及宿主缓存的 Git 分支。分支复用 Pi 的 `footerData.getGitBranch()`/`onBranchChange()`，不会为显示分支额外启动 Git 进程；额外的 dirty 标记仍由独立的 `git.enabled` 探测提供。
+
+footer **不是**原生 footer 的逐字节等价替换。本轮不读取会话历史，因此计数口径仍是“本次挂载/重置以来观察到”，上下文仍是明确标注的 `ctx(last)` 快照；不模仿原生 footer 的全会话合计、实时上下文估计、自动压缩/订阅标记和 provider 数量。`/hud status` 会打印这些覆盖差异。
+
+所有权规则：HUD 仍拥有槽位时，`/hud off` 恢复原生 footer；如果其他扩展后来覆盖了 HUD footer，HUD 既不会在 `off`/dispose 时清除对方的 footer，也不会在普通刷新时抢回，只有显式的 `/hud surface footer` 才会重新接管。宿主不提供 `ui.setFooter` 时回退到 widget，并在 `/hud status` 中记录原因。
 
 ## 活动信息
 
@@ -48,7 +66,8 @@ pi -e /absolute/path/to/pi-hud/index.ts
 | 命令 | 效果 |
 | --- | --- |
 | `/hud on`、`/hud off`、`/hud toggle` | 开关 HUD；重新开启时重新计算观察范围。 |
-| `/hud preset minimal\|balanced\|full` | 切换固定的一、二、三行布局。 |
+| `/hud preset minimal\|balanced\|full` | 切换固定布局：widget 一、二、三行；footer 主体二、三、四行。 |
+| `/hud surface widget\|footer` | 切换显示位置；`footer` 替换原生 footer 且不挂载 widget，显式执行该命令可重新接管被其他扩展占用的槽位。 |
 | `/hud palette pastel\|theme\|mono` | 切换字段配色：HUD 柔和色板（默认）、跟随宿主主题、或不着色。 |
 | `/hud lang en`、`/hud lang zh-CN` | 切换 HUD 标签语言；命令帮助仍为英文。 |
 | `/hud placement aboveEditor\|belowEditor` | 只移动 pi-hud 自己的 widget。 |
@@ -64,6 +83,7 @@ pi -e /absolute/path/to/pi-hud/index.ts
 {
   "version": 1,
   "preset": "balanced",
+  "surface": "widget",
   "language": "zh-CN",
   "palette": "pastel",
   "refreshMs": 250,
@@ -97,11 +117,13 @@ pi -e /absolute/path/to/pi-hud/index.ts
 
 **`*` 表示“自本次 HUD 挂载/重置以来观察到”。** 工具结果、token、压缩次数与费用不回扫历史，因此不是完整会话账本。树导航、重新开启会重置观察范围；压缩只使上下文失效，保留已经观察到的累计计数。分类账本随观察范围一起清空，旧活动不会残留到新会话。近期工具完成事件在有界 ID 窗口内去重。出现 `limited*` 表示因固定上限丢弃过记录；真正收尾后仍未完成的工具归为中断，不伪装成成功；分类上的 `!`/`~` 标记使这种不完整可见。
 
+**`obs*` 把 input、output、cacheRead、cacheWrite 分开呈现。** 缓存 token 不会被重复计入新的 input：显示的是 `↑输入`、`↓输出`、`R缓存读`、`W缓存写` 四个独立字段，而不是一个已经合并的数字。`CH` 取最近一次有效 assistant 响应的缓存命中率 `cacheRead / (input + cacheRead + cacheWrite)`；分母为零或 provider 未报告缓存字段时显示 `?`。重置、切换模型和压缩会清除不再适用的命中率，出错或中止的响应也不会覆盖上一次有效值。`obs*`、`last`、`est*` 含义一致：都是本次挂载范围内的有界观察，不是原生 footer 的全会话账本。
+
 **“估算*”来自 Pi 的 `usage.cost.total`，不是实际账单或套餐额度。** 缺失数据显示 `?`，部分已知显示 `+?`。历史调用、压缩模型调用、没有进入主助手事件流的子代理费用不会被悄悄算入。不会读取服务商凭据，也不会请求套餐额度接口。
 
 **代理和任务需要显式桥接。** 原生 `subagent` 工具会作为有界分类显示，但单凭工具名无法知道其内部每个子代理的状态。[桥接协议](docs/BRIDGE.md) 允许 subagent 或 `/goal` 扩展发布小型生命周期记录。本版没有宣称自动适配所有第三方插件。
 
-**可选 Git 只是在空闲边界采集的缓存快照。** 它不检查 untracked 文件、子模块状态、行级 diff、ahead/behind；星号只代表 tracked 变更，`git:?` 代表不可用而不是干净。追求最低额外争用时保持关闭，继续看 Pi 原有 footer 中的分支即可。
+**可选 Git 只是在空闲边界采集的缓存快照。** 它不检查 untracked 文件、子模块状态、行级 diff、ahead/behind；星号只代表 tracked 变更，`git:?` 代表不可用而不是干净。追求最低额外争用时保持关闭；footer 接管模式仍会显示 Pi 自己缓存的分支名，widget 模式也可以继续看原生 footer 的分支。
 
 ## 为什么不照搬 claude-hud
 
@@ -113,10 +135,10 @@ pi-hud 的路径是：
 原生生命周期 / 工具 / 最终消息事件
   → 有界标量状态（同步返回 undefined）
   → 一个合并发布定时器（稳态刷新间隔至少 250 ms）
-  → 小型快照 → 缓存 widget 行 → 只有行变了才 requestRender
+  → 小型快照 → 缓存的 widget / footer 行 → 只有行变了才 requestRender
 ```
 
-不监听 `message_update`、`tool_execution_update`；不调用 `getBranch()`、`getEntries()`、`getContextUsage()`；不做同步文件/进程操作；不轮询空闲状态；不接管输入、编辑器或 footer；不注册 LLM 工具、不改消息、不写会话。每行由有界的语义片段组成（字段 ≤ 12、片段 ≤ 40）；最终 ANSI 行会被缓存，宿主随模型流重绘时，只要宽度、已发布状态和主题失效均未变化就复用同一数组。RPC、JSON、print 模式不创建 HUD 定时器、不读 HUD 配置、不挂 UI。
+不监听 `message_update`、`tool_execution_update`；不调用 `getBranch()`、`getEntries()`、`getContextUsage()`；不做同步文件/进程操作；不轮询空闲状态；不接管输入或编辑器。`ctx.ui.setFooter` 只在专门的 footer 模块（`src/footer.ts`）里调用，带能力检测和 `tui` 模式判断，其他源文件一旦调用会被 `scripts/check.mjs` 直接判失败。不注册 LLM 工具、不改消息、不写会话。每行由有界的语义片段组成（字段 ≤ 12、片段 ≤ 40）；最终 ANSI 行会被缓存，宿主随模型流重绘时，只要宽度、已发布状态、状态变化和主题失效均未变化就复用同一数组。RPC、JSON、print 模式不创建 HUD 定时器、不读 HUD 配置、不挂 UI。
 
 启动配置读取异步延后；桥接活动最多使用一个过期定时器；可选 Git 具备超时、输出上限、单飞、冷却、取消与过期结果隔离。异步 Git 仍可能争用 CPU 或磁盘，不能把“异步”等同于“没有成本”。
 

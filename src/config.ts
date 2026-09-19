@@ -11,6 +11,11 @@ export type HudPlacement = "aboveEditor" | "belowEditor";
 export type HudLanguage = "en" | "zh-CN";
 /** `pastel` uses the HUD's own soft palette, `theme` follows host theme tokens, `mono` is unstyled. */
 export type HudPalette = "pastel" | "theme" | "mono";
+/**
+ * `widget` keeps the named widget above/below the editor next to Pi's native footer.
+ * `footer` replaces the native footer through `ui.setFooter` and does not mount the widget.
+ */
+export type HudSurface = "widget" | "footer";
 
 export interface GitConfig {
   enabled: boolean;
@@ -22,6 +27,7 @@ export interface HudConfig {
   version: number;
   enabled: boolean;
   preset: HudPreset;
+  surface: HudSurface;
   placement: HudPlacement;
   language: HudLanguage;
   palette: HudPalette;
@@ -42,6 +48,7 @@ export const DEFAULT_CONFIG: Readonly<HudConfig> = Object.freeze({
   version: 1,
   enabled: true,
   preset: "balanced",
+  surface: "widget",
   placement: "belowEditor",
   language: "en",
   palette: "pastel",
@@ -71,6 +78,7 @@ export function normalizeConfig(input: unknown = {}): Readonly<HudConfig> {
   }
   for (const [key, values] of [
     ["preset", ["minimal", "balanced", "full"]],
+    ["surface", ["widget", "footer"]],
     ["placement", ["aboveEditor", "belowEditor"]],
     ["language", ["en", "zh-CN"]],
     ["palette", ["pastel", "theme", "mono"]],

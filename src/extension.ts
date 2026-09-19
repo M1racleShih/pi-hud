@@ -6,18 +6,23 @@ import { HudState } from "./state.ts";
 import type { MessageLike, ModelLike, ToolEventLike } from "./state.ts";
 import { HudView } from "./render.ts";
 import type { HudTheme, WidgetTui } from "./render.ts";
+import { HudFooterView, installFooter as mountFooterSurface, releaseFooter as unmountFooterSurface } from "./footer.ts";
+import type { FooterDataLike, HudFooterComponent } from "./footer.ts";
 import { GitProbe } from "./git.ts";
 import type { GitProbeLike, GitStatus } from "./git.ts";
-import { safeText } from "./text.ts";
+import { displayPath, safeText } from "./text.ts";
 
 export const WIDGET_KEY = "pi-hud";
 export const BRIDGE_EVENT = "pi-hud:update";
 export const OBSERVED_EVENTS: readonly string[] = Object.freeze([
-  "session_start", "session_shutdown", "agent_start", "agent_end", "agent_settled",
+  "session_start", "session_shutdown", "session_info_changed", "agent_start", "agent_end", "agent_settled",
   "message_end", "tool_execution_start", "tool_execution_end", "session_compact",
   "session_tree", "model_select", "thinking_level_select", "ui_prompt_start", "ui_prompt_end",
 ]);
 const sameGit = (a: GitConfig, b: GitConfig) => a.enabled === b.enabled && a.ttlMs === b.ttlMs && a.timeoutMs === b.timeoutMs;
+const MAX_TITLE = 80;
+const MAX_PROVIDER = 64;
+const MAX_CWD = 72;
 
 /** Structural host surface used by the HUD; payloads are still validated at runtime. */
 export interface HudWidget {
@@ -29,6 +34,8 @@ export interface HudWidget {
 export interface PiUi {
   theme?: HudTheme;
   setWidget(key: string, factory?: ((tui: WidgetTui, theme: HudTheme) => HudWidget) | undefined, options?: { placement: string }): void;
+  /** Present on Pi 0.85.1; optional so a limited host can fall back to the widget surface. */
+  setFooter?(factory?: ((tui: WidgetTui, theme: HudTheme, footerData: FooterDataLike) => HudFooterComponent) | undefined): void;
   notify(message: string, type?: string): void;
 }
 
@@ -40,12 +47,18 @@ export interface PiContext {
   thinkingLevel?: string;
   ui: PiUi;
   isIdle(): boolean;
+  /** Present on Pi 0.85.1 event contexts; the HUD only reads the name at lifecycle boundaries. */
+  sessionManager?: { getSessionName?(): string | undefined };
+  /** Some hosts expose the name directly; also read only at lifecycle boundaries. */
+  getSessionName?(): string | undefined;
 }
 
 export interface PiEventPayload extends ToolEventLike {
   message?: MessageLike;
   model?: ModelLike;
   level?: string;
+  /** Payload of `session_info_changed`. */
+  name?: string;
 }
 
 export interface ExtensionApi {
@@ -81,6 +94,15 @@ export class HudController {
   declare state: HudState | null;
   declare scheduler: Coalescer | null;
   declare view: HudView | null;
+  declare footer: HudFooterView | null;
+  declare footerOwned: boolean;
+  declare footerSuppressed: boolean;
+  declare footerData: FooterDataLike | null;
+  declare footerBranchUnsubscribe: (() => void) | null;
+  declare identity: { cwd: string; provider: string; title: string; branch: string | null; branchDirty: boolean };
+  declare surfaceFallback: string | null;
+  declare footerInstallations: number;
+  declare footerReleases: number;
   declare git: GitProbeLike | null;
   declare unsubscribe: (() => void) | null;
   declare configTimer: TimerHandle | null;
@@ -111,6 +133,15 @@ export class HudController {
     this.state = null;
     this.scheduler = null;
     this.view = null;
+    this.footer = null;
+    this.footerOwned = false;
+    this.footerSuppressed = false;
+    this.footerData = null;
+    this.footerBranchUnsubscribe = null;
+    this.identity = { cwd: "", provider: "", title: "", branch: null, branchDirty: false };
+    this.surfaceFallback = null;
+    this.footerInstallations = 0;
+    this.footerReleases = 0;
     this.git = null;
     this.unsubscribe = null;
     this.configTimer = null;
@@ -146,7 +177,12 @@ export class HudController {
         case "tool_execution_end": changed = this.state!.endTool(event); break;
         case "session_compact": this.state!.compact(); break;
         case "session_tree": this.resetEpoch(); break;
-        case "model_select": this.state!.setModel(event?.model ?? ctx.model); this.state!.thinking = safeText(ctx.thinkingLevel, 16); break;
+        case "session_info_changed": this.identity.title = safeText(event?.name, MAX_TITLE); break;
+        case "model_select":
+          this.state!.setModel(event?.model ?? ctx.model);
+          this.state!.thinking = safeText(ctx.thinkingLevel, 16);
+          this.identity.provider = safeText((event?.model ?? ctx.model)?.provider, MAX_PROVIDER);
+          break;
         case "thinking_level_select": this.state!.thinking = safeText(event?.level ?? ctx.thinkingLevel, 16); break;
         case "ui_prompt_start": this.state!.waiting = true; break;
         case "ui_prompt_end": this.state!.waiting = false; break;
@@ -166,6 +202,16 @@ export class HudController {
     this.state = new HudState(ctx.cwd, ctx.model, this.now());
     this.state.thinking = safeText(ctx.thinkingLevel, 16);
     this.state.phase = ctx.isIdle() ? "idle" : "working";
+    // Identity is captured once per session and refreshed by events, never during render.
+    this.footerSuppressed = false;
+    this.surfaceFallback = null;
+    this.identity = {
+      cwd: displayPath(ctx.cwd, this.env.HOME ?? this.env.USERPROFILE, MAX_CWD),
+      provider: safeText(ctx.model?.provider, MAX_PROVIDER),
+      title: safeText(this.readSessionName(ctx), MAX_TITLE),
+      branch: null,
+      branchDirty: false,
+    };
     this.scheduler = new Coalescer(() => this.flush(), {
       intervalMs: this.config.refreshMs, now: this.monotonic,
       setTimer: this.setTimer, clearTimer: this.clearTimer,
@@ -191,6 +237,18 @@ export class HudController {
     }
   }
 
+  /**
+   * Pi resolves the session name by walking session history, so this runs once at session
+   * start (and on `session_info_changed`), never from render and never per frame.
+   */
+  readSessionName(ctx: PiContext): string | undefined {
+    try {
+      if (typeof ctx.getSessionName === "function") return ctx.getSessionName();
+      if (typeof ctx.sessionManager?.getSessionName === "function") return ctx.sessionManager.getSessionName();
+      return undefined;
+    } catch { this.callbackErrors++; return undefined; }
+  }
+
   request() {
     if (this.enabled && this.ready) this.scheduler?.request();
   }
@@ -214,7 +272,118 @@ export class HudController {
     this.attached = false;
   }
 
-  applyConfig(next: unknown) {
+  /**
+   * Mount exactly one surface. `surface: footer` never mounts the widget, and `placement`
+   * only affects the widget. A host without `setFooter` falls back to the widget and records
+   * the reason for `/hud status`.
+   */
+  attachSurface(claim = false) {
+    if (!this.enabled || !this.ready) return;
+    if (claim) this.footerSuppressed = false;
+    const wantsFooter = this.config.surface === "footer";
+    const supported = typeof this.ctx?.ui.setFooter === "function";
+    this.surfaceFallback = wantsFooter && !supported
+      ? "host ui.setFooter is unavailable; fell back to the widget surface"
+      : null;
+    if (wantsFooter && supported) {
+      this.detachWidget();
+      this.attachFooter();
+      return;
+    }
+    this.releaseFooter();
+    this.attachWidget();
+  }
+
+  attachFooter() {
+    if (!this.enabled || this.footer || this.footerSuppressed) return;
+    const ui = this.ctx?.ui;
+    if (!ui) return;
+    const installed = mountFooterSurface(ui, (tui, theme, footerData) => {
+      const component = new HudFooterView(
+        tui,
+        () => this.ctx?.ui.theme ?? theme,
+        footerData,
+        this.state!.snapshot(),
+        this.config,
+        this.identity,
+        () => { this.callbackErrors++; },
+        (disposed) => { this.onFooterDisposed(disposed); },
+      );
+      this.footer = component;
+      this.footerOwned = true;
+      this.footerInstallations++;
+      this.attachFooterData(footerData);
+      return component;
+    });
+    if (!installed) this.surfaceFallback = "host ui.setFooter is unavailable; fell back to the widget surface";
+  }
+
+  /**
+   * The host's footer slot is a single replacement slot. The branch subscription belongs to
+   * the installed component, so it is created here and dropped with the component.
+   */
+  attachFooterData(footerData: FooterDataLike) {
+    this.detachFooterData();
+    this.footerData = footerData;
+    try {
+      // Cached by the host provider; no extra Git process is started for the branch name.
+      this.identity.branch = typeof footerData.getGitBranch === "function" ? footerData.getGitBranch() : null;
+      this.footerBranchUnsubscribe = typeof footerData.onBranchChange === "function"
+        ? footerData.onBranchChange(() => {
+          try {
+            this.identity.branch = this.footerData?.getGitBranch?.() ?? null;
+            this.request();
+          } catch { this.callbackErrors++; }
+        })
+        : null;
+    } catch { this.callbackErrors++; }
+  }
+
+  detachFooterData() {
+    this.footerData = null;
+    try { this.footerBranchUnsubscribe?.(); } catch { this.callbackErrors++; }
+    this.footerBranchUnsubscribe = null;
+  }
+
+  /**
+   * The host replaced or reset our footer component (another extension took the slot, or the
+   * host rebuilt extension UI). Ownership is gone: never clear the slot later, and never
+   * steal it back on a plain refresh.
+   */
+  onFooterDisposed(component: HudFooterView) {
+    if (this.footer !== component) return;
+    this.footer = null;
+    this.footerOwned = false;
+    this.footerSuppressed = true;
+    this.detachFooterData();
+  }
+
+  /**
+   * Release our own footer: unsubscribe first, then restore the native footer only while we
+   * still own the slot. The component's own `dispose()` runs before the host's follow-up
+   * dispose, so a self-release and a host release can never restore twice or recurse.
+   */
+  releaseFooter() {
+    const component = this.footer;
+    const owned = this.footerOwned;
+    this.footer = null;
+    this.footerOwned = false;
+    this.detachFooterData();
+    if (component) {
+      try { component.dispose(); } catch { this.callbackErrors++; }
+    }
+    if (owned) {
+      if (unmountFooterSurface(this.ctx?.ui)) this.footerReleases++;
+    }
+  }
+
+  /** Dirty marker comes from the existing opt-in probe, never from a new Git query. */
+  syncBranchDirty() {
+    const git = this.state?.git;
+    this.identity.branchDirty = !!(this.config.git.enabled && git?.available && git.dirty);
+  }
+
+  applyConfig(next: unknown, claim = false) {
     const previous = this.config;
     this.config = normalizeConfig(next);
     this.loadToken++; // In-flight file reads cannot overwrite a later user command.
@@ -229,12 +398,13 @@ export class HudController {
       this.wantGit = true;
     }
     if (!this.config.enabled) {
-      this.scheduler?.cancel(); this.clearExpiry(); this.detachWidget();
+      this.scheduler?.cancel(); this.clearExpiry(); this.releaseFooter(); this.detachWidget();
       return;
     }
     if (!previous.enabled) this.resetEpoch();
-    if (previous.placement !== this.config.placement) this.detachWidget();
-    this.attachWidget();
+    // `placement` is a widget-only option: changing it must not disturb an installed footer.
+    if (previous.placement !== this.config.placement && this.config.surface === "widget") this.detachWidget();
+    this.attachSurface(claim);
     this.request();
   }
 
@@ -265,6 +435,8 @@ export class HudController {
     this.state!.reset(this.ctx!.cwd, this.ctx!.model, this.now());
     this.state!.thinking = safeText(this.ctx!.thinkingLevel, 16);
     this.state!.phase = this.ctx!.isIdle() ? "idle" : "working";
+    // A disabled HUD ignores model_select, so re-read the cheap identity fields here.
+    this.identity.provider = safeText(this.ctx!.model?.provider, MAX_PROVIDER);
     this.wantGit = true;
   }
 
@@ -274,8 +446,11 @@ export class HudController {
     try {
       this.flushes++;
       this.state!.prune(this.now());
-      this.attachWidget();
-      this.view?.publish(this.state!.snapshot(), this.config);
+      this.attachSurface();
+      this.syncBranchDirty();
+      const snapshot = this.state!.snapshot();
+      this.view?.publish(snapshot, this.config);
+      this.footer?.publish(snapshot, this.config, this.identity);
       this.scheduleExpiry();
       if (this.wantGit && this.git && this.state!.phase === "idle" && !this.state!.waiting && this.ctx!.isIdle()) {
         this.wantGit = false;
@@ -314,10 +489,24 @@ export class HudController {
     try { this.ctx?.ui.notify(message, type); } catch { this.callbackErrors++; }
   }
 
+  /**
+   * Which surface is actually live. `suppressed` means the user asked for the footer but a
+   * later footer (another extension) owns the slot, so the HUD deliberately stays silent.
+   */
+  effectiveSurface(): string {
+    if (this.footer) return "footer";
+    if (this.attached) return "widget";
+    if (this.config.surface === "footer" && this.footerSuppressed) return "suppressed";
+    return "inactive";
+  }
+
   inspect() {
+    const statuses = this.footerData?.getExtensionStatuses?.();
     return {
       version: "0.1.0", targetPi: "0.85.1", enabled: this.enabled,
       mode: this.ctx?.mode ?? "inactive", preset: this.config.preset,
+      surface: this.config.surface, surfaceEffective: this.effectiveSurface(),
+      placement: this.config.placement, surfaceFallback: this.surfaceFallback,
       palette: this.config.palette, color: this.config.color, ascii: this.config.ascii,
       configurationPath: this.configurationPath, configurationError: this.configurationError,
       refreshMs: this.config.refreshMs, gitEnabled: this.config.git.enabled,
@@ -325,9 +514,33 @@ export class HudController {
       countersSince: this.state?.since ?? null,
       flushes: this.flushes, maxFlushMs: this.maxFlushMs,
       renderRequests: this.view?.paintRequests ?? 0,
+      footerRenderRequests: this.footer?.paintRequests ?? 0,
       callbackErrors: this.callbackErrors,
       droppedActivity: this.state?.dropped ?? 0,
       boundedState: { tools: this.state?.tools.size ?? 0, agents: this.state?.agents.size ?? 0, tasks: this.state?.tasks.size ?? 0 },
+      footerOwnership: {
+        installed: this.footer !== null, owned: this.footerOwned, suppressed: this.footerSuppressed,
+        installations: this.footerInstallations, nativeRestores: this.footerReleases,
+        statusChecks: this.footer?.statusChecks ?? 0, statusChanges: this.footer?.statusChanges ?? 0,
+        extensionStatuses: statuses && typeof statuses.size === "number" ? statuses.size : 0,
+      },
+      identity: {
+        cwd: this.identity.cwd, provider: this.identity.provider, model: this.state?.model ?? "",
+        thinking: this.state?.thinking ?? "", title: this.identity.title, branch: this.identity.branch,
+      },
+      observedUsage: {
+        scope: "since attach/reset", input: this.state?.input ?? 0, output: this.state?.output ?? 0,
+        cacheRead: this.state?.cacheRead ?? 0, cacheWrite: this.state?.cacheWrite ?? 0,
+        cacheHitRate: this.state?.cacheHit ?? null, cost: this.state?.cost ?? 0,
+      },
+      coverage: {
+        counters: "observed since attach/reset; NOT a full-session ledger (the native footer aggregates every session entry)",
+        context: "last observed assistant snapshot, labelled ctx(last); not the host's live context estimate",
+        cacheHit: "most recent valid assistant: cacheRead / (input + cacheRead + cacheWrite); ? when unknown",
+        title: "read at session start and on session_info_changed; never in render",
+        branch: "footerData.getGitBranch() at install and on onBranchChange; no extra Git process",
+        extensionStatuses: "footerData.getExtensionStatuses(); shown only by the footer surface, bounded to 8 entries / 64 chars / 2 rows",
+      },
     };
   }
 
@@ -343,8 +556,14 @@ export class HudController {
       if (command === "reset") { this.resetEpoch(); this.request(); this.notify("pi-hud observation counters reset"); return; }
       if (command === "refresh") { this.wantGit = true; this.request(); return; }
       let next: HudConfig | undefined;
+      let claim = false;
       if (["on", "off", "toggle"].includes(command)) {
         next = { ...this.config, enabled: command === "toggle" ? !this.config.enabled : command === "on" };
+        claim = next.enabled;
+      } else if (command === "surface" && ["widget", "footer"].includes(value as string)) {
+        next = { ...this.config, surface: value as HudConfig["surface"] };
+        // An explicit surface request is the documented way to re-claim a replaced slot.
+        claim = true;
       } else if (command === "preset" && ["minimal", "balanced", "full"].includes(value as string)) {
         next = { ...this.config, preset: value as HudConfig["preset"] };
       } else if (command === "lang" && ["en", "zh-CN"].includes(value as string)) {
@@ -357,13 +576,20 @@ export class HudController {
         next = { ...this.config, placement: value as HudConfig["placement"] };
       }
       if (!next) {
-        this.notify("/hud on|off|toggle · preset minimal|balanced|full · palette pastel|theme|mono · lang en|zh-CN · git on|off · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
+        this.notify("/hud on|off|toggle · surface widget|footer · preset minimal|balanced|full · palette pastel|theme|mono · lang en|zh-CN · git on|off · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
         return;
       }
       // A pending startup load must not overwrite an explicit command.
       if (this.configTimer !== null) this.clearTimer(this.configTimer);
       this.configTimer = null;
-      this.applyConfig(next);
+      if (next.enabled && command !== "off") this.identity.title = safeText(this.readSessionName(ctx), MAX_TITLE);
+      this.applyConfig(next, claim);
+      if (command === "surface") {
+        this.notify(this.surfaceFallback
+          ? `pi-hud surface ${value}: ${this.surfaceFallback}`
+          : `pi-hud surface ${value} (${this.effectiveSurface()}, in-memory)`);
+        return;
+      }
       this.notify(`pi-hud ${command}${value ? ` ${value}` : ""} (in-memory)`);
     } catch { this.callbackErrors++; this.notify("pi-hud command failed; the agent was not changed", "warning"); }
   }
@@ -381,7 +607,11 @@ export class HudController {
     this.git = null;
     try { this.unsubscribe?.(); } catch { this.callbackErrors++; }
     this.unsubscribe = null;
+    // Release our own surfaces in order: footer ownership first, then the widget.
+    this.releaseFooter();
     this.detachWidget();
+    this.footerSuppressed = false;
+    this.surfaceFallback = null;
     this.ctx = null;
     this.state = null;
   }

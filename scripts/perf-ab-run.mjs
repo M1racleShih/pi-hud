@@ -26,6 +26,14 @@ assert.ok(existsSync(probe), `Missing probe ${probe}`);
 copyFileSync(probe, join(beforeDirectory, "scripts/perf-ab.mjs"));
 mkdirSync(join(beforeDirectory, ".tmp"), { recursive: true });
 
+const treeState = (directory) => {
+  const git = (args) => spawnSync("git", args, { cwd: directory, encoding: "utf8" }).stdout.trim();
+  const dirty = git(["status", "--porcelain"]).split("\n").filter(Boolean);
+  return { directory, commit: git(["rev-parse", "HEAD"]), dirtyPathsAtStart: dirty.length };
+};
+const beforeState = treeState(beforeDirectory);
+const afterState = treeState(afterDirectory);
+
 const run = (directory, label) => {
   const result = spawnSync(process.execPath, ["scripts/perf-ab.mjs", `--label=${label}`], { cwd: directory, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
   assert.equal(result.status, 0, `${label} probe failed: ${result.stderr || result.stdout}`);
@@ -89,8 +97,9 @@ for (const [path, read] of metricPaths) {
 const record = {
   generatedAt: new Date().toISOString(),
   methodology: "Interleaved same-machine synthetic microbenchmarks across pairs of before/after runs, alternating order inside each pair. The pre-change worktree ignores the phase-2 snapshot fields; both sides use identical fixtures, sample counts and the copied probe file. Gates are unchanged (hook p99 <= 250 us, uncached render p99 <= 5 ms, cached mean <= 5 us). NOT a live Pi/provider/terminal A/B.",
-  before: { directory: beforeDirectory, commit: spawnSync("git", ["rev-parse", "HEAD"], { cwd: beforeDirectory, encoding: "utf8" }).stdout.trim() },
-  after: { directory: afterDirectory, commit: spawnSync("git", ["rev-parse", "HEAD"], { cwd: afterDirectory, encoding: "utf8" }).stdout.trim(), workingTree: true },
+  before: beforeState,
+  after: afterState,
+  treeStateNote: "dirtyPathsAtStart is measured before any probe runs. The before tree's one dirty path is the copied probe file, which is byte-identical in both trees; the after tree must be clean at measurement start. The runner writes only its JSON record afterwards.",
   pairs, runsPerSide: runs.length / 2,
   newScenariosWithoutBaseline: unavailable,
   environment: runs[0].report.environment,

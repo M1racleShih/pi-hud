@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { HudState, LIMITS } from "../src/state.mjs";
+import { HudState, LIMITS } from "../src/state.ts";
 import { assistant, MODEL } from "./helpers.mjs";
 
 function state() { return new HudState("/tmp/example", MODEL, 100); }

@@ -36,7 +36,10 @@ def main() -> None:
         agent.mkdir()
         (agent / "pi-hud.json").write_text(json.dumps({"color": False, "preset": "balanced"}))
         env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home), "TERM": "xterm-256color",
-               "LANG": "C.UTF-8", "PI_CODING_AGENT_DIR": str(agent), "PI_HUD_CONFIG": str(agent / "pi-hud.json")}
+               "LANG": "C.UTF-8", "PI_CODING_AGENT_DIR": str(agent), "PI_HUD_CONFIG": str(agent / "pi-hud.json"),
+               # Without fd on PATH Pi would download it from github.com before the
+               # session starts; skip that so the smoke stays offline and deterministic.
+               "PI_OFFLINE": "1"}
         pid, fd = pty.fork()
         if pid == 0:
             os.chdir(home)

@@ -1,11 +1,36 @@
+/** Hosts and tests inject different timer implementations; handles only need optional unref. */
+export interface TimerHandle {
+  unref?(): void;
+}
+export type SetTimer = (callback: () => void, delay: number) => TimerHandle;
+export type ClearTimer = (timer: TimerHandle | null) => void;
+
+export interface CoalescerOptions {
+  intervalMs?: number;
+  now?: () => number;
+  setTimer?: SetTimer;
+  clearTimer?: ClearTimer;
+}
+
 /** A trailing coalescer with a minimum publication interval, not a debounce that can starve. */
 export class Coalescer {
-  constructor(callback, options = {}) {
+  declare callback: () => void;
+  declare intervalMs: number;
+  declare now: () => number;
+  declare setTimer: SetTimer;
+  declare clearTimer: ClearTimer;
+  declare last: number;
+  declare timer: TimerHandle | null;
+  declare closed: boolean;
+  declare requests: number;
+  declare ticks: number;
+
+  constructor(callback: () => void, options: CoalescerOptions = {}) {
     this.callback = callback;
     this.intervalMs = options.intervalMs ?? 250;
     this.now = options.now ?? (() => performance.now());
     this.setTimer = options.setTimer ?? setTimeout;
-    this.clearTimer = options.clearTimer ?? clearTimeout;
+    this.clearTimer = options.clearTimer ?? (clearTimeout as unknown as ClearTimer);
     this.last = -Infinity;
     this.timer = null;
     this.closed = false;
@@ -28,7 +53,7 @@ export class Coalescer {
     this.timer?.unref?.();
   }
 
-  setIntervalMs(value) {
+  setIntervalMs(value: number) {
     const pending = this.timer !== null;
     this.cancel();
     this.intervalMs = value;

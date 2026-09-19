@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GitProbe, GIT_ARGS, parseGitStatus } from "../src/git.mjs";
+import { GitProbe, GIT_ARGS, parseGitStatus } from "../src/git.ts";
 import { controllerFixture } from "./helpers.mjs";
 
 const config = { enabled: true, ttlMs: 10_000, timeoutMs: 500 };

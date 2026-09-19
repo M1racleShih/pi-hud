@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import registerHud, { OBSERVED_EVENTS, BRIDGE_EVENT } from "../src/extension.mjs";
-import { Coalescer } from "../src/scheduler.mjs";
-import { DEFAULT_CONFIG } from "../src/config.mjs";
+import registerHud, { OBSERVED_EVENTS, BRIDGE_EVENT } from "../src/extension.ts";
+import { Coalescer } from "../src/scheduler.ts";
+import { DEFAULT_CONFIG } from "../src/config.ts";
 import { FakeClock, fakeHost, controllerFixture, assistant } from "./helpers.mjs";
 
 test("factory registers only approved observational events and one slash command", () => {

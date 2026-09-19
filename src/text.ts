@@ -1,11 +1,11 @@
 import { stripVTControlCharacters } from "node:util";
 
-let segmenter;
+let segmenter: Intl.Segmenter | undefined;
 const mark = /^\p{Mark}$/u;
 const emoji = /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20e3]/u;
 
 /** Cap BEFORE parsing controls; never retain tool output or unbounded strings. */
-export function safeText(value, limit = 100) {
+export function safeText(value: unknown, limit = 100): string {
   if (typeof value !== "string") return "";
   const cap = Math.max(0, Math.min(512, limit));
   const text = stripVTControlCharacters(value.slice(0, Math.min(1_024, cap * 4 + 64)))
@@ -18,14 +18,14 @@ export function safeText(value, limit = 100) {
   return result;
 }
 
-export function baseName(value, limit = 48) {
+export function baseName(value: unknown, limit = 48): string {
   // Keep the TAIL, so a long path still shows its basename; the retained input is bounded.
   const raw = typeof value === "string" ? value.slice(-512) : "";
   const parts = raw.replace(/\\/g, "/").replace(/\/+$/, "").split("/");
   return safeText(parts.at(-1), limit) || "/";
 }
 
-function wide(code) {
+function wide(code: number): boolean {
   return code >= 0x1100 && (
     code <= 0x115f || code === 0x2329 || code === 0x232a ||
     (code >= 0x2e80 && code <= 0xa4cf && code !== 0x303f) ||
@@ -36,17 +36,17 @@ function wide(code) {
   );
 }
 
-function graphemes(text) {
+function graphemes(text: string): Intl.Segments {
   segmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
   return segmenter.segment(text);
 }
 
-function cells(grapheme) {
+function cells(grapheme: string): number {
   if (emoji.test(grapheme)) return 2;
   let count = 0;
   for (const char of grapheme) {
     if (mark.test(char) || char === "\u200d" || char === "\ufe0f" || char === "\ufe0e") continue;
-    const point = char.codePointAt(0);
+    const point = char.codePointAt(0) ?? 0;
     if (point < 32 || (point >= 0x7f && point < 0xa0)) continue;
     count += wide(point) ? 2 : 1;
   }
@@ -54,7 +54,7 @@ function cells(grapheme) {
 }
 
 /** Common terminal-cell convention: CJK/emoji wide, ambiguous characters narrow. */
-export function visibleWidth(text) {
+export function visibleWidth(text: string): number {
   const plain = stripVTControlCharacters(text);
   if (/^[\x20-\x7e]*$/.test(plain)) return plain.length;
   let count = 0;
@@ -62,7 +62,7 @@ export function visibleWidth(text) {
   return count;
 }
 
-export function clip(text, width, ascii = false) {
+export function clip(text: string, width: number, ascii = false): string {
   width = Math.max(0, Math.floor(Number.isFinite(width) ? width : 0));
   if (!width) return "";
   if (visibleWidth(text) <= width) return text;
@@ -79,9 +79,9 @@ export function clip(text, width, ascii = false) {
   return out + suffix;
 }
 
-export function compactNumber(number) {
-  if (!Number.isFinite(number) || number < 0) return "?";
-  if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(1)}m`;
-  if (number >= 1_000) return `${(number / 1_000).toFixed(number < 10_000 ? 1 : 0)}k`;
-  return String(Math.round(number));
+export function compactNumber(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "?";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}m`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(value < 10_000 ? 1 : 0)}k`;
+  return String(Math.round(value));
 }

@@ -1,29 +1,110 @@
-import { DEFAULT_CONFIG, configPath, isDisabled, normalizeConfig, readConfigFile } from "./config.mjs";
-import { Coalescer } from "./scheduler.mjs";
-import { HudState } from "./state.mjs";
-import { HudView } from "./render.mjs";
-import { GitProbe } from "./git.mjs";
-import { safeText } from "./text.mjs";
+import { DEFAULT_CONFIG, configPath, isDisabled, normalizeConfig, readConfigFile } from "./config.ts";
+import type { GitConfig, HudConfig, LoadedConfig } from "./config.ts";
+import { Coalescer } from "./scheduler.ts";
+import type { ClearTimer, SetTimer, TimerHandle } from "./scheduler.ts";
+import { HudState } from "./state.ts";
+import type { MessageLike, ModelLike, ToolEventLike } from "./state.ts";
+import { HudView } from "./render.ts";
+import type { HudTheme, WidgetTui } from "./render.ts";
+import { GitProbe } from "./git.ts";
+import type { GitProbeLike, GitStatus } from "./git.ts";
+import { safeText } from "./text.ts";
 
 export const WIDGET_KEY = "pi-hud";
 export const BRIDGE_EVENT = "pi-hud:update";
-export const OBSERVED_EVENTS = Object.freeze([
+export const OBSERVED_EVENTS: readonly string[] = Object.freeze([
   "session_start", "session_shutdown", "agent_start", "agent_end", "agent_settled",
   "message_end", "tool_execution_start", "tool_execution_end", "session_compact",
   "session_tree", "model_select", "thinking_level_select", "ui_prompt_start", "ui_prompt_end",
 ]);
-const sameGit = (a, b) => a.enabled === b.enabled && a.ttlMs === b.ttlMs && a.timeoutMs === b.timeoutMs;
+const sameGit = (a: GitConfig, b: GitConfig) => a.enabled === b.enabled && a.ttlMs === b.ttlMs && a.timeoutMs === b.timeoutMs;
+
+/** Structural host surface used by the HUD; payloads are still validated at runtime. */
+export interface HudWidget {
+  render(width: number): string[];
+  invalidate?(): void;
+  dispose?(): void;
+}
+
+export interface PiUi {
+  theme?: HudTheme;
+  setWidget(key: string, factory?: ((tui: WidgetTui, theme: HudTheme) => HudWidget) | undefined, options?: { placement: string }): void;
+  notify(message: string, type?: string): void;
+}
+
+export interface PiContext {
+  mode: string;
+  hasUI: boolean;
+  cwd: string;
+  model?: ModelLike;
+  thinkingLevel?: string;
+  ui: PiUi;
+  isIdle(): boolean;
+}
+
+export interface PiEventPayload extends ToolEventLike {
+  message?: MessageLike;
+  model?: ModelLike;
+  level?: string;
+}
+
+export interface ExtensionApi {
+  on(name: string, handler: (event: PiEventPayload, ctx: PiContext) => void): void;
+  registerCommand(name: string, command: { description: string; handler: (args: string, ctx: PiContext) => unknown }): void;
+  events?: { on(name: string, handler: (payload: unknown) => void): () => void };
+}
+
+export interface HudControllerOptions {
+  env?: Record<string, string | undefined>;
+  now?: () => number;
+  monotonic?: () => number;
+  setTimer?: SetTimer;
+  clearTimer?: ClearTimer;
+  configLoader?: (path: string) => Promise<LoadedConfig>;
+  config?: unknown;
+  gitFactory?: (config: GitConfig) => GitProbeLike;
+  loadOnStart?: boolean;
+}
 
 /** Exported for deterministic tests; normal users load the default extension factory. */
 export class HudController {
-  constructor(pi, options = {}) {
+  declare pi: ExtensionApi;
+  declare options: HudControllerOptions;
+  declare env: Record<string, string | undefined>;
+  declare now: () => number;
+  declare monotonic: () => number;
+  declare setTimer: SetTimer;
+  declare clearTimer: ClearTimer;
+  declare configLoader: (path: string) => Promise<LoadedConfig>;
+  declare config: HudConfig;
+  declare ctx: PiContext | null;
+  declare state: HudState | null;
+  declare scheduler: Coalescer | null;
+  declare view: HudView | null;
+  declare git: GitProbeLike | null;
+  declare unsubscribe: (() => void) | null;
+  declare configTimer: TimerHandle | null;
+  declare expiryTimer: TimerHandle | null;
+  declare expiryAt: number;
+  declare epoch: number;
+  declare loadToken: number;
+  declare ready: boolean;
+  declare attached: boolean;
+  declare wantGit: boolean;
+  declare configurationError: string | null;
+  declare configurationPath: string | null;
+  declare callbackErrors: number;
+  declare flushes: number;
+  declare maxFlushMs: number;
+
+  constructor(pi: ExtensionApi, options: HudControllerOptions = {}) {
     this.pi = pi;
     this.options = options;
     this.env = options.env ?? process.env;
     this.now = options.now ?? Date.now;
     this.monotonic = options.monotonic ?? (() => performance.now());
     this.setTimer = options.setTimer ?? setTimeout;
-    this.clearTimer = options.clearTimer ?? clearTimeout;
+    this.clearTimer = options.clearTimer ?? (clearTimeout as unknown as ClearTimer);
     this.configLoader = options.configLoader ?? readConfigFile;
     this.config = normalizeConfig(options.config ?? {});
     this.ctx = null;
@@ -49,7 +130,7 @@ export class HudController {
 
   get enabled() { return !!this.ctx && this.config.enabled; }
 
-  handle(name, event, ctx) {
+  handle(name: string, event: PiEventPayload | undefined, ctx?: PiContext) {
     try {
       if (name === "session_shutdown") { this.stop(); return; }
       if (name === "session_start") { this.start(ctx); return; }
@@ -57,18 +138,18 @@ export class HudController {
       this.ctx = ctx;
       let changed = true;
       switch (name) {
-        case "agent_start": this.state.phase = "working"; this.git?.cancel(); break;
-        case "agent_end": this.state.phase = "settling"; break;
-        case "agent_settled": this.state.settle(); this.wantGit = true; break;
-        case "message_end": changed = this.state.messageEnd(event?.message, this.now()); break;
-        case "tool_execution_start": changed = this.state.startTool(event); break;
-        case "tool_execution_end": changed = this.state.endTool(event); break;
-        case "session_compact": this.state.compact(); break;
+        case "agent_start": this.state!.phase = "working"; this.git?.cancel(); break;
+        case "agent_end": this.state!.phase = "settling"; break;
+        case "agent_settled": this.state!.settle(); this.wantGit = true; break;
+        case "message_end": changed = this.state!.messageEnd(event?.message, this.now()); break;
+        case "tool_execution_start": changed = this.state!.startTool(event); break;
+        case "tool_execution_end": changed = this.state!.endTool(event); break;
+        case "session_compact": this.state!.compact(); break;
         case "session_tree": this.resetEpoch(); break;
-        case "model_select": this.state.setModel(event?.model ?? ctx.model); this.state.thinking = safeText(ctx.thinkingLevel, 16); break;
-        case "thinking_level_select": this.state.thinking = safeText(event?.level ?? ctx.thinkingLevel, 16); break;
-        case "ui_prompt_start": this.state.waiting = true; break;
-        case "ui_prompt_end": this.state.waiting = false; break;
+        case "model_select": this.state!.setModel(event?.model ?? ctx.model); this.state!.thinking = safeText(ctx.thinkingLevel, 16); break;
+        case "thinking_level_select": this.state!.thinking = safeText(event?.level ?? ctx.thinkingLevel, 16); break;
+        case "ui_prompt_start": this.state!.waiting = true; break;
+        case "ui_prompt_end": this.state!.waiting = false; break;
         default: changed = false;
       }
       if (changed) this.request();
@@ -76,7 +157,7 @@ export class HudController {
     // Always undefined. Never replace messages/results or block the core loop.
   }
 
-  start(ctx) {
+  start(ctx?: PiContext) {
     this.stop();
     // hasUI is true in RPC too: terminal UI must check mode explicitly.
     if (ctx?.mode !== "tui" || !ctx.hasUI) return;
@@ -92,7 +173,7 @@ export class HudController {
     if (this.pi.events?.on) {
       this.unsubscribe = this.pi.events.on(BRIDGE_EVENT, (payload) => {
         if (!this.enabled) return;
-        try { if (this.state.bridge(payload, this.now())) this.request(); }
+        try { if (this.state!.bridge(payload, this.now())) this.request(); }
         catch { this.callbackErrors++; }
       });
     }
@@ -116,9 +197,9 @@ export class HudController {
 
   attachWidget() {
     if (!this.enabled || !this.ready || this.attached) return;
-    const ctx = this.ctx;
+    const ctx = this.ctx!;
     ctx.ui.setWidget(WIDGET_KEY, (tui, theme) => {
-      this.view = new HudView(tui, () => this.ctx?.ui.theme ?? theme, this.state.snapshot(), this.config, () => { this.callbackErrors++; });
+      this.view = new HudView(tui, () => this.ctx?.ui.theme ?? theme, this.state!.snapshot(), this.config, () => { this.callbackErrors++; });
       return this.view;
     }, { placement: this.config.placement });
     this.attached = true;
@@ -133,7 +214,7 @@ export class HudController {
     this.attached = false;
   }
 
-  applyConfig(next) {
+  applyConfig(next: unknown) {
     const previous = this.config;
     this.config = normalizeConfig(next);
     this.loadToken++; // In-flight file reads cannot overwrite a later user command.
@@ -141,7 +222,7 @@ export class HudController {
     if (!this.ctx) return;
     this.scheduler?.setIntervalMs(this.config.refreshMs);
     if (!this.config.enabled || !this.config.git.enabled) {
-      this.git?.dispose(); this.git = null; this.state.git = null;
+      this.git?.dispose(); this.git = null; this.state!.git = null;
     } else if (!this.git || !sameGit(previous.git, this.config.git)) {
       this.git?.dispose();
       this.git = this.options.gitFactory ? this.options.gitFactory(this.config.git) : new GitProbe(this.config.git, { now: this.now });
@@ -157,7 +238,7 @@ export class HudController {
     this.request();
   }
 
-  async reloadConfig(notify) {
+  async reloadConfig(notify: boolean) {
     if (!this.ctx) return;
     const token = ++this.loadToken;
     try {
@@ -170,7 +251,7 @@ export class HudController {
       if (notify) this.notify(loaded.found ? "pi-hud configuration reloaded" : "No pi-hud.json found; defaults loaded");
     } catch (error) {
       if (token !== this.loadToken || !this.ctx) return;
-      this.configurationError = safeText(error?.message, 160) || "Could not load configuration";
+      this.configurationError = safeText((error as Error | null)?.message, 160) || "Could not load configuration";
       this.ready = true;
       this.attachWidget(); this.request();
       if (notify) this.notify(`pi-hud: ${this.configurationError}`, "warning");
@@ -181,9 +262,9 @@ export class HudController {
     this.epoch++;
     this.git?.cancel();
     this.clearExpiry();
-    this.state.reset(this.ctx.cwd, this.ctx.model, this.now());
-    this.state.thinking = safeText(this.ctx.thinkingLevel, 16);
-    this.state.phase = this.ctx.isIdle() ? "idle" : "working";
+    this.state!.reset(this.ctx!.cwd, this.ctx!.model, this.now());
+    this.state!.thinking = safeText(this.ctx!.thinkingLevel, 16);
+    this.state!.phase = this.ctx!.isIdle() ? "idle" : "working";
     this.wantGit = true;
   }
 
@@ -192,16 +273,16 @@ export class HudController {
     const started = this.monotonic();
     try {
       this.flushes++;
-      this.state.prune(this.now());
+      this.state!.prune(this.now());
       this.attachWidget();
-      this.view?.publish(this.state.snapshot(), this.config);
+      this.view?.publish(this.state!.snapshot(), this.config);
       this.scheduleExpiry();
-      if (this.wantGit && this.git && this.state.phase === "idle" && !this.state.waiting && this.ctx.isIdle()) {
+      if (this.wantGit && this.git && this.state!.phase === "idle" && !this.state!.waiting && this.ctx!.isIdle()) {
         this.wantGit = false;
         const epoch = this.epoch;
-        this.git.request(this.ctx.cwd, (status) => {
+        this.git.request(this.ctx!.cwd, (status: GitStatus) => {
           if (epoch !== this.epoch || !this.enabled || !this.config.git.enabled) return;
-          this.state.git = status;
+          this.state!.git = status;
           this.request();
         });
       }
@@ -216,7 +297,7 @@ export class HudController {
   }
 
   scheduleExpiry() {
-    const next = this.state.nextExpiry();
+    const next = this.state!.nextExpiry();
     if (next === this.expiryAt) return;
     this.clearExpiry();
     if (!Number.isFinite(next)) return;
@@ -229,7 +310,7 @@ export class HudController {
     this.expiryTimer?.unref?.();
   }
 
-  notify(message, type = "info") {
+  notify(message: string, type = "info") {
     try { this.ctx?.ui.notify(message, type); } catch { this.callbackErrors++; }
   }
 
@@ -249,7 +330,7 @@ export class HudController {
     };
   }
 
-  async command(args, ctx) {
+  async command(args: unknown, ctx?: PiContext) {
     if (ctx?.mode !== "tui" || !ctx.hasUI) return;
     try {
       if (!this.ctx) this.start(ctx);
@@ -260,17 +341,17 @@ export class HudController {
       if (command === "reload") { await this.reloadConfig(true); return; }
       if (command === "reset") { this.resetEpoch(); this.request(); this.notify("pi-hud observation counters reset"); return; }
       if (command === "refresh") { this.wantGit = true; this.request(); return; }
-      let next;
+      let next: HudConfig | undefined;
       if (["on", "off", "toggle"].includes(command)) {
         next = { ...this.config, enabled: command === "toggle" ? !this.config.enabled : command === "on" };
-      } else if (command === "preset" && ["minimal", "balanced", "full"].includes(value)) {
-        next = { ...this.config, preset: value };
-      } else if (command === "lang" && ["en", "zh-CN"].includes(value)) {
-        next = { ...this.config, language: value };
-      } else if (command === "git" && ["on", "off"].includes(value)) {
+      } else if (command === "preset" && ["minimal", "balanced", "full"].includes(value as string)) {
+        next = { ...this.config, preset: value as HudConfig["preset"] };
+      } else if (command === "lang" && ["en", "zh-CN"].includes(value as string)) {
+        next = { ...this.config, language: value as HudConfig["language"] };
+      } else if (command === "git" && ["on", "off"].includes(value as string)) {
         next = { ...this.config, git: { ...this.config.git, enabled: value === "on" } };
-      } else if (command === "placement" && ["aboveEditor", "belowEditor"].includes(value)) {
-        next = { ...this.config, placement: value };
+      } else if (command === "placement" && ["aboveEditor", "belowEditor"].includes(value as string)) {
+        next = { ...this.config, placement: value as HudConfig["placement"] };
       }
       if (!next) {
         this.notify("/hud on|off|toggle · preset minimal|balanced|full · lang en|zh-CN · git on|off · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
@@ -303,7 +384,7 @@ export class HudController {
   }
 }
 
-export default function piHud(pi) {
+export default function piHud(pi: ExtensionApi): void {
   if (isDisabled(process.env.PI_HUD_DISABLE)) return;
   const controller = new HudController(pi);
   for (const name of OBSERVED_EVENTS) {

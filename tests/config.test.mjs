@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile, rm, mkdir, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { CONFIG_LIMIT, DEFAULT_CONFIG, configPath, isDisabled, normalizeConfig, readConfigFile } from "../src/config.mjs";
+import { CONFIG_LIMIT, DEFAULT_CONFIG, configPath, isDisabled, normalizeConfig, readConfigFile } from "../src/config.ts";
 
 for (const value of [null, [], "x", 3, true]) {
   test(`rejects non-object config ${JSON.stringify(value)}`, () => assert.throws(() => normalizeConfig(value)));

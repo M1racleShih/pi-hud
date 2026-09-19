@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clip, safeText, baseName, visibleWidth } from "../src/text.mjs";
-import { normalizeConfig } from "../src/config.mjs";
-import { HudState } from "../src/state.mjs";
-import { HudView, formatHud } from "../src/render.mjs";
+import { clip, safeText, baseName, visibleWidth } from "../src/text.ts";
+import { normalizeConfig } from "../src/config.ts";
+import { HudState } from "../src/state.ts";
+import { HudView, formatHud } from "../src/render.ts";
 import { MODEL, assistant } from "./helpers.mjs";
 
 const snapshot = () => {

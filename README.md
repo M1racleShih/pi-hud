@@ -12,7 +12,7 @@ Balanced, 120 columns; synthetic data rendered by the actual renderer, not a scr
 
 ```text
 [Example Model] | ctx(last) █████░░░░░ 45% 90k/200k | pi-hud | high
-● edit state.mjs | tools* ✓5 !0 | agents 1 | tasks 3/7 | est* $0.042
+● edit state.ts | tools* ✓5 !0 | agents 1 | tasks 3/7 | est* $0.042
 ```
 
 `minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including when tools start or finish. Segments are removed by priority on narrow terminals; text is grapheme-aware and width-bounded. Colors follow Pi's theme. See [all six previews](docs/preview.txt).

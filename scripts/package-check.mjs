@@ -17,7 +17,7 @@ function run(args, cwd = process.cwd()) {
 try {
   const packed = JSON.parse(run([npm, "pack", "--offline", "--json", "--ignore-scripts", "--pack-destination", work]))[0];
   const names = packed.files.map((file) => file.path);
-  for (const required of ["index.ts", "src/extension.mjs", "src/render.mjs", "src/state.mjs", "README.md", "README.zh-CN.md", "LICENSE"]) assert.ok(names.includes(required), `Missing packed file: ${required}`);
+  for (const required of ["index.ts", "src/extension.ts", "src/render.ts", "src/state.ts", "README.md", "README.zh-CN.md", "LICENSE"]) assert.ok(names.includes(required), `Missing packed file: ${required}`);
   assert.ok(!names.some((name) => name.startsWith("node_modules/") || name.startsWith(".git/")));
   // Minimal regular-file TAR extraction for our own npm artifact, with traversal checks.
   const data = gunzipSync(readFileSync(join(work, packed.filename)));

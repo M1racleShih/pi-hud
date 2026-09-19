@@ -26,13 +26,13 @@ Pi's own stream/keyboard render -> HudView.render(width)
 
 ## Separation of costs
 
-`state.mjs` sanitizes only selected bounded strings and retains scalars/maps. No callback retains an event, output block, prompt, transcript or session manager reference. Finalized assistant usage is accepted once per native `message_end`, not parsed from accumulated history. The native contract is expected to deliver each final assistant event once; arbitrary replay of historical message events is not deduplicated as a transcript ingestion feature.
+`state.ts` sanitizes only selected bounded strings and retains scalars/maps. No callback retains an event, output block, prompt, transcript or session manager reference. Finalized assistant usage is accepted once per native `message_end`, not parsed from accumulated history. The native contract is expected to deliver each final assistant event once; arbitrary replay of historical message events is not deduplicated as a transcript ingestion feature.
 
-`scheduler.mjs` is a trailing coalescer with non-starving throttling. The first dirty publication can be immediate; subsequent scheduled publications are at least `refreshMs` apart. Multiple events share one pending timer. No `setInterval`, animation clock or idle heartbeat exists. Cancellation is idempotent and timers are unreferenced when supported.
+`scheduler.ts` is a trailing coalescer with non-starving throttling. The first dirty publication can be immediate; subsequent scheduled publications are at least `refreshMs` apart. Multiple events share one pending timer. No `setInterval`, animation clock or idle heartbeat exists. Cancellation is idempotent and timers are unreferenced when supported.
 
-`render.mjs` consumes an already-sanitized snapshot, uses fixed row counts, and drops lower-priority segments before overflowing. Cached unchanged frames reuse the same array. Width changes and host theme invalidation legitimately recompute. Publishing an unchanged visual result makes no render request. Host `invalidate()` behavior can cause extra recomputation; the cache is not a claim that a host never invalidates on its own.
+`render.ts` consumes an already-sanitized snapshot, uses fixed row counts, and drops lower-priority segments before overflowing. Cached unchanged frames reuse the same array. Width changes and host theme invalidation legitimately recompute. Publishing an unchanged visual result makes no render request. Host `invalidate()` behavior can cause extra recomputation; the cache is not a claim that a host never invalidates on its own.
 
-`config.mjs` reads one bounded regular file asynchronously after the lifecycle hook has returned, or on an explicit reload command. `git.mjs` is an optional, isolated, asynchronous child-process wrapper. Neither runs during rendering. Async operations still involve completion callbacks on the shared event loop; only the synchronous acquisition/CPU-heavy paths are eliminated.
+`config.ts` reads one bounded regular file asynchronously after the lifecycle hook has returned, or on an explicit reload command. `git.ts` is an optional, isolated, asynchronous child-process wrapper. Neither runs during rendering. Async operations still involve completion callbacks on the shared event loop; only the synchronous acquisition/CPU-heavy paths are eliminated.
 
 ## State bounds
 

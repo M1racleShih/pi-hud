@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { OBSERVED_EVENTS } from "../src/extension.mjs";
+import { OBSERVED_EVENTS } from "../src/extension.ts";
 
 const root = resolve(".tmp/sdk");
 const sdk = join(root, "node_modules/@earendil-works/pi-coding-agent");

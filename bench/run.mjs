@@ -3,9 +3,9 @@ import { performance } from "node:perf_hooks";
 import { cpus, platform, arch } from "node:os";
 import { writeFileSync } from "node:fs";
 import { controllerFixture, assistant, MODEL } from "../tests/helpers.mjs";
-import { HudState } from "../src/state.mjs";
-import { HudView } from "../src/render.mjs";
-import { normalizeConfig } from "../src/config.mjs";
+import { HudState } from "../src/state.ts";
+import { HudView } from "../src/render.ts";
+import { normalizeConfig } from "../src/config.ts";
 
 const GATES = Object.freeze({ hookP99Us: 250, uncachedRenderP99Us: 5_000, cachedRenderMeanUs: 5 });
 function sample(callback, count = 12_000) {

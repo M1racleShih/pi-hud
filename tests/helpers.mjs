@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { HudController } from "../src/extension.mjs";
+import { HudController } from "../src/extension.ts";
 
 export class FakeClock {
   time = 0;

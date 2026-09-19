@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { OBSERVED_EVENTS } from "../src/extension.mjs";
+import { OBSERVED_EVENTS } from "../src/extension.ts";
 
 const manifest = JSON.parse(readFileSync("package.json", "utf8"));
 assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0, "Runtime dependencies are forbidden");
@@ -11,12 +11,12 @@ for (const event of ["message_update", "tool_execution_update", "before_agent_st
   assert.ok(!OBSERVED_EVENTS.includes(event), `Forbidden core-path listener: ${event}`);
 }
 const allowedBuiltins = {
-  "config.mjs": new Set(["node:fs", "node:fs/promises", "node:os", "node:path"]),
-  "git.mjs": new Set(["node:child_process"]),
-  "text.mjs": new Set(["node:util"]),
+  "config.ts": new Set(["node:fs", "node:fs/promises", "node:os", "node:path"]),
+  "git.ts": new Set(["node:child_process"]),
+  "text.ts": new Set(["node:util"]),
 };
 const forbidden = /\b(?:execSync|execFileSync|spawnSync|readFileSync|writeFileSync|setInterval|fetch)\s*\(|\.(?:getBranch|getEntries|getContextUsage|registerTool|sendMessage|sendUserMessage|appendEntry|setFooter|setEditorComponent|onTerminalInput)\s*\(|\bconsole\s*\./;
-for (const file of readdirSync("src").filter((file) => file.endsWith(".mjs"))) {
+for (const file of readdirSync("src").filter((file) => file.endsWith(".ts"))) {
   const source = readFileSync(join("src", file), "utf8");
   assert.ok(!forbidden.test(source), `Forbidden hot-path API or direct output in ${file}`);
   for (const match of source.matchAll(/from\s+["'](node:[^"']+)["']/g)) {

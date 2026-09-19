@@ -1,12 +1,43 @@
-import { clip, compactNumber, visibleWidth } from "./text.mjs";
+import { clip, compactNumber, visibleWidth } from "./text.ts";
+import type { HudConfig, HudLanguage } from "./config.ts";
+import type { HudSnapshot } from "./state.ts";
 
-const LABELS = {
+interface HudWords {
+  context: string;
+  ready: string;
+  working: string;
+  settling: string;
+  waiting: string;
+  tools: string;
+  agents: string;
+  tasks: string;
+  empty: string;
+  compact: string;
+  cost: string;
+  stopped: string;
+}
+
+const LABELS: Record<HudLanguage, HudWords> = {
   en: { context: "ctx(last)", ready: "ready", working: "working", settling: "settling", waiting: "waiting", tools: "tools*", agents: "agents", tasks: "tasks", empty: "no bridged activity", compact: "compactions*", cost: "est*", stopped: "interrupted" },
   "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", settling: "收尾中", waiting: "等待确认", tools: "工具*", agents: "代理", tasks: "任务", empty: "暂无桥接活动", compact: "压缩*", cost: "估算*", stopped: "已中断" },
 };
 
-function pack(parts, width, ascii) {
-  const present = parts.filter((part) => part !== "" && part !== null && part !== undefined);
+export interface HudRow {
+  text: string;
+  tone: string;
+}
+
+/** TUI surface and color theme supplied by the host widget factory. */
+export interface WidgetTui {
+  requestRender(): void;
+}
+
+export interface HudTheme {
+  fg(tone: string, text: string): string;
+}
+
+function pack(parts: (string | null | undefined)[], width: number, ascii: boolean): string {
+  const present = parts.filter((part): part is string => part !== "" && part !== null && part !== undefined);
   if (!present.length) return "";
   let line = clip(present[0], width, ascii);
   for (const part of present.slice(1)) {
@@ -16,34 +47,34 @@ function pack(parts, width, ascii) {
   return clip(line, width, ascii);
 }
 
-function contextText(snapshot, config, width, label) {
+function contextText(snapshot: HudSnapshot, config: HudConfig, width: number, label: string): HudRow {
   const valid = snapshot.contextTokens !== null && snapshot.contextWindow > 0;
   if (!valid) return { text: `${label} ?`, tone: "dim" };
-  const ratio = snapshot.contextTokens / snapshot.contextWindow;
+  const ratio = snapshot.contextTokens! / snapshot.contextWindow;
   const percent = ratio * 100;
   const tone = percent >= 90 ? "error" : percent >= 70 ? "warning" : "accent";
   const percentage = percent > 999 ? ">999%" : `${Math.round(percent)}%`;
   const size = width >= 100 ? 10 : width >= 70 ? 6 : 0;
   const fill = Math.max(0, Math.min(size, Math.round(ratio * size)));
   const bar = size ? `${(config.ascii ? "#" : "█").repeat(fill)}${(config.ascii ? "." : "░").repeat(size - fill)} ` : "";
-  const tokens = width >= 120 ? ` ${compactNumber(snapshot.contextTokens)}/${compactNumber(snapshot.contextWindow)}` : "";
+  const tokens = width >= 120 ? ` ${compactNumber(snapshot.contextTokens!)}/${compactNumber(snapshot.contextWindow)}` : "";
   return { text: `${label} ${bar}${percentage}${tokens}`, tone };
 }
 
 /** Pure, bounded renderer. Input is already sanitized by the state boundary. */
-export function formatHud(snapshot, config, rawWidth) {
+export function formatHud(snapshot: HudSnapshot, config: HudConfig, rawWidth: number): HudRow[] {
   const width = Math.max(0, Math.min(4_096, Math.floor(Number.isFinite(rawWidth) ? rawWidth : 0)));
   const words = LABELS[config.language];
   const context = contextText(snapshot, config, width, words.context);
   const model = `[${clip(snapshot.model, Math.max(4, Math.min(32, Math.floor(width / 3))), config.ascii)}]`;
   const git = snapshot.git ? snapshot.git.available ? `git:${snapshot.git.branch}${snapshot.git.dirty ? "*" : ""}` : "git:?" : "";
   const first = width < 45 ? [context.text, model] : [model, context.text, snapshot.project, git, config.showThinking ? snapshot.thinking : ""];
-  const rows = [{ text: pack(first, width, config.ascii), tone: context.tone }];
+  const rows: HudRow[] = [{ text: pack(first, width, config.ascii), tone: context.tone }];
   if (config.preset === "minimal") return rows;
 
   const running = config.ascii ? ">" : "●";
   const check = config.ascii ? "ok" : "✓";
-  const phase = snapshot.phase === "idle" ? words.ready : snapshot.phase === "tools" ? words.working : words[snapshot.phase] || words.working;
+  const phase = snapshot.phase === "idle" ? words.ready : snapshot.phase === "tools" ? words.working : words[snapshot.phase as keyof HudWords] || words.working;
   const active = snapshot.activeTools.length ? `${running} ${snapshot.activeTools.join(", ")}${snapshot.activeCount > 3 ? ` +${snapshot.activeCount - 3}` : ""}` : phase;
   const agents = snapshot.runningAgents || snapshot.agentErrors ? `${words.agents} ${snapshot.runningAgents}${snapshot.agentErrors ? ` !${snapshot.agentErrors}` : ""}` : "";
   const tasks = snapshot.taskSources ? `${words.tasks} ${snapshot.taskDone}/${snapshot.taskTotal}` : "";
@@ -71,7 +102,19 @@ export function formatHud(snapshot, config, rawWidth) {
 
 /** Pi may render on every stream delta. An unchanged width/state is O(1) here. */
 export class HudView {
-  constructor(tui, theme, snapshot, config, onError = () => {}) {
+  declare tui: WidgetTui;
+  declare theme: HudTheme | (() => HudTheme | undefined) | null | undefined;
+  declare snapshot: HudSnapshot | null;
+  declare config: HudConfig;
+  declare onError: () => void;
+  declare width: number;
+  declare dirty: boolean;
+  declare lines: string[];
+  declare disposed: boolean;
+  declare paintRequests: number;
+  declare computations: number;
+
+  constructor(tui: WidgetTui, theme: HudTheme | (() => HudTheme | undefined) | null | undefined, snapshot: HudSnapshot, config: HudConfig, onError: () => void = () => {}) {
     this.tui = tui;
     this.theme = theme;
     this.snapshot = snapshot;
@@ -85,7 +128,7 @@ export class HudView {
     this.computations = 0;
   }
 
-  render(width) {
+  render(width: number): string[] {
     if (this.disposed) return [];
     width = Math.max(0, Math.min(4_096, Math.floor(Number.isFinite(width) ? width : 0)));
     if (!this.dirty && width === this.width) return this.lines;
@@ -94,7 +137,7 @@ export class HudView {
     this.computations++;
     try {
       const theme = typeof this.theme === "function" ? this.theme() : this.theme;
-      this.lines = formatHud(this.snapshot, this.config, width).map(({ text, tone }) =>
+      this.lines = formatHud(this.snapshot!, this.config, width).map(({ text, tone }) =>
         this.config.color && theme?.fg ? theme.fg(tone, text) : text);
     } catch {
       this.lines = [clip("pi-hud unavailable", width, true)];
@@ -103,7 +146,7 @@ export class HudView {
     return this.lines;
   }
 
-  publish(snapshot, config) {
+  publish(snapshot: HudSnapshot, config: HudConfig) {
     if (this.disposed) return;
     const previous = this.lines;
     this.snapshot = snapshot;

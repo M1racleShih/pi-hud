@@ -127,3 +127,10 @@ test("tool event flood is coalesced into one scheduled UI publication", () => {
   assert.equal(f.controller.flushes, 1); assert.equal(f.controller.state.done, 10_000);
   f.clock.advance(60_000); assert.equal(f.controller.flushes, 1); f.emit("session_shutdown");
 });
+
+test("thinking event takes precedence over a stale context snapshot", () => {
+  const f = controllerFixture();
+  f.emit("thinking_level_select", { level: "minimal" });
+  assert.equal(f.controller.state.thinking, "minimal");
+  f.emit("session_shutdown");
+});

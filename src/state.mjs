@@ -64,8 +64,12 @@ export class HudState {
       this.cost = add(this.cost, usage.cost.total);
       this.costReports++;
     }
+    // A response may finish after model selection changes. Its usage still counts,
+    // but must not be divided by the newly selected model's context window.
+    const responseKey = `${safeText(message.provider, 64)}:${safeText(message.model, 100)}`;
+    const mismatch = message.model && message.provider && responseKey !== this.modelKey;
     // Error/abort usage may be partial; never portray it as a trustworthy context snapshot.
-    if (message.stopReason === "error" || message.stopReason === "aborted" || input + output <= 0) {
+    if (mismatch || message.stopReason === "error" || message.stopReason === "aborted" || input + output <= 0) {
       this.contextTokens = null;
       this.contextAt = null;
     } else {

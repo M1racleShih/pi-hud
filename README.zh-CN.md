@@ -33,6 +33,8 @@ footer 还会显示 widget 没有的身份信息：工作目录（家目录缩�
 
 footer **不是**原生 footer 的逐字节等价替换。本轮不读取会话历史，因此计数口径仍是“本次挂载/重置以来观察到”，上下文仍是明确标注的 `ctx(last)` 快照；不模仿原生 footer 的全会话合计、实时上下文估计、自动压缩/订阅标记和 provider 数量。`/hud status` 会打印这些覆盖差异。
 
+`minimal` 的活动摘要在第二行与上下文、用量共用空间：如果 40 列终端放不下，优先级更高的上下文留到最后，活动字段整体折叠；`balanced`（默认）与 `full` 为活动单列一行，因此 40 列下上下文百分比、当前工具和错误提示都能保留。
+
 所有权规则：HUD 仍拥有槽位时，`/hud off` 恢复原生 footer；如果其他扩展后来覆盖了 HUD footer，HUD 既不会在 `off`/dispose 时清除对方的 footer，也不会在普通刷新时抢回，只有显式的 `/hud surface footer` 才会重新接管。宿主不提供 `ui.setFooter` 时回退到 widget，并在 `/hud status` 中记录原因。
 
 ## 活动信息

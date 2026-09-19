@@ -35,6 +35,8 @@ The footer adds identity data that the widget does not show: the working directo
 
 The footer is **not** a byte-for-byte replacement of the built-in footer. This round does not read session history, so its counters remain "observed since this attachment/reset" and its context value stays the labelled `ctx(last)` snapshot. The host's full-session totals, live context estimate, auto-compaction/subscription flags and provider count are intentionally not imitated. `/hud status` prints the exact data-coverage differences.
 
+In `minimal`, the activity summary shares the second row with the context meter and usage. If a 40-column terminal cannot fit both, the higher-priority context meter wins and the activity fields fold; `balanced` (the default) and `full` give activity its own row, so the context percentage, the current tool and the error alert all survive at 40 columns.
+
 Ownership rules: `/hud off` restores the built-in footer while the HUD still owns the slot; if another extension replaced the HUD footer, the HUD neither clears that footer on `off`/dispose nor takes the slot back during a refresh — only an explicit `/hud surface footer` re-claims it. A host without `ui.setFooter` falls back to the widget and records the reason for `/hud status`.
 
 ## Activity information

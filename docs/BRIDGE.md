@@ -58,4 +58,12 @@ pi -e /absolute/path/to/pi-hud/index.ts -e /absolute/path/to/pi-hud/examples/bri
 
 Run `/hud preset full`, then `/hud-demo`, `/hud-demo done`, or `/hud-demo clear`. These display clearly labelled **synthetic demo records**, do not start agents/tasks, and do not call a model. Do not load a second copy of the HUD when it is already globally installed; in that case add only `bridge-demo.ts`.
 
+The footer surface's bounded status area shows `ctx.ui.setStatus` values from any extension. `examples/status-demo.ts` is a separate, equally explicit demo for that path:
+
+```sh
+pi -e /absolute/path/to/pi-hud/index.ts -e /absolute/path/to/pi-hud/examples/status-demo.ts
+```
+
+Run `/hud surface footer`, then `/hud-status-demo two`: the footer status line must update without any HUD event. The demo registers one status key and makes no model call.
+
 No adapters for specific subagent forks or `/goal` packages are bundled in v0.1.0. Their actual start/progress/finish events must be mapped deliberately to this protocol.

@@ -82,9 +82,10 @@ pi.events.emit("pi-hud:update", { version: 1 });
 pi.registerCommand("hud-contract", { description: "contract only", handler: async (_args, ctx) => { terminalContext(ctx); } });
 `);
 copyFileSync("examples/bridge-demo.ts", join(root, "bridge-demo.ts"));
+copyFileSync("examples/status-demo.ts", join(root, "status-demo.ts"));
 const result = spawnSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"),
   "--noEmit", "--strict", "--skipLibCheck", "--target", "ES2023", "--module", "NodeNext", "--moduleResolution", "NodeNext",
   "--allowImportingTsExtensions",
-  join(root, "contract.ts"), join(root, "bridge-demo.ts")], { stdio: "inherit" });
+  join(root, "contract.ts"), join(root, "bridge-demo.ts"), join(root, "status-demo.ts")], { stdio: "inherit" });
 assert.equal(result.status, 0, "Pinned Pi SDK API-contract check failed");
 console.log("PASS: actual Pi 0.85.1 SDK event/UI/usage/bridge contracts and example types");

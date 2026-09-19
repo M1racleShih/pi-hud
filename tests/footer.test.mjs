@@ -300,6 +300,38 @@ test("footer body and status rows never fabricate a completion ratio from a stat
   assert.doesNotMatch(text, /3\/7/, "no parsed progress is invented");
 });
 
+test("narrow footer rows keep the context percentage, current activity and error alert", () => {
+  const value = state({ active: true });
+  value.contextTokens = 950_000;
+  value.startTool({ toolCallId: "failed", toolName: "bash" });
+  value.endTool({ toolCallId: "failed", toolName: "bash", isError: true });
+  value.startTool({ toolCallId: "live", toolName: "edit", args: { path: "/tmp/live.ts" } });
+  for (const width of [40, 80, 120, 180]) {
+    // The context meter is always the highest priority field.
+    for (const preset of PRESETS) {
+      const text = rows(value.snapshot(), preset, width).join(" | ");
+      assert.match(text, /ctx\(last\)/, `${preset}/${width}: ${text}`);
+      assert.match(text, /95%!/, `${preset}/${width} dropped the context warning: ${text}`);
+    }
+    // balanced (default) and full give activity and errors their own row, so 40 columns
+    // still show both; minimal merges them into the usage row and can only keep the
+    // higher-priority context meter at 40 columns.
+    for (const preset of ["balanced", "full"]) {
+      const text = rows(value.snapshot(), preset, width).join(" | ");
+      assert.match(text, /● edit/, `${preset}/${width} dropped current activity: ${text}`);
+      assert.match(text, /errors 1/, `${preset}/${width} dropped the error alert: ${text}`);
+    }
+    if (width >= 80) {
+      const minimal = rows(value.snapshot(), "minimal", width).join(" | ");
+      assert.match(minimal, /● edit/, `minimal/${width} dropped current activity: ${minimal}`);
+      assert.match(minimal, /errors 1/, `minimal/${width} dropped the error alert: ${minimal}`);
+    } else {
+      const minimal = rows(value.snapshot(), "minimal", width).join(" | ");
+      assert.doesNotMatch(minimal, /● /, "at 40 columns the minimal merged row keeps the higher-priority context meter only");
+    }
+  }
+});
+
 test("footer never reintroduces a recent-completion summary", () => {
   for (const preset of PRESETS) {
     for (const width of WIDTHS) {

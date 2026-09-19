@@ -98,6 +98,8 @@ pi-hud 的路径是：
 
 ## 开发与仓库工作流
 
+计划中的套餐额度与 API 余额功能见 [Provider 额度方案](docs/PROVIDER-LIMITS-PLAN.zh-CN.md)；该文档描述待实现能力，不改变当前版本的数据获取行为。
+
 ```sh
 npm ci --ignore-scripts
 npm run verify

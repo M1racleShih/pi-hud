@@ -1,5 +1,7 @@
 # pi-hud
 
+Planned provider quota and API balance support: [implementation plan (Chinese)](docs/PROVIDER-LIMITS-PLAN.zh-CN.md). This is a proposal, not a feature available in the current release.
+
 English | [简体中文](README.zh-CN.md)
 
 A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, native tool activity, observed token/cost counters, and opt-in agent/task progress without replacing Pi's editor or footer.

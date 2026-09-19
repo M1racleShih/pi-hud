@@ -182,3 +182,7 @@ Pi 0.85.1 的 `ctx.ui.setFooter(factory)` 会替换默认 footer；`setFooter(un
 - [Pi footer 扩展槽的组合性讨论](https://github.com/earendil-works/pi/issues/4262)：辅助说明多个 footer 扩展的覆盖问题；具体 API 以本地固定版本为准。
 
 本方案将改变 ARCHITECTURE.md 中“保留原生 footer、不扫描历史”的既有决策。实施时必须同步修订该文档及 RESEARCH/CONFIGURATION/README，区分严格缓存路径和兼容重建路径，避免对外仍宣称所有模式完全不访问历史。
+
+## 活动展示调整（2026-09-20）
+
+覆盖上文关于当前工具目标与独立 Errors 项的展示要求：widget/footer 活动区仅显示工作中、等待确认、就绪。工具执行与收尾都映射为工作中，不随单个工具切换。移除 errors 汇总项，保留工具分类的失败计数、内部状态及诊断。

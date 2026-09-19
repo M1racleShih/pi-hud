@@ -300,7 +300,7 @@ test("footer body and status rows never fabricate a completion ratio from a stat
   assert.doesNotMatch(text, /3\/7/, "no parsed progress is invented");
 });
 
-test("narrow footer rows keep the context percentage, current activity and error alert", () => {
+test("narrow footer rows keep the context percentage, stable activity without duplicate errors", () => {
   const value = state({ active: true });
   value.contextTokens = 950_000;
   value.startTool({ toolCallId: "failed", toolName: "bash" });
@@ -318,16 +318,16 @@ test("narrow footer rows keep the context percentage, current activity and error
     // higher-priority context meter at 40 columns.
     for (const preset of ["balanced", "full"]) {
       const text = rows(value.snapshot(), preset, width).join(" | ");
-      assert.match(text, /● edit/, `${preset}/${width} dropped current activity: ${text}`);
-      assert.match(text, /errors 1/, `${preset}/${width} dropped the error alert: ${text}`);
+      assert.match(text, /● working/, `${preset}/${width} dropped current activity: ${text}`);
+      assert.doesNotMatch(text, /errors 1/, `${preset}/${width} must not show duplicate errors: ${text}`);
     }
     if (width >= 80) {
       const minimal = rows(value.snapshot(), "minimal", width).join(" | ");
-      assert.match(minimal, /● edit/, `minimal/${width} dropped current activity: ${minimal}`);
-      assert.match(minimal, /errors 1/, `minimal/${width} dropped the error alert: ${minimal}`);
+      assert.match(minimal, /● working/, `minimal/${width} dropped current activity: ${minimal}`);
+      assert.doesNotMatch(minimal, /errors 1/, `minimal/${width} must not show duplicate errors: ${minimal}`);
     } else {
       const minimal = rows(value.snapshot(), "minimal", width).join(" | ");
-      assert.doesNotMatch(minimal, /● /, "at 40 columns the minimal merged row keeps the higher-priority context meter only");
+      assert.match(minimal, /95%!/, "the context warning survives alongside any activity that fits");
     }
   }
 });
@@ -355,4 +355,35 @@ test("the palette styler used by the footer is bounded and pure", () => {
   const text = "goal active";
   assert.equal(strip(styler.style("body", text)), text);
   assert.equal(assistant().role, "assistant");
+});
+
+test("both surfaces keep one working phase across tool churn and settling", () => {
+  for (const language of ["en", "zh-CN"]) {
+    const value = state();
+    const cfg = config({ preset: "balanced", language });
+    const labels = language === "en" ? ["working", "waiting", "ready"] : ["工作中", "等待确认", "就绪"];
+    const expectPhase = (label) => {
+      for (const body of [formatHud(value.snapshot(), cfg, 180), formatFooter(value.snapshot(), cfg, 180, identity())]) {
+        const text = body.map(row => row.text).join(" | ");
+        assert.ok(text.includes(label), text);
+        assert.doesNotMatch(text, /● (bash|edit)|live\.ts|errors \d|错误 \d|settling|收尾中/);
+      }
+    };
+    value.phase = "working";
+    expectPhase(labels[0]);
+    value.startTool({ toolCallId: "a", toolName: "bash" });
+    value.startTool({ toolCallId: "b", toolName: "edit", args: { path: "/tmp/live.ts" } });
+    expectPhase(labels[0]);
+    value.waiting = true;
+    expectPhase(labels[1]);
+    value.waiting = false;
+    value.endTool({ toolCallId: "a", toolName: "bash", isError: true });
+    expectPhase(labels[0]);
+    value.endTool({ toolCallId: "b", toolName: "edit" });
+    value.phase = "settling";
+    expectPhase(labels[0]);
+    value.settle();
+    expectPhase(labels[2]);
+    assert.equal(value.errors, 1);
+  }
 });

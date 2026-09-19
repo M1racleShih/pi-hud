@@ -1,5 +1,7 @@
 # Changelog
 
+Activity display now uses stable working/waiting/ready states on both surfaces. Individual tool names no longer rotate through the activity field; duplicate aggregate errors display removed, category failure counts retained.
+
 ## Unreleased — optional footer surface (phase 3)
 
 **Opt-in, not the default.** `surface: widget | footer` (default `widget`) plus `/hud surface widget|footer` select where the HUD is drawn. `footer` replaces Pi's built-in footer through the official `ctx.ui.setFooter` slot and mounts no widget, removing the duplicate model/context/cost display; `placement` only affects the widget.

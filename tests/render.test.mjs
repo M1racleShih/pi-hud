@@ -207,7 +207,7 @@ test("40 columns keeps the short model, context percentage and activity", () => 
   assert.ok(first.text.includes("ctx(last)"));
   assert.ok(/ctx\(last\) \d+%/.test(first.text));
   assert.match(second.text, /^● /);
-  assert.ok(second.text.includes("read"));
+  assert.ok(second.text.includes("working"));
   assert.ok(!second.text.includes("tools*"), "zero counters must not fabricate a tools field");
   assert.ok(visibleWidth(first.text) <= 40 && visibleWidth(second.text) <= 40);
 });
@@ -266,7 +266,7 @@ test("phase colors: idle marker is success, phases stay accent, waiting is a loc
   state.startTool({ toolCallId: "a", toolName: "edit", args: { path: "/tmp/file.ts" } });
   const active = formatHud(state.snapshot(), normalizeConfig(), 180)[1];
   assert.equal(active.segments[0].role, "phase");
-  assert.match(active.text, /^● edit file\.ts/);
+  assert.match(active.text, /^● working/);
   state.waiting = true;
   assert.equal(formatHud(state.snapshot(), normalizeConfig(), 180)[1].segments[0].role, "warning");
 });
@@ -320,15 +320,15 @@ const activityState = () => {
   return state;
 };
 
-test("tool categories render bounded per-name counts and a separate aggregate error field", () => {
+test("tool categories render bounded per-name counts without a duplicate aggregate error field", () => {
   const state = activityState();
   const rows = formatHud(state.snapshot(), normalizeConfig({ preset: "balanced" }), 180);
   assert.match(rows[1].text, /bash ✓14 !1/);
   assert.match(rows[1].text, /edit ✓3/);
   assert.match(rows[1].text, /write ✓1/);
-  assert.match(rows[1].text, /errors 1/);
-  // Only the failed-category mark and the aggregate count carry the error role.
-  assert.deepEqual(rows[1].segments.filter((segment) => segment.role === "error").map((segment) => segment.text).sort(), [" !1", "1"].sort());
+  assert.doesNotMatch(rows[1].text, /errors /);
+  // Only the failed-category mark carries the error role.
+  assert.deepEqual(rows[1].segments.filter((segment) => segment.role === "error").map((segment) => segment.text).sort(), [" !1"]);
   assert.equal(rows[0].segments.some((segment) => segment.role === "error"), false, "historical failures must not tint the identity row");
   assert.ok(rows[1].segments.filter((segment) => segment.role === "success").length >= 3, "each successful category keeps its own success mark");
 });
@@ -448,14 +448,13 @@ test("phase-2 activity cannot crowd the 40-column context warning out of the ide
     const context = rows[0].segments.find((segment) => segment.text.trim() === "95%!");
     assert.ok(context, `${width}: the context warning must survive: ${rows[0].text}`);
     assert.equal(context.role, "warning");
-    assert.match(rows[1].text, /^● edit 中文文件\.ts/, `${width}: current activity must survive`);
-    assert.ok(rows[1].segments.some((segment) => segment.role === "error"), `${width}: the error alert must survive: ${rows[1].text}`);
+    assert.match(rows[1].text, /^● 工作中/, `${width}: current activity must survive`);
     assert.ok(rows[1].segments.filter((segment) => segment.role === "error" || segment.role === "warning").length <= 3, "historical failures stay local");
     assert.ok(visibleWidth(rows[1].text) <= width);
   }
   // Narrow rows fold the categories and history instead of the alerts.
   const narrow = formatHud(state.snapshot(), config, 40)[1];
-  assert.ok(!narrow.text.includes("tool-0"), narrow.text);
+  assert.doesNotMatch(narrow.text, /错误 \d|errors \d/);
   assert.ok(!narrow.text.includes("最近"), narrow.text);
 });
 
@@ -464,7 +463,7 @@ test("ASCII mode keeps every category mark printable", () => {
   const rows = formatHud(state.snapshot(), normalizeConfig({ preset: "full", ascii: true }), 120);
   for (const row of rows) assert.match(row.text, /^[\x20-\x7e]*$/, row.text);
   assert.match(rows[1].text, /bash ok14 !1/);
-  assert.match(rows[1].text, /errors 1/);
+  assert.doesNotMatch(rows[1].text, /errors /);
 });
 
 test("all palettes style the new activity fields without changing the layout", () => {
@@ -597,7 +596,7 @@ test("a broken theme degrades to plain text instead of replacing the HUD", () =>
 });
 test("renderer failure is isolated from the TUI", () => {
   let errors = 0;
-  const broken = { ...snapshot(), activeTools: null };
+  const broken = { ...snapshot(), toolCategories: null };
   const view = new HudView({ requestRender() {} }, null, broken, normalizeConfig(), () => { errors++; });
   assert.doesNotThrow(() => view.render(4));
   assert.ok(visibleWidth(view.render(4)[0]) <= 4);

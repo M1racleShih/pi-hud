@@ -17,7 +17,7 @@
  * place, so nothing smaller than a value comparison can detect a change.
  */
 import { clip, safeText, visibleWidth } from "./text.ts";
-import { LABELS, activityField, agentsField, assembleRow, bridgeFields, compactionField, contextField, costField, errorsField, field, hudSegment, tasksField, tokensField, toolCategoriesField } from "./render.ts";
+import { LABELS, activityField, agentsField, assembleRow, bridgeFields, compactionField, contextField, costField, field, hudSegment, tasksField, tokensField, toolCategoriesField } from "./render.ts";
 import type { HudField, HudRow, HudSegment, HudWords, WidgetTui } from "./render.ts";
 import { createStyler } from "./palette.ts";
 import type { HudStyler, HudThemeLike } from "./palette.ts";
@@ -160,9 +160,8 @@ function usageRowFields(snapshot: HudSnapshot, config: HudConfig, width: number,
 /** Activity, alerts and bounded tool categories; balanced and full give this its own row. */
 function activityRowFields(snapshot: HudSnapshot, config: HudConfig, width: number, words: HudWords): (HudField | null)[] {
   return [
-    activityField(snapshot, config, width, words),
+    activityField(snapshot, config, words),
     snapshot.interrupted ? field(93, [hudSegment("warning", `${words.stopped} ${snapshot.interrupted}`)]) : null,
-    errorsField(snapshot, words),
     toolCategoriesField(snapshot, config, words),
     snapshot.dropped ? field(45, [hudSegment("warning", "limited*")]) : null,
   ];

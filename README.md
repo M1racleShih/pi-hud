@@ -14,10 +14,10 @@ Balanced, 120 columns; synthetic data rendered by the actual renderer, not a scr
 
 ```text
 [Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
-● edit state.ts · interrupted 1 · errors 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
+● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
 ```
 
-`minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including while tools start, finish, fail or settle. Segments are removed by priority on narrow terminals: the context percentage, the currently running tool and the error alert survive first, then tool categories fold away. The context meter keeps its space, so a long model name is clipped before a high-usage warning can disappear. Text is grapheme-aware and width-bounded — Chinese, emoji and long paths are measured in terminal cells, not code units. See [all generated previews](docs/preview.txt).
+`minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including while tools start, finish, fail or settle. Segments are removed by priority on narrow terminals: the context percentage, the stable phase survive first, then tool categories fold away. The context meter keeps its space, so a long model name is clipped before a high-usage warning can disappear. Text is grapheme-aware and width-bounded — Chinese, emoji and long paths are measured in terminal cells, not code units. See [all generated previews](docs/preview.txt).
 
 ## Surfaces: widget (default) or footer
 
@@ -26,7 +26,7 @@ Balanced, 120 columns; synthetic data rendered by the actual renderer, not a scr
 ```text
 [Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 ctx(last) ██░░░░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042
-● edit state.ts · interrupted 1 · errors 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
+● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 ```
 
 The footer body uses **2 rows for `minimal`, 3 for `balanced` and 4 for `full`**. Statuses published by other extensions (`ctx.ui.setStatus`) are displayed in a separate bounded area: at most 8 entries, 64 sanitized characters each, at most 2 rows, and at most 6 footer rows in total. A status change is detected inside the footer's own render pass — no polling, no HUD event and no host patch is required.
@@ -35,13 +35,13 @@ The footer adds identity data that the widget does not show: the working directo
 
 The footer is **not** a byte-for-byte replacement of the built-in footer. This round does not read session history, so its counters remain "observed since this attachment/reset" and its context value stays the labelled `ctx(last)` snapshot. The host's full-session totals, live context estimate, auto-compaction/subscription flags and provider count are intentionally not imitated. `/hud status` prints the exact data-coverage differences.
 
-In `minimal`, the activity summary shares the second row with the context meter and usage. If a 40-column terminal cannot fit both, the higher-priority context meter wins and the activity fields fold; `balanced` (the default) and `full` give activity its own row, so the context percentage, the current tool and the error alert all survive at 40 columns.
+In `minimal`, the activity summary shares the second row with the context meter and usage. If a 40-column terminal cannot fit both, the higher-priority context meter wins and the activity fields fold; `balanced` (the default) and `full` give activity its own row, so the context percentage, the stable phase all survive at 40 columns.
 
 Ownership rules: `/hud off` restores the built-in footer while the HUD still owns the slot; if another extension replaced the HUD footer, the HUD neither clears that footer on `off`/dispose nor takes the slot back during a refresh — only an explicit `/hud surface footer` re-claims it. A host without `ui.setFooter` falls back to the widget and records the reason for `/hud status`.
 
 ## Activity information
 
-- **Running tools come first.** Up to three `name target` entries are shown for the tools that are actually running. Targets are basenames for file tools only (`read`, `write`, `edit`, `ls`); shell commands, prompts, tool output and other arguments are never read or displayed, and no file is opened to complete a target.
+- **Stable activity states.** The activity field shows working, waiting for confirmation, or ready. Model responses, tool execution and settling all remain working until `agent_settled`; individual tool names and targets do not rotate through this field. Failure counts appear only on tool categories (`!`), without a duplicate errors item.
 - **Tool categories are bounded.** Completed work is counted per tool name, for example `bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1`. Success (`✓`), failure (`!`) and interruption (`~`) are counted separately. Starting a tool is not a completion. At most 16 tool names are retained; every further name shares one `other` record that is stored separately from tool names, so the ledger cannot grow with the number of distinct tools and a real tool literally named `other` keeps its own counters. Only the three most active categories are displayed, with a `+N` marker for the rest.
 - **Agents and tasks require the bridge.** Without valid bridge data there is no empty placeholder: the fixed row retains available usage information (or stays blank). No adapter for a specific subagent, `/goal` or todo plugin is bundled.
 

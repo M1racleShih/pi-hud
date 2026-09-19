@@ -8,7 +8,6 @@ export interface HudWords {
   context: string;
   ready: string;
   working: string;
-  settling: string;
   waiting: string;
   agents: string;
   tasks: string;
@@ -16,13 +15,12 @@ export interface HudWords {
   cost: string;
   usage: string;
   stopped: string;
-  errors: string;
   other: string;
 }
 
 export const LABELS: Record<HudLanguage, HudWords> = {
-  en: { context: "ctx(last)", ready: "ready", working: "working", settling: "settling", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", stopped: "interrupted", errors: "errors", other: "other" },
-  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", settling: "收尾中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", stopped: "已中断", errors: "错误", other: "其他" },
+  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", stopped: "interrupted", other: "other" },
+  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", stopped: "已中断", other: "其他" },
 };
 
 /** Fixed layout bounds: a row can never grow past these counts, whatever the state. */
@@ -217,18 +215,11 @@ export function contextField(snapshot: HudSnapshot, config: HudConfig, width: nu
 }
 
 /** Activity is the phase marker plus its label; only waiting switches this field to warning. */
-export function activityField(snapshot: HudSnapshot, config: HudConfig, width: number, words: HudWords): HudField | null {
+export function activityField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
   const running = config.ascii ? ">" : "●";
   const check = config.ascii ? "ok" : "✓";
-  if (snapshot.activeTools.length) {
-    const names = snapshot.activeTools.join(", ") + (snapshot.activeCount > 3 ? ` +${snapshot.activeCount - 3}` : "");
-    const budget = Math.max(0, Math.min(width, Math.floor(width * 0.6)) - visibleWidth(running) - 1);
-    const role: HudRole = snapshot.phase === "waiting" ? "warning" : "phase";
-    return field(100, [seg(role, `${running} ${clip(names, budget, config.ascii)}`)]);
-  }
   const phase = snapshot.phase === "idle" ? words.ready
-    : snapshot.phase === "tools" ? words.working
-    : words[snapshot.phase as keyof HudWords] || words.working;
+    : snapshot.phase === "waiting" ? words.waiting : words.working;
   if (snapshot.phase === "idle") return field(100, [seg("success", check), seg("phase", ` ${phase}`)]);
   if (snapshot.phase === "waiting") return field(100, [seg("warning", `${running} ${phase}`)]);
   return field(100, [seg("phase", `${running} ${phase}`)]);
@@ -262,12 +253,6 @@ export function toolCategoriesField(snapshot: HudSnapshot, config: HudConfig, wo
   const hidden = ranked.length - shown.length;
   if (hidden > 0) segments.push(seg("label", ` +${hidden}`));
   return field(85, segments);
-}
-
-/** Aggregate failure count; the count itself is the only error-colored segment. */
-export function errorsField(snapshot: HudSnapshot, words: HudWords): HudField | null {
-  if (!snapshot.errors) return null;
-  return field(94, [seg("label", `${words.errors} `), seg("error", String(snapshot.errors))]);
 }
 
 export function agentsField(snapshot: HudSnapshot, words: HudWords): HudField | null {
@@ -344,9 +329,8 @@ export function formatHud(snapshot: HudSnapshot, config: HudConfig, rawWidth: nu
   const agents = agentsField(snapshot, words);
   const tasks = tasksField(snapshot, words);
   rows.push(toRow(layout([
-    activityField(snapshot, config, width, words),
+    activityField(snapshot, config, words),
     snapshot.interrupted ? field(93, [seg("warning", `${words.stopped} ${snapshot.interrupted}`)]) : null,
-    errorsField(snapshot, words),
     toolCategoriesField(snapshot, config, words),
     costField(snapshot, config, words),
     config.preset === "balanced" ? agents : null,

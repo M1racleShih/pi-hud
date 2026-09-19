@@ -44,7 +44,9 @@ def main() -> None:
         pid, fd = pty.fork()
         if pid == 0:
             os.chdir(home)
-            os.execve(node, [node, str(cli), "--no-session", "--no-extensions", "-e", str(root / "index.ts")], env)
+            os.execve(node, [node, str(cli), "--no-session", "--no-extensions",
+                            "-e", str(root / "index.ts"),
+                            "-e", str(root / "examples/bridge-demo.ts")], env)
         alive = True
         seen = bytearray()
 
@@ -72,18 +74,26 @@ def main() -> None:
 
         # A field-colored segment (TRUEcolor or 256-color) immediately before the label.
         colored_context = re.compile(rb"\x1b\[38;(?:2|5);[0-9;]+mctx\(last\)")
+        # The full preset's summary row carries the explicitly synthetic demo label; the
+        # balanced preset shows the same bridge data as a shorter `agents`/`tasks` field.
+        demo_label = b"DEMO: build Pi HUD"
 
         try:
             fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
             mounted = wait_for(b"ctx(last)")
             if not colored_context.search(mounted):
                 raise RuntimeError("HUD mounted without the default pastel field colors")
+            # Bridge data is displayed only when a real producer publishes it.
+            # The notify text is contiguous; styled field segments are not, so the
+            # full-preset demo label below is the contiguous row-3 marker.
+            os.write(fd, b"/hud-demo\r")
+            wait_for(b"no agent or task was actually started")
             os.write(fd, b"/hud preset full\r")
-            wait_for(b"no bridged activity")
+            wait_for(demo_label)
             fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 70, 0, 0))
             os.kill(pid, signal.SIGWINCH)
-            # The full preset's unchanged ASCII activity line also survives narrow redraws.
-            wait_for(b"no bridged activity")
+            # The full preset's bridge summary row also survives narrow redraws.
+            wait_for(demo_label)
             os.write(fd, b"/hud palette mono\r")
             plain = wait_for(b"ctx(last)")
             if colored_context.search(plain):
@@ -96,7 +106,7 @@ def main() -> None:
             wait_for(b"pi-hud off")
             os.write(fd, b"/hud on\r")
             wait_for(b"ctx(last)")
-            print("PASS: real Pi TUI mounts HUD, switches layout/palette, resizes, and toggles off/on without a model call")
+            print("PASS: real Pi TUI mounts HUD, shows bridged activity, switches layout/palette, resizes, and toggles off/on without a model call")
         finally:
             try:
                 os.kill(pid, signal.SIGTERM)

@@ -160,3 +160,55 @@ test("palette changes repaint the widget exactly once and keep fixed rows", asyn
   assert.equal(f.widget().render(80), lines);
   f.emit("session_shutdown");
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2 state isolation: reset, off/on, session replacement and disposal
+// ---------------------------------------------------------------------------
+
+test("reset, off/on and a new session leave no stale category activity", async () => {
+  const f = controllerFixture();
+  f.emit("tool_execution_start", { toolCallId: "a", toolName: "bash" });
+  f.emit("tool_execution_end", { toolCallId: "a", toolName: "bash" });
+  f.emit("tool_execution_start", { toolCallId: "b", toolName: "edit", args: { path: "/tmp/old.ts" } });
+  assert.equal(f.controller.state.toolStats.size, 1);
+
+  await f.controller.command("reset", f.ctx);
+  assert.equal(f.controller.state.toolStats.size, 0);
+  assert.equal(f.controller.state.tools.size, 0);
+  f.emit("agent_settled");
+  assert.equal(f.controller.state.interrupted, 0, "a late settle cannot credit the previous epoch");
+  assert.equal(f.controller.state.toolStats.size, 0);
+
+  f.emit("tool_execution_start", { toolCallId: "c", toolName: "read", args: { path: "/tmp/old.ts" } });
+  f.emit("tool_execution_end", { toolCallId: "c", toolName: "read" });
+  await f.controller.command("off", f.ctx);
+  f.emit("tool_execution_start", { toolCallId: "d", toolName: "write" });
+  assert.equal(f.controller.state.toolStats.size, 1, "a disabled HUD observes nothing new");
+  await f.controller.command("on", f.ctx);
+  assert.equal(f.controller.state.toolStats.size, 0);
+  assert.equal(f.controller.state.tools.size, 0);
+
+  f.emit("session_shutdown");
+  assert.equal(f.controller.state, null);
+  f.emit("session_start");
+  assert.equal(f.controller.state.toolStats.size, 0);
+  f.emit("session_shutdown");
+});
+
+test("a disposed view cannot render activity from a previous observation scope", async () => {
+  const f = controllerFixture();
+  f.clock.advance(0);
+  f.emit("tool_execution_start", { toolCallId: "a", toolName: "bash" });
+  f.emit("tool_execution_end", { toolCallId: "a", toolName: "bash" });
+  f.clock.advance(250);
+  const old = f.widget();
+  assert.match(old.render(120).join("\n"), /bash/);
+  await f.controller.command("off", f.ctx);
+  assert.deepEqual(old.render(120), [], "a disposed view must stop rendering");
+  await f.controller.command("on", f.ctx);
+  f.clock.advance(250);
+  const fresh = f.widget();
+  assert.notEqual(fresh, old);
+  assert.doesNotMatch(fresh.render(120).join("\n"), /bash/);
+  f.emit("session_shutdown");
+});

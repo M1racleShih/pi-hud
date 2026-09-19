@@ -1,7 +1,9 @@
 import { baseName, safeText } from "./text.ts";
 import type { GitStatus } from "./git.ts";
 
-export const LIMITS = Object.freeze({ tools: 64, recentIds: 128, agents: 16, tasks: 8 });
+export const LIMITS = Object.freeze({ tools: 64, recentIds: 128, agents: 16, tasks: 8, toolCategories: 16 });
+/** Display name of the synthetic bucket that merges tool names beyond the retention cap. */
+export const OTHER_CATEGORY = "other";
 const number = (value: unknown): number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.min(value, Number.MAX_SAFE_INTEGER) : 0;
 const add = (a: number, b: number): number => Math.min(Number.MAX_SAFE_INTEGER, a + b);
@@ -49,6 +51,19 @@ interface BridgeItem {
   completed?: number;
 }
 
+/** A lifecycle outcome. Starting a tool is never a completion. */
+export type ToolOutcome = "ok" | "error" | "interrupted";
+
+/** Bounded per-tool-name counters. Success, failure and interruption never share a field. */
+export interface ToolCategory {
+  name: string;
+  ok: number;
+  error: number;
+  interrupted: number;
+  /** True only for the synthetic overflow bucket, never for a real tool name. */
+  merged?: boolean;
+}
+
 export interface HudSnapshot {
   project: string;
   model: string;
@@ -76,6 +91,7 @@ export interface HudSnapshot {
   taskDone: number;
   taskLabel: string;
   taskSources: number;
+  toolCategories: ToolCategory[];
   git: GitStatus | null;
 }
 
@@ -92,6 +108,8 @@ export class HudState {
   declare phase: string;
   declare waiting: boolean;
   declare tools: Map<string, { name: string; target: string }>;
+  declare toolStats: Map<string, ToolCategory>;
+  declare overflowStats: ToolCategory | null;
   declare recentIds: Set<string>;
   declare agents: Map<string, BridgeItem>;
   declare tasks: Map<string, BridgeItem>;
@@ -122,6 +140,8 @@ export class HudState {
     this.phase = "idle";
     this.waiting = false;
     this.tools = new Map();
+    this.toolStats = new Map();
+    this.overflowStats = null;
     this.recentIds = new Set();
     this.agents = new Map();
     this.tasks = new Map();
@@ -196,17 +216,48 @@ export class HudState {
     return true;
   }
 
+  /**
+   * Resolve the retained category for a tool name. The first `LIMITS.toolCategories` names
+   * are kept verbatim; any further name is merged into a separate overflow record, so the
+   * per-name map cannot grow with the number of distinct tools seen. Because the overflow
+   * bucket is not stored under a tool name, a real tool named `other` keeps its own counters.
+   */
+  categoryFor(name: string): ToolCategory {
+    // Retained names are already sanitized, so the common path is one map lookup.
+    const existing = this.toolStats.get(name);
+    if (existing) return existing;
+    const key = safeText(name, 48) || "tool";
+    const sanitized = this.toolStats.get(key);
+    if (sanitized) return sanitized;
+    if (this.toolStats.size >= LIMITS.toolCategories) {
+      this.overflowStats ??= { name: OTHER_CATEGORY, ok: 0, error: 0, interrupted: 0, merged: true };
+      return this.overflowStats;
+    }
+    const category: ToolCategory = { name: key, ok: 0, error: 0, interrupted: 0 };
+    this.toolStats.set(key, category);
+    return category;
+  }
+
+  /** Record one terminal outcome in its category. */
+  countCompletion(name: string, status: ToolOutcome) {
+    const category = this.categoryFor(name);
+    if (status === "error") category.error = add(category.error, 1);
+    else if (status === "interrupted") category.interrupted = add(category.interrupted, 1);
+    else category.ok = add(category.ok, 1);
+  }
+
   endTool(event: ToolEventLike | undefined) {
     const id = event?.toolCallId;
     if (!validId(id)) { this.dropped++; return false; }
     if (this.recentIds.has(id)) return false;
     const tool = this.tools.get(id);
-    this.lastTool = tool ? `${tool.name}${tool.target ? ` ${tool.target}` : ""}` : safeText(event!.toolName, 48);
+    const name = tool?.name || safeText(event!.toolName, 48) || "tool";
+    this.lastTool = `${name}${tool?.target ? ` ${tool.target}` : ""}`;
     this.tools.delete(id);
     if (this.recentIds.size >= LIMITS.recentIds) this.recentIds.delete(this.recentIds.values().next().value as string);
     this.recentIds.add(id);
-    if (event!.isError === true) this.errors = add(this.errors, 1);
-    else this.done = add(this.done, 1);
+    if (event!.isError === true) { this.errors = add(this.errors, 1); this.countCompletion(name, "error"); }
+    else { this.done = add(this.done, 1); this.countCompletion(name, "ok"); }
     return true;
   }
 
@@ -214,6 +265,8 @@ export class HudState {
     this.phase = "idle";
     this.waiting = false;
     this.interrupted = add(this.interrupted, this.tools.size);
+    // Interrupted tools are counted separately per category: never as success or failure.
+    for (const tool of this.tools.values()) this.countCompletion(tool.name, "interrupted");
     this.tools.clear();
   }
 
@@ -274,6 +327,17 @@ export class HudState {
       activeTools.push(`${tool.name}${tool.target ? ` ${tool.target}` : ""}`);
       if (activeTools.length === 3) break;
     }
+    // Snapshot copies stay bounded: at most 16 names plus the synthetic overflow record.
+    const toolCategories: ToolCategory[] = [];
+    for (const category of this.toolStats.values()) {
+      toolCategories.push({ name: category.name, ok: category.ok, error: category.error, interrupted: category.interrupted });
+    }
+    if (this.overflowStats) {
+      toolCategories.push({
+        name: this.overflowStats.name, ok: this.overflowStats.ok,
+        error: this.overflowStats.error, interrupted: this.overflowStats.interrupted, merged: true,
+      });
+    }
     let runningAgents = 0;
     let agentErrors = 0;
     let agentLabel = "";
@@ -299,6 +363,7 @@ export class HudState {
       compactions: this.compactions, lastTool: this.lastTool,
       runningAgents, agentErrors, agentLabel,
       taskTotal, taskDone, taskLabel, taskSources: this.tasks.size,
+      toolCategories,
       git: this.git,
     };
   }

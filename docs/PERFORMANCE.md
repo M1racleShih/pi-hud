@@ -24,9 +24,9 @@ The committed baseline was captured at `2026-09-19T11:20:01.275Z` on `linux/x64`
 | Uncached full three-row render, p99 | 0.891 ms | ≤ 5 ms |
 | Cached render, bulk-loop mean | 0.0119 µs | ≤ 5 µs |
 
-The hook samples use 2,000 warmups and 12,000 observations. Assistant fixtures include provider/model identity and reported cache/cost usage. Full-layout rendering includes Chinese and emoji at 120 columns, with 3,000 uncached samples. The cached measure loops one million times and verifies object-identical cache hits. That tiny optimized bulk-loop average is **not an input-to-paint latency**, does not include terminal rendering, and must not be advertised as the TUI response time. Warm JIT, GC, OS scheduling and timing overhead affect all numbers; a single-host microbenchmark is not a deployment guarantee.
+The hook samples use 2,000 warmups and 12,000 observations. Assistant fixtures include provider/model identity and reported cache/cost usage. Full-layout rendering includes Chinese and emoji at 120 columns, with 3,000 uncached samples. Phase-2 scenarios add a category-saturated full layout (16 retained names plus `other`, three concurrent tools, an interruption) at 120/180 columns and a concurrent-activity balanced layout at 120/40 columns; they run against the same unchanged gates. The cached measure loops one million times and verifies object-identical cache hits. That tiny optimized bulk-loop average is **not an input-to-paint latency**, does not include terminal rendering, and must not be advertised as the TUI response time. Warm JIT, GC, OS scheduling and timing overhead affect all numbers; a single-host microbenchmark is not a deployment guarantee.
 
-The synthetic 100,000-tool-event burst asserts **one pending publication timer and one publication**, bounded recent IDs (128), no retained completed tools, and zero extra publications across 60,000 ms of fake-clock idle time. This is a deterministic scheduling test, not a real minute of CPU/RSS sampling. A one-million-frame cache loop proves reuse for unchanged inputs; host invalidation or resizing necessarily changes that condition.
+The synthetic 100,000-tool-event burst asserts **one pending publication timer and one publication**, bounded recent IDs (128), no retained completed tools, and zero extra publications across 60,000 ms of fake-clock idle time. A separate 50,000-event flood of unique tool names asserts that the retained per-name ledger stays at 16 entries, that the synthetic overflow record stays separate (so a real tool named `other` keeps its own counters). This is a deterministic scheduling/structure test, not a real minute of CPU/RSS sampling. A one-million-frame cache loop proves reuse for unchanged inputs; host invalidation or resizing necessarily changes that condition.
 
 Thresholds in `bench/run.mjs` are regression gates, not perceptual thresholds established by a user study. Results may fluctuate. Investigate a failed runner with repeated controlled trials; do not simply increase the budget to make CI green. Structural tests are at least as important as a noisy timing gate.
 
@@ -51,6 +51,35 @@ Method: `git worktree` of the pre-change commit as the before side, the working 
 The common path improved: field widths are measured once during layout, so segments cost less than the old whole-line packing. Styling itself is not measurable in the mean (34.3 µs layout-only versus 33.8 µs fully styled). The p99 tail is higher and reproduces tightly in this session (after 569–598 µs versus before 410–430 µs) against the unchanged 5 ms gate, leaving roughly eight times of headroom. A separate 200,000-render `--trace-gc` run attributes the tail to garbage collection rather than renderer work: the new renderer produced **fewer** scavenges (1,453 versus 3,196) with a larger mean pause (0.85 ms versus 0.34 ms), for roughly equal total collector time per render (6.1 µs versus 5.5 µs). Forced GC and a larger semi-space did not remove the tail. That 200k-render burst ran at roughly 29,000 renders/s, thousands of times the sustained uncached-render rate of a real session (at most one recompute per 250 ms coalesced publication, with every stream frame taking the cached path). No gate, budget or sample count was relaxed to accommodate this, and the structural burst assertions (one pending timer, one publication, bounded records) still pass.
 
 **These are synthetic microbenchmarks, not a live Pi/provider/terminal A/B.** The real-host streaming, tool-dispatch and keyboard-latency acceptance procedure below is still required before any release claim.
+
+## Phase 2 bounded activity information: same-machine before/after
+
+The per-tool-name category ledger, aggregate error count and recent-completion summary changed `state.ts` and `render.ts`, so the phase was measured against the pre-change commit (`622c949`) on the same host in one session. The gates were **not** changed. The after side also contains a `text.ts` fast path: `visibleWidth`/`clip` now sum code points directly and only fall back to `Intl.Segmenter` when a real grapheme-cluster candidate (mark, ZWJ, variation selector, emoji, regional indicator) is present. The new fields carry the HUD's own `✓`/`~` glyphs, and the segmenter cost on those strings dominated the render. A seeded differential fuzz test asserts the fast path matches the segmenter-based reference; the existing CJK/emoji/cluster width tests are unchanged. Raw per-run data is in [performance-phase2-ab.json](performance-phase2-ab.json).
+
+Method: `git worktree` of the pre-change commit as the before side; the same tree-agnostic probe file (`scripts/perf-ab.mjs`) copied into both worktrees; identical fixtures and sample counts (2,000 warmups + 12,000 hook observations, 3,000 uncached render samples per scenario, a 1,000,000-frame cache loop per run). Eight pairs ran, alternating before-then-after and after-then-before, for 8 runs per side. Render fixtures are plain snapshot objects shared by both trees; the pre-change renderer ignores the phase-2 fields it does not know. `renders.baselineFull120` has no category ledger on either side, so it isolates the shared layout and the text fast path, while `saturatedFull120`/`concurrentBalanced*` exercise the new activity information.
+
+| Measurement | Before (mean of 8) | After (mean of 8) | Delta |
+| --- | ---: | ---: | ---: |
+| Final assistant-message handler, p99 | 1.208 µs | 1.248 µs | +3.3% (+0.04 µs paired, noise) |
+| Tool start + end pair, p99 | 2.287 µs | 2.523 µs | +10.3% (+0.24 µs paired) |
+| Uncached full render, baseline fixture, p50 | 24.08 µs | 5.05 µs | −79.0% |
+| Uncached full render, baseline fixture, mean | 34.63 µs | 6.27 µs | −81.9% |
+| Uncached full render, baseline fixture, p99 | 387.5 µs | 38.3 µs | −90.1% |
+| Uncached full render, category-saturated, p50 | 24.19 µs | 7.36 µs | −69.6% |
+| Uncached full render, category-saturated, mean | 34.29 µs | 9.16 µs | −73.3% |
+| Uncached full render, category-saturated, p95 | 39.61 µs | 12.48 µs | −68.5% |
+| Uncached full render, category-saturated, p99 | 677.2 µs | 68.5 µs | −89.9% |
+| Uncached full render, category-saturated, 180 columns, mean | 29.27 µs | 8.77 µs | −70.0% |
+| Uncached full render, category-saturated, mono, mean | 34.44 µs | 7.55 µs | −78.1% |
+| Uncached balanced render, concurrent activity, mean | 26.72 µs | 6.53 µs | −75.6% |
+| Uncached balanced render, concurrent activity, p99 | 70.9 µs | 23.5 µs | −66.8% |
+| Uncached balanced render, concurrent activity, 40 columns, mean | 17.72 µs | 5.15 µs | −70.9% |
+| Uncached full render, empty idle row, mean | 20.56 µs | 2.83 µs | −86.2% |
+| Cached render, bulk-loop mean | 0.0050 µs | 0.0050 µs | −1.0% (noise) |
+
+Paired per-run deltas (after − before within one pair) make the direction clearer than the means: every render comparison improved in 8/8 pairs (baseline −28.4 ± 0.9 µs, category-saturated −25.1 ± 1.2 µs, concurrent activity −20.2 ± 0.8 µs, empty idle row −17.7 ± 0.6 µs), the tool-pair hook p99 rose in 7/8 pairs by +0.24 ± 0.43 µs, the final-message hook p99 was +0.04 ± 0.28 µs with 2/8 positive (indistinguishable from noise), and the cached loop was −0.0001 ± 0.0003 µs (also noise). The hook increase is the per-completion category lookup and bounded ring update; its paired-mean cost is 0.24 µs, about 1000× below the 250 µs gate. Within the after side, the category-saturated fixture still costs about +2.9 µs mean over the same-tree fixture without a ledger at 120 columns, while the idle row is cheaper because zero-count and empty bridge fields are no longer drawn.
+
+The worst uncached p99 in this phase (68 µs) leaves roughly 73× headroom against the unchanged 5 ms gate, and the strictest render path (one recompute per 250 ms coalesced publication) spends on the order of 0.004% of one core. **These are synthetic microbenchmarks, not a live Pi/provider/terminal A/B.** The real-host streaming, tool-dispatch and keyboard-latency acceptance procedure below is still required before any release claim.
 
 ## Real host checks
 

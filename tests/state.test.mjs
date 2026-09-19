@@ -102,3 +102,125 @@ test("late response from previous model counts usage but not current context", (
   state.messageEnd(assistant({ model: "new-model", provider: MODEL.provider }), 3);
   assert.equal(state.contextTokens, 3_700);
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2: bounded tool categories
+// ---------------------------------------------------------------------------
+
+test("tool categories count only real completions and keep success, failure and interruption apart", () => {
+  const s = state();
+  for (let i = 0; i < 3; i++) s.startTool({ toolCallId: `bash-${i}`, toolName: "bash" });
+  assert.deepEqual(s.snapshot().toolCategories, [], "starting a tool is not a completion");
+  assert.equal(s.endTool({ toolCallId: "bash-0", toolName: "bash" }), true);
+  assert.equal(s.endTool({ toolCallId: "bash-1", toolName: "bash", isError: true }), true);
+  assert.equal(s.endTool({ toolCallId: "bash-0", toolName: "bash" }), false, "a duplicate completion event is ignored");
+  assert.deepEqual(s.snapshot().toolCategories, [{ name: "bash", ok: 1, error: 1, interrupted: 0 }]);
+  assert.equal(s.done, 1); assert.equal(s.errors, 1); assert.equal(s.interrupted, 0);
+  s.settle();
+  assert.deepEqual(s.snapshot().toolCategories, [{ name: "bash", ok: 1, error: 1, interrupted: 1 }]);
+  assert.equal(s.done, 1, "an interrupted tool is never credited as a success");
+  assert.equal(s.errors, 1); assert.equal(s.interrupted, 1);
+});
+
+test("concurrent tool instances share one category and never double count", () => {
+  const s = state();
+  for (const id of ["a", "b", "c"]) s.startTool({ toolCallId: id, toolName: "read", args: { path: "/tmp/dir/file.ts" } });
+  assert.equal(s.snapshot().activeCount, 3);
+  s.endTool({ toolCallId: "a", toolName: "read" });
+  s.endTool({ toolCallId: "b", toolName: "read", isError: true });
+  s.endTool({ toolCallId: "c", toolName: "read" });
+  assert.deepEqual(s.snapshot().toolCategories, [{ name: "read", ok: 2, error: 1, interrupted: 0 }]);
+  assert.equal(s.done, 2); assert.equal(s.errors, 1);
+});
+
+test("unknown, empty and oversized tool names still get a bounded safe category", () => {
+  const s = state();
+  for (const [id, name] of [["u1", "made-up-tool"], ["u2", undefined], ["u3", "x".repeat(100_000)], ["u4", "\u001b[31mweird\u001b[0m name"]]) {
+    s.startTool({ toolCallId: id, toolName: name });
+    s.endTool({ toolCallId: id, toolName: name });
+  }
+  assert.deepEqual(s.snapshot().toolCategories.map((item) => item.name), ["made-up-tool", "tool", "x".repeat(48), "weird name"]);
+});
+
+test("category retention is capped at 16 names plus one merged other bucket", () => {
+  const s = state();
+  for (let i = 0; i < 40; i++) {
+    s.startTool({ toolCallId: `c${i}`, toolName: `tool-${i}` });
+    s.endTool({ toolCallId: `c${i}`, toolName: `tool-${i}` });
+  }
+  const categories = s.snapshot().toolCategories;
+  assert.equal(s.toolStats.size, LIMITS.toolCategories);
+  assert.equal(categories.filter((item) => !item.merged).length, LIMITS.toolCategories);
+  const merged = categories.filter((item) => item.merged);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].name, "other");
+  assert.equal(merged[0].ok, 40 - LIMITS.toolCategories);
+  assert.equal(categories.reduce((total, item) => total + item.ok, 0), 40);
+  // A retained name keeps updating after the cap was reached.
+  s.startTool({ toolCallId: "again", toolName: "tool-0" });
+  s.endTool({ toolCallId: "again", toolName: "tool-0" });
+  assert.equal(s.snapshot().toolCategories.find((item) => item.name === "tool-0").ok, 2);
+  assert.equal(s.toolStats.size, LIMITS.toolCategories, "the per-name ledger never grows past the cap");
+});
+
+test("a real tool named other keeps its own counters and never becomes the overflow bucket", () => {
+  const s = state();
+  for (const id of ["real-1", "real-2"]) {
+    s.startTool({ toolCallId: id, toolName: "other" });
+    s.endTool({ toolCallId: id, toolName: "other" });
+  }
+  for (let i = 0; i < 20; i++) {
+    s.startTool({ toolCallId: `x${i}`, toolName: `tool-${i}` });
+    s.endTool({ toolCallId: `x${i}`, toolName: `tool-${i}` });
+  }
+  const categories = s.snapshot().toolCategories;
+  const real = categories.find((item) => item.name === "other" && !item.merged);
+  const merged = categories.find((item) => item.merged);
+  assert.ok(real, "the real `other` tool keeps a retained category");
+  assert.ok(merged, "unrelated names still get the separate synthetic bucket");
+  assert.equal(real.ok, 2);
+  assert.equal(merged.name, "other");
+  // 21 distinct names total: the real `other` plus tool-0..tool-19. The first 16 are
+  // retained (`other` and tool-0..tool-14), so only tool-15..tool-19 merge.
+  assert.equal(merged.ok, 5);
+  assert.equal(categories.reduce((total, item) => total + item.ok, 0), 22);
+  assert.equal(s.toolStats.size, LIMITS.toolCategories);
+  // Another real `other` completion must not land in the synthetic bucket.
+  s.startTool({ toolCallId: "real-3", toolName: "other" });
+  s.endTool({ toolCallId: "real-3", toolName: "other" });
+  assert.equal(s.snapshot().toolCategories.find((item) => item.name === "other" && !item.merged).ok, 3);
+  assert.equal(s.snapshot().toolCategories.find((item) => item.merged).ok, 5);
+});
+
+test("interrupted categories are bounded by the active-tool cap and never counted as starts", () => {
+  const s = state();
+  for (let i = 0; i < LIMITS.tools + 20; i++) s.startTool({ toolCallId: `t${i}`, toolName: "bash" });
+  s.settle();
+  assert.deepEqual(s.snapshot().toolCategories, [{ name: "bash", ok: 0, error: 0, interrupted: LIMITS.tools }]);
+  assert.equal(s.done, 0); assert.equal(s.errors, 0); assert.equal(s.interrupted, LIMITS.tools);
+});
+
+
+test("file targets are sanitized basenames and non-file tool arguments are never inspected", () => {
+  const s = state();
+  s.startTool({ toolCallId: "a", toolName: "edit", args: { path: "/tmp/fi\u001b[31mle\u001b[0m.ts" } });
+  s.startTool({ toolCallId: "b", toolName: "read", args: { path: `/very/deep/${"d/".repeat(200)}file.ts` } });
+  s.startTool({ toolCallId: "c", toolName: "bash", args: Object.defineProperty({}, "command", { get() { throw new Error("shell commands must never be read"); } }) });
+  assert.deepEqual(s.snapshot().activeTools, ["edit file.ts", "read file.ts", "bash"]);
+  s.startTool({ toolCallId: "long", toolName: "read", args: { path: `/tmp/${"目".repeat(60)}.ts` } });
+  assert.equal(s.tools.get("long").target.length, 36, "a long basename is capped by the existing length limit");
+  s.endTool({ toolCallId: "a", toolName: "edit" });
+});
+
+test("reset and a late settle cannot revive activity from the previous epoch", () => {
+  const s = state();
+  s.startTool({ toolCallId: "a", toolName: "bash" });
+  s.endTool({ toolCallId: "a", toolName: "bash" });
+  s.startTool({ toolCallId: "b", toolName: "edit", args: { path: "/tmp/x.ts" } });
+  assert.equal(s.toolStats.size, 1);
+  s.reset("/tmp/next", MODEL, 900);
+  assert.equal(s.toolStats.size, 0);
+  assert.deepEqual(s.snapshot().toolCategories, []);
+  s.settle();
+  assert.deepEqual(s.snapshot().toolCategories, [], "a late settle must not credit the old epoch");
+});

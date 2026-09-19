@@ -48,7 +48,7 @@ TTL must be an integer from 1,000 to 3,600,000 ms. Defaults are 60,000 ms for ru
 
 Multiple task groups are summed for the displayed fraction. Use disjoint groups to avoid double-counting the same underlying tasks. Clearing one source does not clear another. Session changes and `/hud reset` clear everything. No history is loaded on resume; publishers must emit new snapshots if appropriate.
 
-The bus is **not an authentication boundary**: any trusted extension can impersonate a source. Labels must be safe for a shared terminal. The bridge intentionally provides neither billing aggregation nor a mechanism for executing commands.
+The bus is **not an authentication boundary**: any trusted extension can impersonate a source. Labels must be safe for a shared terminal. The bridge intentionally provides neither billing aggregation nor a mechanism for executing commands. With no valid bridge data the HUD renders no placeholder: the fixed summary row retains available usage information or stays blank, so an idle HUD never claims synthetic agents or tasks.
 
 ## Try the included explicit demo
 

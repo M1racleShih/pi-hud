@@ -41,6 +41,13 @@ function graphemes(text: string): Intl.Segments {
   return segmenter.segment(text);
 }
 
+/**
+ * A code point that can merge with a neighbour into one grapheme cluster, or whose
+ * cluster needs the emoji rule. Anything else is its own grapheme, so the plain
+ * per-code-point sum below is already exact and no segmenter run is needed.
+ */
+const cluster = /[\p{Mark}\u200d\ufe0f\ufe0e\p{Extended_Pictographic}\p{Regional_Indicator}\u20e3]/u;
+
 function cells(grapheme: string): number {
   if (emoji.test(grapheme)) return 2;
   let count = 0;
@@ -53,12 +60,27 @@ function cells(grapheme: string): number {
   return count;
 }
 
-/** Common terminal-cell convention: CJK/emoji wide, ambiguous characters narrow. */
+function graphemeWidth(text: string): number {
+  let count = 0;
+  for (const item of graphemes(text)) count += cells(item.segment);
+  return count;
+}
+
+/**
+ * Common terminal-cell convention: CJK/emoji wide, ambiguous characters narrow.
+ * Pure ASCII and simple mixed text (for example the HUD's own `✓`/`↑`/`░` glyphs)
+ * take the per-code-point path; only real cluster candidates pay for `Intl.Segmenter`.
+ */
 export function visibleWidth(text: string): number {
   const plain = stripVTControlCharacters(text);
   if (/^[\x20-\x7e]*$/.test(plain)) return plain.length;
   let count = 0;
-  for (const item of graphemes(plain)) count += cells(item.segment);
+  for (const char of plain) {
+    if (cluster.test(char)) return graphemeWidth(plain);
+    const point = char.codePointAt(0) ?? 0;
+    if (point < 32 || (point >= 0x7f && point < 0xa0)) continue;
+    count += wide(point) ? 2 : 1;
+  }
   return count;
 }
 
@@ -68,6 +90,8 @@ export function clip(text: string, width: number, ascii = false): string {
   if (visibleWidth(text) <= width) return text;
   const suffix = ascii ? "." : "…";
   const available = width - 1;
+  // ASCII code points are all single-width, so assignment cannot split a cluster.
+  if (/^[\x20-\x7e]*$/.test(text)) return text.slice(0, available) + suffix;
   let out = "";
   let used = 0;
   for (const item of graphemes(text)) {

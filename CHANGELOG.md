@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — bounded activity information (phase 2)
+
+Added a bounded per-tool-name category ledger: success (`✓`), failure (`!`) and interruption (`~`) are counted separately, a tool start is never a completion, duplicate completion events stay deduplicated. At most 16 tool names are retained and every further name is merged into a separate overflow record, so the ledger cannot grow with the number of distinct tools and a real tool literally named `other` keeps its own counters; the renderer shows the three most active categories plus a `+N` fold marker, and the overflow record is the only category that is localized. The activity row now prioritizes the running tool and any safe file target (basename of `read`/`write`/`edit`/`ls` only), then the error alert, then the categories, so narrow terminals fold activity detail instead of the context percentage, the current tool or an error.
+
+Removed the empty `no bridged activity` placeholder: bridge agents/tasks appear only with valid bridge data, and the fixed row otherwise retains available usage information (or stays blank). Zero-compaction and zero-usage fields are no longer drawn. The widget keeps its fixed minimal/balanced/full 1/2/3 rows across tool start, completion, failure, settlement and idle transitions, and pastel/theme/mono, `color: false`, ASCII, English/Chinese labels and theme switching are unchanged. No pi-goal or todo-specific adapter was added.
+
+Also added a width fast path: `visibleWidth`/`clip` now sum code points directly and fall back to `Intl.Segmenter` only for real grapheme-cluster candidates (marks, ZWJ, variation selectors, emoji, regional indicators). A seeded differential fuzz test asserts equivalence with the segmenter-based reference. The new activity fields therefore cost less than the old `tools*` line.
+
+Verification for this phase: 149 tests, `npm run verify`, `npm run package:check`, and an 8-pair same-machine A/B against the pre-change commit (category-saturated uncached render p50 24.2→7.4 µs, mean 34.3→9.2 µs, p99 677→68 µs; concurrent activity mean 26.7→6.5 µs; empty idle row 20.6→2.8 µs; tool-pair hook p99 +0.24 µs; cached mean unchanged within noise; gates unchanged). The pinned Pi 0.85.1 SDK contract check, the real RPC smoke and the real PTY smoke passed; the PTY smoke now loads the bridge demo and verifies the full-preset summary row through a resize. Real-terminal visual acceptance, a live tool-stream A/B and the real rendering of native tool categories remain pending.
+
 ## Unreleased — per-field colors and semantic segments (phase 1)
 
 Replaced the per-row `tone` with a bounded list of semantic segments (`{ role, text }`). Plain text is laid out and truncated to the terminal's visible width first; each surviving segment is colored afterwards, so a color can never change the layout. Row fields are capped at 12 and segments at 32, and lower-priority fields are dropped before overflow.

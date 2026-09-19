@@ -2,7 +2,7 @@ import { clip, compactNumber, visibleWidth } from "./text.ts";
 import { createStyler } from "./palette.ts";
 import type { HudRole, HudStyler, HudThemeLike } from "./palette.ts";
 import type { HudConfig, HudLanguage } from "./config.ts";
-import type { HudSnapshot } from "./state.ts";
+import type { HudSnapshot, ToolCategory, ToolOutcome } from "./state.ts";
 
 interface HudWords {
   context: string;
@@ -10,23 +10,26 @@ interface HudWords {
   working: string;
   settling: string;
   waiting: string;
-  tools: string;
   agents: string;
   tasks: string;
-  empty: string;
   compact: string;
   cost: string;
   stopped: string;
+  errors: string;
+  other: string;
 }
 
 const LABELS: Record<HudLanguage, HudWords> = {
-  en: { context: "ctx(last)", ready: "ready", working: "working", settling: "settling", waiting: "waiting", tools: "tools*", agents: "agents", tasks: "tasks", empty: "no bridged activity", compact: "compactions*", cost: "est*", stopped: "interrupted" },
-  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", settling: "收尾中", waiting: "等待确认", tools: "工具*", agents: "代理", tasks: "任务", empty: "暂无桥接活动", compact: "压缩*", cost: "估算*", stopped: "已中断" },
+  en: { context: "ctx(last)", ready: "ready", working: "working", settling: "settling", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", stopped: "interrupted", errors: "errors", other: "other" },
+  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", settling: "收尾中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", stopped: "已中断", errors: "错误", other: "其他" },
 };
 
 /** Fixed layout bounds: a row can never grow past these counts, whatever the state. */
 export const MAX_ROW_FIELDS = 12;
-export const MAX_ROW_SEGMENTS = 32;
+/** 40 segments cover the widest full row: identity, activity, categories and bridge. */
+export const MAX_ROW_SEGMENTS = 40;
+/** Names shown from the bounded category ledger; the rest fold into `+N` / `other`. */
+export const MAX_TOOL_FIELDS = 3;
 
 /** One already-laid-out piece of a row. Layout happens before this becomes ANSI. */
 export interface HudSegment {
@@ -217,14 +220,40 @@ function activityField(snapshot: HudSnapshot, config: HudConfig, width: number, 
   return field(100, [seg("phase", `${running} ${phase}`)]);
 }
 
-function toolsField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): Field | null {
-  const check = config.ascii ? "ok" : "✓";
-  // Zero successes/failures stay neutral; alerts color only their own count.
-  return field(90, [
-    seg("label", `${words.tools} `),
-    seg(snapshot.done ? "success" : "label", `${check}${snapshot.done}`),
-    seg(snapshot.errors ? "error" : "label", ` !${snapshot.errors}`),
-  ]);
+const outcomeMark: Record<ToolOutcome, string> = { ok: "✓", error: "!", interrupted: "~" };
+
+/**
+ * Bounded tool categories: at most three names by activity, plus a `+N` fold marker.
+ * The state ledger already merges every name beyond its cap into one `other` bucket,
+ * so this field can never iterate an unbounded collection.
+ */
+function toolCategoriesField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): Field | null {
+  // The state ledger mirrors every terminal outcome, so an empty ledger means no completions yet.
+  if (!snapshot.toolCategories.length) return null;
+  const marker = config.ascii ? "ok" : outcomeMark.ok;
+  const ranked = snapshot.toolCategories
+    .slice()
+    .sort((a: ToolCategory, b: ToolCategory) => (b.ok + b.error + b.interrupted) - (a.ok + a.error + a.interrupted));
+  const shown = ranked.slice(0, MAX_TOOL_FIELDS);
+  const segments: HudSegment[] = [];
+  for (const category of shown) {
+    if (segments.length) segments.push(seg("separator", config.ascii ? " | " : " · "));
+    // Only the synthetic overflow record is localized; a real tool named `other` is not.
+    const name = category.merged ? words.other : category.name;
+    segments.push(seg("label", `${name} `));
+    if (category.ok) segments.push(seg("success", `${marker}${category.ok}`));
+    if (category.error) segments.push(seg("error", ` !${category.error}`));
+    if (category.interrupted) segments.push(seg("warning", ` ~${category.interrupted}`));
+  }
+  const hidden = ranked.length - shown.length;
+  if (hidden > 0) segments.push(seg("label", ` +${hidden}`));
+  return field(85, segments);
+}
+
+/** Aggregate failure count; the count itself is the only error-colored segment. */
+function errorsField(snapshot: HudSnapshot, words: HudWords): Field | null {
+  if (!snapshot.errors) return null;
+  return field(94, [seg("label", `${words.errors} `), seg("error", String(snapshot.errors))]);
 }
 
 function agentsField(snapshot: HudSnapshot, words: HudWords): Field | null {
@@ -247,24 +276,35 @@ function costField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): F
   return field(60, [seg("label", `${words.cost} `), seg("body", value)]);
 }
 
-function summaryFields(snapshot: HudSnapshot, config: HudConfig, width: number, words: HudWords, agents: Field | null, tasks: Field | null): (Field | null)[] {
+/** Bridge agents/tasks are emitted only for valid bridge data; no empty placeholder. */
+function bridgeFields(snapshot: HudSnapshot, config: HudConfig, width: number, words: HudWords, agents: Field | null, tasks: Field | null): (Field | null)[] {
   const summary: HudSegment[] = [];
   for (const item of [agents, tasks]) {
     if (!item) continue;
     if (summary.length) summary.push(seg("separator", config.ascii ? " | " : " · "));
     for (const segment of item.segments) summary.push(segment);
   }
+  if (!summary.length) return [];
   const label = snapshot.taskLabel || snapshot.agentLabel;
-  const arrow = { up: config.ascii ? "in" : "↑", down: config.ascii ? "out" : "↓" };
   return [
-    field(70, summary.length ? summary : [seg("label", words.empty)]),
+    field(70, summary),
     label ? field(40, [seg("body", clip(label, Math.max(8, Math.min(40, Math.floor(width / 3))), config.ascii))]) : null,
-    field(35, [seg("label", `${words.compact} `), seg("body", String(snapshot.compactions))]),
-    field(30, [
-      seg("label", arrow.up), seg("body", compactNumber(snapshot.input)),
-      seg("label", ` ${arrow.down}`), seg("body", compactNumber(snapshot.output)),
-    ]),
   ];
+}
+
+/** Zero compactions or zero observed usage stay hidden instead of padding the row. */
+function compactionField(snapshot: HudSnapshot, words: HudWords): Field | null {
+  if (!snapshot.compactions) return null;
+  return field(35, [seg("label", `${words.compact} `), seg("body", String(snapshot.compactions))]);
+}
+
+function tokensField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): Field | null {
+  if (!snapshot.usageReports) return null;
+  const arrow = { up: config.ascii ? "in" : "↑", down: config.ascii ? "out" : "↓" };
+  return field(30, [
+    seg("label", arrow.up), seg("body", compactNumber(snapshot.input)),
+    seg("label", ` ${arrow.down}`), seg("body", compactNumber(snapshot.output)),
+  ]);
 }
 
 /** Pure, bounded renderer. Input is already sanitized by the state boundary. */
@@ -279,15 +319,20 @@ export function formatHud(snapshot: HudSnapshot, config: HudConfig, rawWidth: nu
   const tasks = tasksField(snapshot, words);
   rows.push(toRow(layout([
     activityField(snapshot, config, width, words),
-    snapshot.interrupted ? field(92, [seg("warning", `${words.stopped} ${snapshot.interrupted}`)]) : null,
-    toolsField(snapshot, config, words),
+    snapshot.interrupted ? field(93, [seg("warning", `${words.stopped} ${snapshot.interrupted}`)]) : null,
+    errorsField(snapshot, words),
+    toolCategoriesField(snapshot, config, words),
     costField(snapshot, config, words),
     config.preset === "balanced" ? agents : null,
     config.preset === "balanced" ? tasks : null,
     snapshot.dropped ? field(45, [seg("warning", "limited*")]) : null,
   ], width, separator, config.ascii)));
   if (config.preset === "full") {
-    rows.push(toRow(layout(summaryFields(snapshot, config, width, words, agents, tasks), width, separator, config.ascii)));
+    rows.push(toRow(layout([
+      ...bridgeFields(snapshot, config, width, words, agents, tasks),
+      compactionField(snapshot, words),
+      tokensField(snapshot, config, words),
+    ], width, separator, config.ascii)));
   }
   return rows;
 }

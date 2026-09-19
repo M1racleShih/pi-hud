@@ -4,7 +4,7 @@ Planned provider quota and API balance support: [implementation plan (Chinese)](
 
 English | [简体中文](README.zh-CN.md)
 
-A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, native tool activity, observed token/cost counters, and opt-in agent/task progress without replacing Pi's editor or footer.
+A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, and opt-in agent/task progress without replacing Pi's editor or footer.
 
 **No runtime dependencies. No token-stream listeners. No transcript scans. No prompt injection. No network requests. Git probing is off by default.**
 
@@ -14,10 +14,16 @@ Balanced, 120 columns; synthetic data rendered by the actual renderer, not a scr
 
 ```text
 [Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
-● edit state.ts · tools* ✓4 !1 · est* $0.042 · agents 1 · tasks 3/7
+● edit state.ts · interrupted 1 · errors 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
 ```
 
-`minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including when tools start or finish. Segments are removed by priority on narrow terminals; the context meter keeps its space, so a long model name is clipped before a high-usage warning can disappear. Text is grapheme-aware and width-bounded — Chinese, emoji and long paths are measured in terminal cells, not code units. See [all generated previews](docs/preview.txt).
+`minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including while tools start, finish, fail or settle. Segments are removed by priority on narrow terminals: the context percentage, the currently running tool and the error alert survive first, then tool categories fold away. The context meter keeps its space, so a long model name is clipped before a high-usage warning can disappear. Text is grapheme-aware and width-bounded — Chinese, emoji and long paths are measured in terminal cells, not code units. See [all generated previews](docs/preview.txt).
+
+## Activity information
+
+- **Running tools come first.** Up to three `name target` entries are shown for the tools that are actually running. Targets are basenames for file tools only (`read`, `write`, `edit`, `ls`); shell commands, prompts, tool output and other arguments are never read or displayed, and no file is opened to complete a target.
+- **Tool categories are bounded.** Completed work is counted per tool name, for example `bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1`. Success (`✓`), failure (`!`) and interruption (`~`) are counted separately. Starting a tool is not a completion. At most 16 tool names are retained; every further name shares one `other` record that is stored separately from tool names, so the ledger cannot grow with the number of distinct tools and a real tool literally named `other` keeps its own counters. Only the three most active categories are displayed, with a `+N` marker for the rest.
+- **Agents and tasks require the bridge.** Without valid bridge data there is no empty placeholder: the fixed row retains available usage information (or stays blank). No adapter for a specific subagent, `/goal` or todo plugin is bundled.
 
 ## Install
 
@@ -85,17 +91,17 @@ Styling is semantic and per field, not per row. Plain text is laid out and trunc
 | Separators, empty bar | `separator`, `barEmpty` | `#838ba7`, `#6c7086` | `#9ca0b0`, `#ccd0da` | `dim` |
 | Completion / waiting / failure | `success`, `warning`, `error` | `#a6d189`, `#f9e2af`, `#e78284` | `#40a02b`, `#9a6700`, `#d20f39` | `success`, `warning`, `error` |
 
-`palette: pastel` (default) selects the soft dark-terminal candidates, or their deeper same-family variants when the host theme reports light text. `palette: theme` uses host theme tokens so the HUD follows a user theme. `palette: mono` and `color: false` render plain text; `ascii: true` swaps `·`, `█`, `░`, `✓`, `↑`, `↓` and `…` for ASCII equivalents while keeping translated labels. The full generated role table is in [preview.txt](docs/preview.txt).
+`palette: pastel` (default) selects the soft dark-terminal candidates, or their deeper same-family variants when the host theme reports light text. `palette: theme` uses host theme tokens so the HUD follows a user theme. `palette: mono` and `color: false` render plain text; `ascii: true` swaps `·`, `█`, `░`, `✓`, `●`, `↑`, `↓` and `…` for ASCII equivalents while keeping translated labels and the `~` interruption mark. The full generated role table is in [preview.txt](docs/preview.txt).
 
 ## What the numbers actually mean
 
 **`ctx(last)` is the last completed main-assistant response's usage snapshot**, not a live meter or an exact forecast of the next request. Its numerator is Pi's reported input + cache-read + cache-write + output tokens, divided by the selected model's context window. It does not include subsequent tool results, queued prompts, or a new system prompt. No per-delta approximation is invented. Resume, reset, tree navigation, compaction, a model change, or an error/aborted response can legitimately show `?`. A late response from a previous model never uses the newly selected model's denominator. This HUD is not an automatic-compaction threshold monitor.
 
-**`*` means “observed since this HUD attachment/reset.”** Tool successes/errors, token totals, compaction count, and `est*` cost exclude earlier history. Resuming a long session does not scan it. Tree navigation and re-enabling reset the observation scope; manual compaction invalidates context but retains the observed cumulative counters. Duplicate tool completions are deduplicated within a bounded recent-ID window. Counts can be incomplete when `limited*` appears; unfinished tools are marked interrupted after the run settles, not successful.
+**`*` means “observed since this HUD attachment/reset.”** Tool outcomes, token totals, compaction count, and `est*` cost exclude earlier history. Resuming a long session does not scan it. Tree navigation and re-enabling reset the observation scope; manual compaction invalidates context but retains the observed cumulative counters. The category ledger follows that same observation scope — it is cleared on reset, tree navigation and re-enabling, so old activity never leaks into a new session. Duplicate tool completions are deduplicated within a bounded recent-ID window. `limited*` means a record was dropped because a fixed cap was reached; unfinished tools are counted as interrupted after the run settles, never as success. Counts can be incomplete in that case and the per-category marks make it visible.
 
 **`est*` is a model-pricing estimate**, using Pi's reported `usage.cost.total`, not a bill or subscription allowance. Missing reports display `?`; partly known costs have `+?`. Historical, compaction-model, and unreported child-agent usage are not silently included. No provider credentials or subscription endpoints are read.
 
-**Agents/tasks appear only through an explicit extension bridge.** A native `subagent` tool can appear in tool activity, but that alone does not reveal its internal children. [Bridge protocol and examples](docs/BRIDGE.md) let a subagent or `/goal` extension publish small lifecycle records. There is no universal, preinstalled adapter for every third-party extension.
+**Agents/tasks appear only through an explicit extension bridge.** A native `subagent` tool can appear as a bounded tool category, but that alone does not reveal its internal children. [Bridge protocol and examples](docs/BRIDGE.md) let a subagent or `/goal` extension publish small lifecycle records. There is no universal, preinstalled adapter for every third-party extension.
 
 **Optional Git is a cached, idle-boundary snapshot.** It deliberately ignores untracked files, submodule state, line diffs, and ahead/behind counts. `*` means tracked changes; `git:?` means unavailable, not clean. Leave it off for the strictest low-contention configuration and use Pi's existing footer branch display.
 
@@ -109,7 +115,7 @@ native lifecycle/tool/final-message events
                                    -> requestRender only when lines change
 ```
 
-There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getEntries()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. A row is a fixed-length list of semantic segments; the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
+There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getEntries()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. A row is a bounded list of semantic segments (at most 12 fields and 40 segments); the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
 
 A startup file read is deferred and asynchronous. A bridge record may schedule one bounded expiration timer. The optional Git subprocess has a timeout, output cap, single-flight gate, cooldown, cancellation, and stale-result protection; “asynchronous” does **not** mean it is free of CPU/I/O contention.
 

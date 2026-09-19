@@ -47,6 +47,49 @@ const uncachedRenderMono = sample(() => { monoView.invalidate(); monoView.render
 const narrowView = new HudView({ requestRender() {} }, null, state.snapshot(), normalizeConfig({ preset: "balanced" }));
 narrowView.render(40);
 const uncachedRenderNarrow = sample(() => { narrowView.invalidate(); narrowView.render(40); }, 3_000);
+
+// Phase-2 scenario: the category ledger at its 16-name cap plus `other`, three concurrent
+// tools, an interrupted run, with bridge data attached.
+const saturated = new HudState("/example/中文项目", { ...MODEL, name: "Benchmark Model 👩‍💻" });
+saturated.messageEnd(assistant(), 1);
+for (let i = 0; i < 24; i++) {
+  saturated.startTool({ toolCallId: `cat-${i}`, toolName: `tool-${i}`, args: { path: "/example/src/main.ts" } });
+  saturated.endTool({ toolCallId: `cat-${i}`, toolName: `tool-${i}`, isError: i % 5 === 0 });
+}
+saturated.startTool({ toolCallId: "stopped", toolName: "bash" });
+saturated.settle();
+for (const [index, name] of ["bash", "edit", "write"].entries()) {
+  saturated.startTool({ toolCallId: `active-${index}`, toolName: name, args: { path: "/example/src/main.ts" } });
+}
+saturated.bridge({ version: 1, source: "bench", kind: "agent", id: "a", status: "running", label: "Review implementation" }, 0);
+saturated.bridge({ version: 1, source: "bench", kind: "tasks", id: "t", completed: 3, total: 7, label: "Build HUD" }, 0);
+const saturatedSnapshot = saturated.snapshot();
+const saturatedView = new HudView({ requestRender() {} }, null, saturatedSnapshot, normalizeConfig({ preset: "full" }));
+saturatedView.render(120);
+const uncachedRenderSaturated = sample(() => { saturatedView.invalidate(); saturatedView.render(120); }, 3_000);
+const saturatedWideView = new HudView({ requestRender() {} }, null, saturatedSnapshot, normalizeConfig({ preset: "full" }));
+saturatedWideView.render(180);
+const uncachedRenderSaturatedWide = sample(() => { saturatedWideView.invalidate(); saturatedWideView.render(180); }, 3_000);
+
+// Phase-2 scenario: concurrent running tools with recent failures and an interruption.
+const concurrent = new HudState("/example/中文项目", { ...MODEL, name: "Benchmark Model 👩‍💻" });
+concurrent.messageEnd(assistant(), 1);
+for (const [index, name] of ["bash", "edit", "read"].entries()) {
+  concurrent.startTool({ toolCallId: `run-${index}`, toolName: name, args: { path: "/example/src/main.ts" } });
+}
+concurrent.startTool({ toolCallId: "failed", toolName: "bash" });
+concurrent.endTool({ toolCallId: "failed", toolName: "bash", isError: true });
+concurrent.startTool({ toolCallId: "stopped", toolName: "write" });
+concurrent.settle();
+for (const [index, name] of ["bash", "edit", "read"].entries()) {
+  concurrent.startTool({ toolCallId: `live-${index}`, toolName: name, args: { path: "/example/src/main.ts" } });
+}
+const concurrentView = new HudView({ requestRender() {} }, null, concurrent.snapshot(), normalizeConfig({ preset: "balanced" }));
+concurrentView.render(120);
+const uncachedRenderConcurrent = sample(() => { concurrentView.invalidate(); concurrentView.render(120); }, 3_000);
+const concurrentNarrowView = new HudView({ requestRender() {} }, null, concurrent.snapshot(), normalizeConfig({ preset: "balanced" }));
+concurrentNarrowView.render(40);
+const uncachedRenderConcurrentNarrow = sample(() => { concurrentNarrowView.invalidate(); concurrentNarrowView.render(40); }, 3_000);
 const cached = view.render(120);
 let cacheHits = 0;
 const cachedFrames = 1_000_000;
@@ -67,12 +110,25 @@ const beforeIdle = flood.controller.flushes;
 flood.clock.advance(60_000);
 assert.equal(flood.controller.flushes, beforeIdle);
 
+// Phase-2 structural bound: distinct tool names can never grow the retained category ledger.
+const categoryFlood = controllerFixture();
+for (let i = 0; i < 50_000; i++) {
+  categoryFlood.emit("tool_execution_start", { toolCallId: `f${i}`, toolName: `tool-${i}` });
+  categoryFlood.emit("tool_execution_end", { toolCallId: `f${i}`, toolName: `tool-${i}` });
+}
+assert.equal(categoryFlood.clock.jobs.size, 1);
+assert.equal(categoryFlood.controller.state.toolStats.size, 16);
+assert.equal(categoryFlood.controller.state.overflowStats.ok, 50_000 - 16);
+assert.equal(categoryFlood.controller.state.tools.size, 0);
+
 const report = {
   generatedAt: new Date().toISOString(),
   environment: { node: process.version, platform: platform(), arch: arch(), cpu: cpus()[0]?.model ?? "unknown" },
   methodology: "Local synthetic microbenchmarks, NOT a live Pi/provider/terminal A/B. Timing includes performance.now overhead; cached mean uses a bulk loop. No history traversal or I/O is included in observer hooks. toolPair measures start + end together.",
   hooks, uncachedRender,
   uncachedRenderMono, uncachedRenderNarrow,
+  uncachedRenderSaturated, uncachedRenderSaturatedWide,
+  uncachedRenderConcurrent, uncachedRenderConcurrentNarrow,
   cachedRender: { frames: cachedFrames, identicalCacheHits: cacheHits, meanUs: cachedRenderMeanUs },
   structural: {
     perTokenSubscriptions: 0, runtimeDependencies: 0,
@@ -80,14 +136,21 @@ const report = {
     idleSyntheticMs: 60_000, idleExtraPublications: flood.controller.flushes - beforeIdle,
     retainedToolsAfterBurst: flood.controller.state.tools.size,
     retainedRecentIdsAfterBurst: flood.controller.state.recentIds.size,
+    distinctToolNamesInCategoryFlood: 50_000,
+    retainedCategoriesAfterFlood: categoryFlood.controller.state.toolStats.size,
+    retainedOverflowBucketsAfterFlood: categoryFlood.controller.state.overflowStats ? 1 : 0,
     defaultGitEnabled: false,
   },
   gates: GATES,
   passed: Math.max(hooks.messageEnd.p99Us, hooks.toolPair.p99Us) <= GATES.hookP99Us &&
-    Math.max(uncachedRender.p99Us, uncachedRenderMono.p99Us, uncachedRenderNarrow.p99Us) <= GATES.uncachedRenderP99Us &&
+    Math.max(uncachedRender.p99Us, uncachedRenderMono.p99Us, uncachedRenderNarrow.p99Us,
+      uncachedRenderSaturated.p99Us, uncachedRenderSaturatedWide.p99Us,
+      uncachedRenderConcurrent.p99Us, uncachedRenderConcurrentNarrow.p99Us) <= GATES.uncachedRenderP99Us &&
     cachedRenderMeanUs <= GATES.cachedRenderMeanUs,
 };
-f.emit("session_shutdown"); flood.emit("session_shutdown"); view.dispose(); monoView.dispose(); narrowView.dispose();
+f.emit("session_shutdown"); flood.emit("session_shutdown"); categoryFlood.emit("session_shutdown");
+view.dispose(); monoView.dispose(); narrowView.dispose();
+saturatedView.dispose(); saturatedWideView.dispose(); concurrentView.dispose(); concurrentNarrowView.dispose();
 const destination = process.argv.find((arg) => arg.startsWith("--json="))?.slice(7);
 if (destination) writeFileSync(destination, JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify(report, null, 2));

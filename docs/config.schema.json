@@ -34,6 +34,14 @@
       ],
       "default": "en"
     },
+    "palette": {
+      "enum": [
+        "pastel",
+        "theme",
+        "mono"
+      ],
+      "default": "pastel"
+    },
     "refreshMs": {
       "type": "integer",
       "minimum": 250,

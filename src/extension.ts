@@ -318,6 +318,7 @@ export class HudController {
     return {
       version: "0.1.0", targetPi: "0.85.1", enabled: this.enabled,
       mode: this.ctx?.mode ?? "inactive", preset: this.config.preset,
+      palette: this.config.palette, color: this.config.color, ascii: this.config.ascii,
       configurationPath: this.configurationPath, configurationError: this.configurationError,
       refreshMs: this.config.refreshMs, gitEnabled: this.config.git.enabled,
       observedEvents: [...OBSERVED_EVENTS],
@@ -350,11 +351,13 @@ export class HudController {
         next = { ...this.config, language: value as HudConfig["language"] };
       } else if (command === "git" && ["on", "off"].includes(value as string)) {
         next = { ...this.config, git: { ...this.config.git, enabled: value === "on" } };
+      } else if (command === "palette" && ["pastel", "theme", "mono"].includes(value as string)) {
+        next = { ...this.config, palette: value as HudConfig["palette"] };
       } else if (command === "placement" && ["aboveEditor", "belowEditor"].includes(value as string)) {
         next = { ...this.config, placement: value as HudConfig["placement"] };
       }
       if (!next) {
-        this.notify("/hud on|off|toggle · preset minimal|balanced|full · lang en|zh-CN · git on|off · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
+        this.notify("/hud on|off|toggle · preset minimal|balanced|full · palette pastel|theme|mono · lang en|zh-CN · git on|off · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
         return;
       }
       // A pending startup load must not overwrite an explicit command.

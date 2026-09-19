@@ -9,6 +9,8 @@ export const CONFIG_LIMIT = 32 * 1024;
 export type HudPreset = "minimal" | "balanced" | "full";
 export type HudPlacement = "aboveEditor" | "belowEditor";
 export type HudLanguage = "en" | "zh-CN";
+/** `pastel` uses the HUD's own soft palette, `theme` follows host theme tokens, `mono` is unstyled. */
+export type HudPalette = "pastel" | "theme" | "mono";
 
 export interface GitConfig {
   enabled: boolean;
@@ -22,6 +24,7 @@ export interface HudConfig {
   preset: HudPreset;
   placement: HudPlacement;
   language: HudLanguage;
+  palette: HudPalette;
   refreshMs: number;
   color: boolean;
   ascii: boolean;
@@ -41,6 +44,7 @@ export const DEFAULT_CONFIG: Readonly<HudConfig> = Object.freeze({
   preset: "balanced",
   placement: "belowEditor",
   language: "en",
+  palette: "pastel",
   refreshMs: 250,
   color: true,
   ascii: false,
@@ -69,6 +73,7 @@ export function normalizeConfig(input: unknown = {}): Readonly<HudConfig> {
     ["preset", ["minimal", "balanced", "full"]],
     ["placement", ["aboveEditor", "belowEditor"]],
     ["language", ["en", "zh-CN"]],
+    ["palette", ["pastel", "theme", "mono"]],
   ] as const) {
     if (!(values as readonly string[]).includes(result[key] as string)) throw new Error(`Invalid ${key}`);
   }

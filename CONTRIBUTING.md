@@ -2,7 +2,7 @@
 
 Use a short-lived branch from `main` (`feat/`, `fix/`, `docs/`, `test/`). Describe the problem in an issue, add a regression test, and open a pull request. Keep event processing, rendering and optional acquisition separated. Use conventional commit subjects without inventing issue/PR references.
 
-Run `npm run verify` and `npm run package:check`. Changes touching rendering, state or scheduling require benchmark JSON and an explanation of bounds. Tests must cover failure/cancellation, narrow widths, Unicode, repeated lifecycle transitions and headless operation. Do not call mocked-host tests real Pi integration.
+Run `npm run verify` and `npm run package:check`. Changes touching rendering, state or scheduling require benchmark JSON and an explanation of bounds. Layout changes must regenerate `docs/preview.txt` with `npm run demo -- --write docs/preview.txt` (`npm run check` fails on drift) and keep the JSON schema, example config and runtime defaults equal. Tests must cover failure/cancellation, narrow widths, Unicode, repeated lifecycle transitions and headless operation. Do not call mocked-host tests real Pi integration.
 
 Preserve zero runtime dependencies, the lack of per-token/core-mutation listeners, bounded state and no recurring idle work. Keep `README.md` and `README.zh-CN.md` consistent. Do not add a provider/network client, credential read, prompt injection, history scan, subprocess or editor replacement without an explicit design decision and evidence supporting its cost.
 

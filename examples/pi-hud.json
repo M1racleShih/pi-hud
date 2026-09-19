@@ -4,6 +4,7 @@
   "preset": "balanced",
   "placement": "belowEditor",
   "language": "en",
+  "palette": "pastel",
   "refreshMs": 250,
   "color": true,
   "ascii": false,

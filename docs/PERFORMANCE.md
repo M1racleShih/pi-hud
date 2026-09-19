@@ -30,7 +30,31 @@ The synthetic 100,000-tool-event burst asserts **one pending publication timer a
 
 Thresholds in `bench/run.mjs` are regression gates, not perceptual thresholds established by a user study. Results may fluctuate. Investigate a failed runner with repeated controlled trials; do not simply increase the budget to make CI green. Structural tests are at least as important as a noisy timing gate.
 
-## Real host checks prepared for CI
+## Phase 1 field colors: same-machine before/after
+
+Field colors and bounded semantic segments changed the renderer, so the phase was measured against the pre-change commit on the same host in one session. The gates were **not** changed; the mono, narrow-40 and cached scenarios were added as extra checks. Raw per-run data is in [performance-phase1-ab.json](performance-phase1-ab.json).
+
+Method: `git worktree` of the pre-change commit as the before side, the working tree as the after side, identical fixtures, 12,000 hook samples, 3,000 uncached 120-column full-preset render samples, and a 1,000,000-frame cache loop per run. Four pairs ran before-then-after and four ran after-then-before to expose ordering bias. The numbers below were captured after the narrow-width context fix, so they describe the final renderer.
+
+| Measurement | Before (mean of 8) | After (mean of 8) | Delta |
+| --- | ---: | ---: | ---: |
+| Final assistant-message handler, p99 | 1.159 µs | 1.219 µs | +5.2% (sub-microsecond noise) |
+| Tool start + end pair, p99 | 2.079 µs | 2.020 µs | −2.8% |
+| Uncached full render, p50 | 38.0 µs | 22.6 µs | −40.6% |
+| Uncached full render, p95 | 68.6 µs | 41.7 µs | −39.3% |
+| Uncached full render, p99 | 417.5 µs | 586.4 µs | +40.5% |
+| Uncached full render, mean | 50.2 µs | 33.8 µs | −32.7% |
+| Cached render, bulk-loop mean | 0.00596 µs | 0.00543 µs | −8.8% |
+| Layout-only (mono) render, mean | — | 34.3 µs | new scenario |
+| Narrow 40-column render, mean | — | 26.9 µs | new scenario |
+
+The common path improved: field widths are measured once during layout, so segments cost less than the old whole-line packing. Styling itself is not measurable in the mean (34.3 µs layout-only versus 33.8 µs fully styled). The p99 tail is higher and reproduces tightly in this session (after 569–598 µs versus before 410–430 µs) against the unchanged 5 ms gate, leaving roughly eight times of headroom. A separate 200,000-render `--trace-gc` run attributes the tail to garbage collection rather than renderer work: the new renderer produced **fewer** scavenges (1,453 versus 3,196) with a larger mean pause (0.85 ms versus 0.34 ms), for roughly equal total collector time per render (6.1 µs versus 5.5 µs). Forced GC and a larger semi-space did not remove the tail. That 200k-render burst ran at roughly 29,000 renders/s, thousands of times the sustained uncached-render rate of a real session (at most one recompute per 250 ms coalesced publication, with every stream frame taking the cached path). No gate, budget or sample count was relaxed to accommodate this, and the structural burst assertions (one pending timer, one publication, bounded records) still pass.
+
+**These are synthetic microbenchmarks, not a live Pi/provider/terminal A/B.** The real-host streaming, tool-dispatch and keyboard-latency acceptance procedure below is still required before any release claim.
+
+## Real host checks
+
+The pinned SDK/RPC/PTY checks below are the workflow's real-host gates. They were prepared for CI and, in addition, executed locally in the phase-1 environment; the executed results are recorded in [VERIFICATION.md](VERIFICATION.md).
 
 The pinned SDK type-contract check validates event names and accessed fields against the installed Pi 0.85.1 types. The RPC smoke launches the actual CLI, verifies `/hud` registration and strict JSON framing, and checks that no terminal widget request leaks into RPC. The PTY smoke launches the real TUI with a clean temporary home and no provider credentials, switches preset, resizes and toggles the HUD. It makes **no model request**.
 

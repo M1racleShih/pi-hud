@@ -13,8 +13,9 @@ Resolution order: absolute `PI_HUD_CONFIG`; otherwise `pi-hud.json` beneath abso
 | `preset` | `balanced` | `minimal`, `balanced`, `full` |
 | `placement` | `belowEditor` | `aboveEditor`, `belowEditor` |
 | `language` | `en` | `en`, `zh-CN` |
+| `palette` | `pastel` | `pastel` (HUD soft field colors), `theme` (host theme tokens), `mono` (no color) |
 | `refreshMs` | `250` | integer 250–2000 |
-| `color` | `true` | boolean; uses the current Pi theme |
+| `color` | `true` | boolean; `false` disables all styling regardless of `palette` |
 | `ascii` | `false` | boolean; ASCII symbols/ellipsis, not translation of arbitrary model names or labels |
 | `showCost` | `true` | boolean |
 | `showThinking` | `true` | boolean |
@@ -24,6 +25,8 @@ Resolution order: absolute `PI_HUD_CONFIG`; otherwise `pi-hud.json` beneath abso
 | `$schema` | absent | optional string for editor tooling; ignored at runtime |
 
 Fields may be omitted; defaults fill them. There are no Full/Minimal presets that secretly enable extra I/O: all presets change rendering only. `git.enabled` must always be opted into separately.
+
+`palette` never changes data collection or layout, only the color of already-laid-out segments. `pastel` picks the soft dark-terminal candidates and automatically switches to deeper same-family variants when the host theme's text color indicates a light background. `theme` maps each field role to a host theme token (`accent`, `mdLink`, `mdHeading`, `customMessageLabel`, `success`, `warning`, `error`, `text`, `muted`, `dim`, `thinkingText`). `mono` is equivalent to `color: false` and is useful when a theme or terminal makes field colors unreadable. The command `/hud palette pastel|theme|mono` changes this in memory only, like every other `/hud` control.
 
 On a failed explicit reload, the last configuration remains active and a warning appears. Startup failure falls back to the previous/default configuration and records the reason in `/hud status`; it does not emit unsolicited error text into the terminal. Concurrent reads have generation tokens so a late read cannot overwrite `/hud off`, a placement change, or a new session.
 

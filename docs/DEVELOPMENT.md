@@ -38,7 +38,7 @@ npm run package:check
 npm run demo
 ```
 
-`check` enforces syntax, allowed imports, forbidden core-path APIs, manifest and local documentation links. `test` uses Node's test runner with explicit paths for shell-independent Windows execution. Git tests create and remove their own temporary repository. Performance budgets are explicit and machine-sensitive; see the methodology before comparing results. Packaging tests extract only the package's own tarball, perform an empty-cache offline production install and import the actual packed entry.
+`check` enforces syntax, allowed imports, forbidden core-path APIs, manifest and local documentation links, keeps the JSON schema/example equal to the runtime defaults, and fails if `docs/preview.txt` no longer matches the deterministic renderer output. Regenerate that preview after an intentional layout change with `npm run demo -- --write docs/preview.txt`; do not hand-edit it. `test` uses Node's test runner with explicit paths for shell-independent Windows execution. Git tests create and remove their own temporary repository. Performance budgets are explicit and machine-sensitive; see the methodology before comparing results. Packaging tests extract only the package's own tarball, perform an empty-cache offline production install and import the actual packed entry.
 
 ## Pinned host checks (network-enabled environment)
 
@@ -51,7 +51,7 @@ node scripts/pi-rpc-smoke.mjs
 python3 scripts/pi-pty-smoke.py
 ```
 
-The PTY script requires a Unix-like environment. SDK checks and examples use the actual pinned TypeScript API; implementation behavior remains covered by separate runtime tests. RPC and PTY smoke use disposable homes/workspaces with no provider credentials and make no model requests. A real streaming A/B is a separate acceptance step.
+The SDK check type-checks the pinned `ExtensionAPI`/`Theme` contracts, the bridge example, and the HUD's theme-role tokens against Pi's `ThemeColor` union. The PTY script requires a Unix-like environment. SDK checks and examples use the actual pinned TypeScript API; implementation behavior remains covered by separate runtime tests. RPC and PTY smoke use disposable homes/workspaces with no provider credentials and make no model requests. The PTY smoke also switches presets and palettes and resizes the real TUI, but it is not a streaming A/B. A real streaming A/B is a separate acceptance step.
 
 Direct SDK packages are pinned; the network-installed host's transitive dependency tree is not vendored in this source delivery. Review dependency changes and record the resolved `.tmp/sdk/package-lock.json` for reproducible host investigations. The root lockfile intentionally has zero dependencies.
 

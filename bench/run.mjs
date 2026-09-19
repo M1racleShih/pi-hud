@@ -41,6 +41,12 @@ state.bridge({ version: 1, source: "bench", kind: "tasks", id: "t", completed: 3
 const view = new HudView({ requestRender() {} }, null, state.snapshot(), normalizeConfig({ preset: "full" }));
 view.render(120);
 const uncachedRender = sample(() => { view.invalidate(); view.render(120); }, 3_000);
+const monoView = new HudView({ requestRender() {} }, null, state.snapshot(), normalizeConfig({ preset: "full", color: false }));
+monoView.render(120);
+const uncachedRenderMono = sample(() => { monoView.invalidate(); monoView.render(120); }, 3_000);
+const narrowView = new HudView({ requestRender() {} }, null, state.snapshot(), normalizeConfig({ preset: "balanced" }));
+narrowView.render(40);
+const uncachedRenderNarrow = sample(() => { narrowView.invalidate(); narrowView.render(40); }, 3_000);
 const cached = view.render(120);
 let cacheHits = 0;
 const cachedFrames = 1_000_000;
@@ -66,6 +72,7 @@ const report = {
   environment: { node: process.version, platform: platform(), arch: arch(), cpu: cpus()[0]?.model ?? "unknown" },
   methodology: "Local synthetic microbenchmarks, NOT a live Pi/provider/terminal A/B. Timing includes performance.now overhead; cached mean uses a bulk loop. No history traversal or I/O is included in observer hooks. toolPair measures start + end together.",
   hooks, uncachedRender,
+  uncachedRenderMono, uncachedRenderNarrow,
   cachedRender: { frames: cachedFrames, identicalCacheHits: cacheHits, meanUs: cachedRenderMeanUs },
   structural: {
     perTokenSubscriptions: 0, runtimeDependencies: 0,
@@ -77,9 +84,10 @@ const report = {
   },
   gates: GATES,
   passed: Math.max(hooks.messageEnd.p99Us, hooks.toolPair.p99Us) <= GATES.hookP99Us &&
-    uncachedRender.p99Us <= GATES.uncachedRenderP99Us && cachedRenderMeanUs <= GATES.cachedRenderMeanUs,
+    Math.max(uncachedRender.p99Us, uncachedRenderMono.p99Us, uncachedRenderNarrow.p99Us) <= GATES.uncachedRenderP99Us &&
+    cachedRenderMeanUs <= GATES.cachedRenderMeanUs,
 };
-f.emit("session_shutdown"); flood.emit("session_shutdown"); view.dispose();
+f.emit("session_shutdown"); flood.emit("session_shutdown"); view.dispose(); monoView.dispose(); narrowView.dispose();
 const destination = process.argv.find((arg) => arg.startsWith("--json="))?.slice(7);
 if (destination) writeFileSync(destination, JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify(report, null, 2));

@@ -1,0 +1,363 @@
+{
+  "phase": "Phase 1: per-field colors and bounded semantic segments",
+  "generatedAt": "2026-09-19T16:15:21.943Z",
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 9700X 8-Core Processor",
+    "note": "Same host, Node build and session for both sides; the before side is a git worktree of the pre-change commit."
+  },
+  "method": "bench/run.mjs with identical fixtures on both sides: 12,000 hook samples, 3,000 uncached 120-column full-preset render samples, and a 1,000,000-frame cached loop per run. Eight interleaved pairs (four before-then-after, four after-then-before) on the same machine in one session, after the narrow-width context fix.",
+  "gates": {
+    "hookP99Us": 250,
+    "uncachedRenderP99Us": 5000,
+    "cachedRenderMeanUs": 5,
+    "note": "Regression gates were not changed. The added mono, narrow-40 and styled-render scenarios are extra checks, not relaxed thresholds."
+  },
+  "summary": {
+    "messageEndP99Us": {
+      "before": 1.159,
+      "after": 1.219,
+      "deltaPercent": 5.2,
+      "beforeRange": [
+        1.121,
+        1.181
+      ],
+      "afterRange": [
+        1.15,
+        1.344
+      ]
+    },
+    "toolPairP99Us": {
+      "before": 2.079,
+      "after": 2.02,
+      "deltaPercent": -2.8,
+      "beforeRange": [
+        1.924,
+        2.371
+      ],
+      "afterRange": [
+        1.956,
+        2.087
+      ]
+    },
+    "uncachedRenderP50Us": {
+      "before": 38,
+      "after": 22.6,
+      "deltaPercent": -40.6,
+      "beforeRange": [
+        37.9,
+        38.3
+      ],
+      "afterRange": [
+        22.4,
+        22.7
+      ]
+    },
+    "uncachedRenderP95Us": {
+      "before": 68.6,
+      "after": 41.7,
+      "deltaPercent": -39.3,
+      "beforeRange": [
+        65.2,
+        73.7
+      ],
+      "afterRange": [
+        33.4,
+        45.5
+      ]
+    },
+    "uncachedRenderP99Us": {
+      "before": 417.5,
+      "after": 586.4,
+      "deltaPercent": 40.5,
+      "beforeRange": [
+        410.2,
+        429.5
+      ],
+      "afterRange": [
+        569.5,
+        598.3
+      ]
+    },
+    "uncachedRenderMeanUs": {
+      "before": 50.2,
+      "after": 33.8,
+      "deltaPercent": -32.7,
+      "beforeRange": [
+        50,
+        50.3
+      ],
+      "afterRange": [
+        33,
+        34.7
+      ]
+    },
+    "cachedRenderMeanUs": {
+      "before": 0.00596,
+      "after": 0.00543,
+      "deltaPercent": -8.8,
+      "beforeRange": [
+        0.00574,
+        0.00613
+      ],
+      "afterRange": [
+        0.00516,
+        0.00561
+      ]
+    },
+    "layoutOnlyMeanUs": {
+      "before": null,
+      "after": 34.3,
+      "deltaPercent": null,
+      "beforeRange": [
+        null,
+        null
+      ],
+      "afterRange": [
+        32.9,
+        38.9
+      ]
+    },
+    "narrow40MeanUs": {
+      "before": null,
+      "after": 26.9,
+      "deltaPercent": null,
+      "beforeRange": [
+        null,
+        null
+      ],
+      "afterRange": [
+        24.4,
+        28.7
+      ]
+    }
+  },
+  "raw": [
+    {
+      "pair": 1,
+      "order": "before-then-after",
+      "before": {
+        "messageEndP99Us": 1.1810000000025411,
+        "toolPairP99Us": 2.3709999999965703,
+        "uncachedRender": {
+          "p50Us": 38.19099999998343,
+          "p95Us": 69.69399999996995,
+          "p99Us": 410.1590000000215,
+          "meanUs": 50.21356933333408
+        },
+        "cachedRenderMeanUs": 0.0059601440000000136
+      },
+      "after": {
+        "messageEndP99Us": 1.1700000000018917,
+        "toolPairP99Us": 1.9950000000079626,
+        "uncachedRender": {
+          "p50Us": 22.606999999993604,
+          "p95Us": 45.54999999999154,
+          "p99Us": 579.9729999999954,
+          "meanUs": 34.36500700000019
+        },
+        "cachedRenderMeanUs": 0.005567451000000005,
+        "layoutOnlyMeanUs": 38.917239666665765,
+        "narrow40MeanUs": 24.35254300000092
+      }
+    },
+    {
+      "pair": 2,
+      "order": "before-then-after",
+      "before": {
+        "messageEndP99Us": 1.150000000002649,
+        "toolPairP99Us": 1.9240000000024793,
+        "uncachedRender": {
+          "p50Us": 37.85500000000752,
+          "p95Us": 67.63899999998557,
+          "p99Us": 418.84099999998625,
+          "meanUs": 50.153997666666875
+        },
+        "cachedRenderMeanUs": 0.005872547999999995
+      },
+      "after": {
+        "messageEndP99Us": 1.211000000004958,
+        "toolPairP99Us": 1.9839999999931024,
+        "uncachedRender": {
+          "p50Us": 22.709000000020296,
+          "p95Us": 41.2550000000067,
+          "p99Us": 598.306000000008,
+          "meanUs": 34.71948366666664
+        },
+        "cachedRenderMeanUs": 0.005546055000000024,
+        "layoutOnlyMeanUs": 33.17150500000001,
+        "narrow40MeanUs": 26.289704999999298
+      }
+    },
+    {
+      "pair": 3,
+      "order": "before-then-after",
+      "before": {
+        "messageEndP99Us": 1.1599999999987176,
+        "toolPairP99Us": 2.065999999999235,
+        "uncachedRender": {
+          "p50Us": 38.11999999999216,
+          "p95Us": 66.82399999999689,
+          "p99Us": 419.2390000000046,
+          "meanUs": 50.22930200000016
+        },
+        "cachedRenderMeanUs": 0.0057446860000000015
+      },
+      "after": {
+        "messageEndP99Us": 1.150000000002649,
+        "toolPairP99Us": 2.0870000000030586,
+        "uncachedRender": {
+          "p50Us": 22.40400000002296,
+          "p95Us": 44.08499999999549,
+          "p99Us": 569.4790000000012,
+          "meanUs": 33.04686366666669
+        },
+        "cachedRenderMeanUs": 0.005161172000000078,
+        "layoutOnlyMeanUs": 33.118584333333295,
+        "narrow40MeanUs": 25.705902666666102
+      }
+    },
+    {
+      "pair": 4,
+      "order": "before-then-after",
+      "before": {
+        "messageEndP99Us": 1.1599999999987176,
+        "toolPairP99Us": 2.055999999996061,
+        "uncachedRender": {
+          "p50Us": 37.88499999998862,
+          "p95Us": 65.16600000000494,
+          "p99Us": 429.49900000002117,
+          "meanUs": 50.213613999999566
+        },
+        "cachedRenderMeanUs": 0.005878824000000009
+      },
+      "after": {
+        "messageEndP99Us": 1.211000000004958,
+        "toolPairP99Us": 2.0150000000001,
+        "uncachedRender": {
+          "p50Us": 22.486000000014883,
+          "p95Us": 33.44699999999534,
+          "p99Us": 591.4040000000114,
+          "meanUs": 33.018741333333516
+        },
+        "cachedRenderMeanUs": 0.00548614699999996,
+        "layoutOnlyMeanUs": 35.2622163333333,
+        "narrow40MeanUs": 28.435508333334163
+      }
+    },
+    {
+      "pair": 5,
+      "order": "after-then-before",
+      "before": {
+        "messageEndP99Us": 1.1510000000001241,
+        "toolPairP99Us": 2.2009999999994534,
+        "uncachedRender": {
+          "p50Us": 38.263999999969656,
+          "p95Us": 67.33900000000403,
+          "p99Us": 414.7999999999854,
+          "meanUs": 50.327482333332796
+        },
+        "cachedRenderMeanUs": 0.0061333040000000096
+      },
+      "after": {
+        "messageEndP99Us": 1.2019999999992592,
+        "toolPairP99Us": 2.0870000000030586,
+        "uncachedRender": {
+          "p50Us": 22.698000000019647,
+          "p95Us": 45.316999999982954,
+          "p99Us": 596.7570000000251,
+          "meanUs": 34.413562666667005
+        },
+        "cachedRenderMeanUs": 0.005501419000000055,
+        "layoutOnlyMeanUs": 33.09560133333355,
+        "narrow40MeanUs": 25.90920566666661
+      }
+    },
+    {
+      "pair": 6,
+      "order": "after-then-before",
+      "before": {
+        "messageEndP99Us": 1.1209999999977072,
+        "toolPairP99Us": 1.9770000000107757,
+        "uncachedRender": {
+          "p50Us": 37.887000000011994,
+          "p95Us": 73.66500000000542,
+          "p99Us": 415.7779999999889,
+          "meanUs": 50.27978933333252
+        },
+        "cachedRenderMeanUs": 0.006079206999999997
+      },
+      "after": {
+        "messageEndP99Us": 1.2019999999992592,
+        "toolPairP99Us": 1.986999999999739,
+        "uncachedRender": {
+          "p50Us": 22.677000000015823,
+          "p95Us": 44.855000000012524,
+          "p99Us": 585.9790000000089,
+          "meanUs": 33.726227333333284
+        },
+        "cachedRenderMeanUs": 0.005239000999999917,
+        "layoutOnlyMeanUs": 34.71263833333376,
+        "narrow40MeanUs": 28.366174333333745
+      }
+    },
+    {
+      "pair": 7,
+      "order": "after-then-before",
+      "before": {
+        "messageEndP99Us": 1.170999999999367,
+        "toolPairP99Us": 1.9860000000022637,
+        "uncachedRender": {
+          "p50Us": 38.04999999999836,
+          "p95Us": 69.08100000001127,
+          "p99Us": 416.4910000000077,
+          "meanUs": 50.27256466666647
+        },
+        "cachedRenderMeanUs": 0.006107512999999983
+      },
+      "after": {
+        "messageEndP99Us": 1.2630000000015684,
+        "toolPairP99Us": 2.047000000004573,
+        "uncachedRender": {
+          "p50Us": 22.585000000020727,
+          "p95Us": 33.52699999999231,
+          "p99Us": 581.9350000000156,
+          "meanUs": 32.982903333333745
+        },
+        "cachedRenderMeanUs": 0.005605177000000026,
+        "layoutOnlyMeanUs": 32.896982333333156,
+        "narrow40MeanUs": 28.7374639999993
+      }
+    },
+    {
+      "pair": 8,
+      "order": "after-then-before",
+      "before": {
+        "messageEndP99Us": 1.1809999999954357,
+        "toolPairP99Us": 2.047000000004573,
+        "uncachedRender": {
+          "p50Us": 37.93799999999692,
+          "p95Us": 69.6619999999939,
+          "p99Us": 414.99399999997877,
+          "meanUs": 49.95351699999943
+        },
+        "cachedRenderMeanUs": 0.005882897000000014
+      },
+      "after": {
+        "messageEndP99Us": 1.3440000000031205,
+        "toolPairP99Us": 1.9560000000069522,
+        "uncachedRender": {
+          "p50Us": 22.60599999999613,
+          "p95Us": 45.19200000001433,
+          "p99Us": 587.2320000000002,
+          "meanUs": 34.12234100000004
+        },
+        "cachedRenderMeanUs": 0.005350340000000074,
+        "layoutOnlyMeanUs": 33.55350900000028,
+        "narrow40MeanUs": 27.043159333331793
+      }
+    }
+  ]
+}

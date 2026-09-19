@@ -11,11 +11,11 @@
 以下是生产渲染器在 120 列下生成的合成数据，不是真实 Pi 会话截图：
 
 ```text
-[Example Model] | 上下文(上次) █████░░░░░ 45% 90k/200k | pi-hud | high
-● edit state.ts | 工具* ✓5 !0 | 代理 1 | 任务 3/7 | 估算* $0.042
+[Example Model] · high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
+● edit state.ts · 工具* ✓4 !1 · 估算* $0.042 · 代理 1 · 任务 3/7
 ```
 
-`minimal` 一行、`balanced` 两行、`full` 三行。工具开始或结束不会改变选定布局的行数，避免额外的纵向跳动。窄终端按优先级省略信息，文本按字素安全截断，颜色跟随 Pi 主题。全部示例见 [布局预览](docs/preview.txt)。
+`minimal` 一行、`balanced` 两行、`full` 三行。工具开始或结束不会改变选定布局的行数，避免额外的纵向跳动。窄终端按优先级省略片段，但上下文字段会先预留自己的宽度：长模型名只能被截断，不会让高占用警告消失。中文、emoji 和长路径按终端显示列宽（而非码元）测量、截断。全部预览见 [布局预览](docs/preview.txt)。
 
 ## 安装
 
@@ -43,6 +43,7 @@ pi -e /absolute/path/to/pi-hud/index.ts
 | --- | --- |
 | `/hud on`、`/hud off`、`/hud toggle` | 开关 HUD；重新开启时重新计算观察范围。 |
 | `/hud preset minimal\|balanced\|full` | 切换固定的一、二、三行布局。 |
+| `/hud palette pastel\|theme\|mono` | 切换字段配色：HUD 柔和色板（默认）、跟随宿主主题、或不着色。 |
 | `/hud lang en`、`/hud lang zh-CN` | 切换 HUD 标签语言；命令帮助仍为英文。 |
 | `/hud placement aboveEditor\|belowEditor` | 只移动 pi-hud 自己的 widget。 |
 | `/hud git on`、`/hud git off` | 开关有界、仅检查 tracked 文件的额外 Git 探测。 |
@@ -58,12 +59,31 @@ pi -e /absolute/path/to/pi-hud/index.ts
   "version": 1,
   "preset": "balanced",
   "language": "zh-CN",
+  "palette": "pastel",
   "refreshMs": 250,
   "git": { "enabled": false }
 }
 ```
 
 设置了 `PI_CODING_AGENT_DIR` 时，配置目录随之变化；绝对路径 `PI_HUD_CONFIG` 优先覆盖完整文件路径，相对路径会被拒绝。配置只允许普通文件，异步读取且硬性限制为 32 KiB；没有文件监听，也不会自行写入。未知字段、错误类型会被拒绝。重载失败保留上一份有效配置，首次启动失败使用默认配置，错误可通过 `/hud status` 查看。详见 [配置说明](docs/CONFIGURATION.md)、[完整示例](examples/pi-hud.json) 和 [JSON schema](docs/config.schema.json)。
+
+## 配色
+
+颜色作用在语义片段上，而不是整行。先按纯文本完成宽度布局与截断，再逐片段着色，因此颜色不会影响排版。告警只改变自己所在的字段：上下文高占用不会把模型名染黄，单个工具失败也不会让整行变色。
+
+| 字段 | 角色 | 深色终端柔和色 | 浅色终端加深色 | `theme` 色板 token |
+| --- | --- | --- | --- | --- |
+| 模型 | `model` | `#e5c890` | `#df8e1d` | `accent` |
+| thinking 等级 | `thinking` | `#d8c39a` | `#c08a2e` | `thinkingText` |
+| 项目/路径 | `path` | `#a6d189` | `#40a02b` | `success` |
+| Git 分支 | `git` | `#8caaee` | `#1e66f5` | `mdLink` |
+| 阶段/当前活动 | `phase` | `#ca9ee6` | `#8839ef` | `customMessageLabel` |
+| 上下文数值与进度条 | `context`、`barUsed` | `#ef9f76` | `#fe640b` | `mdHeading` |
+| 数值、费用、标签 | `body`、`label` | `#c6d0f5`、`#838ba7` | `#4c4f69`、`#9ca0b0` | `text`、`muted` |
+| 分隔符、未用进度条 | `separator`、`barEmpty` | `#838ba7`、`#6c7086` | `#9ca0b0`、`#ccd0da` | `dim` |
+| 完成/等待/失败 | `success`、`warning`、`error` | `#a6d189`、`#f9e2af`、`#e78284` | `#40a02b`、`#9a6700`、`#d20f39` | `success`、`warning`、`error` |
+
+`palette: pastel`（默认）使用上述深色终端候选值；当宿主主题的正文色表明是浅色背景时，自动改用同色系的加深色。`palette: theme` 使用宿主主题 token，让 HUD 跟随用户主题。`palette: mono` 与 `color: false` 输出纯文本；`ascii: true` 把 `·`、`█`、`░`、`✓`、`↑`、`↓`、`…` 换成 ASCII 符号，但中文标签照常显示。完整角色表由渲染器生成在 [preview.txt](docs/preview.txt)。
 
 ## 数据的真实含义
 
@@ -90,7 +110,7 @@ pi-hud 的路径是：
   → 小型快照 → 缓存 widget 行 → 只有行变了才 requestRender
 ```
 
-不监听 `message_update`、`tool_execution_update`；不调用 `getBranch()`、`getEntries()`、`getContextUsage()`；不做同步文件/进程操作；不轮询空闲状态；不接管输入、编辑器或 footer；不注册 LLM 工具、不改消息、不写会话。宿主随模型流重新渲染时，宽度、状态和主题未失效就复用同一行数组。RPC、JSON、print 模式不创建 HUD 定时器、不读 HUD 配置、不挂 UI。
+不监听 `message_update`、`tool_execution_update`；不调用 `getBranch()`、`getEntries()`、`getContextUsage()`；不做同步文件/进程操作；不轮询空闲状态；不接管输入、编辑器或 footer；不注册 LLM 工具、不改消息、不写会话。每行由数量有上限的语义片段组成；最终 ANSI 行会被缓存，宿主随模型流重绘时，只要宽度、已发布状态和主题失效均未变化就复用同一数组。RPC、JSON、print 模式不创建 HUD 定时器、不读 HUD 配置、不挂 UI。
 
 启动配置读取异步延后；桥接活动最多使用一个过期定时器；可选 Git 具备超时、输出上限、单飞、冷却、取消与过期结果隔离。异步 Git 仍可能争用 CPU 或磁盘，不能把“异步”等同于“没有成本”。
 

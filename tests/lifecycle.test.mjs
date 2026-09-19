@@ -134,3 +134,29 @@ test("thinking event takes precedence over a stale context snapshot", () => {
   assert.equal(f.controller.state.thinking, "minimal");
   f.emit("session_shutdown");
 });
+test("/hud palette switches the in-memory palette and rejects unknown values", async () => {
+  const f = controllerFixture();
+  assert.equal(f.controller.inspect().palette, "pastel");
+  await f.controller.command("palette theme", f.ctx);
+  assert.equal(f.controller.config.palette, "theme");
+  assert.equal(f.controller.inspect().palette, "theme");
+  await f.controller.command("palette rainbow", f.ctx);
+  assert.equal(f.controller.config.palette, "theme", "unknown values must not change the palette");
+  assert.ok(f.calls.notifications.at(-1).message.includes("palette pastel|theme|mono"));
+  f.emit("session_shutdown");
+});
+test("palette changes repaint the widget exactly once and keep fixed rows", async () => {
+  const f = controllerFixture();
+  f.clock.advance(0);
+  const before = f.calls.paint;
+  await f.controller.command("palette mono", f.ctx);
+  assert.equal(f.calls.paint, before, "the palette change waits for the coalesced publication");
+  f.clock.advance(250);
+  assert.equal(f.calls.paint, before + 1);
+  const lines = f.widget().render(80);
+  assert.equal(lines.length, 2);
+  assert.match(lines[0], /\[Test Model\]/);
+  assert.ok(!lines[0].includes("\u001b[38;2;"), "mono output must not carry ANSI colors");
+  assert.equal(f.widget().render(80), lines);
+  f.emit("session_shutdown");
+});

@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { OBSERVED_EVENTS } from "../src/extension.ts";
+import { DEFAULT_CONFIG, normalizeConfig } from "../src/config.ts";
+import { renderPreview } from "./preview.mjs";
 
 const manifest = JSON.parse(readFileSync("package.json", "utf8"));
 assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0, "Runtime dependencies are forbidden");
@@ -36,3 +38,21 @@ for (const file of ["README.md", "README.zh-CN.md", ...readdirSync("docs").filte
   }
 }
 console.log("PASS: syntax, runtime boundaries, package manifest, bilingual links and documentation paths");
+
+// Configuration, schema and example must describe exactly the runtime defaults.
+const schema = JSON.parse(readFileSync("docs/config.schema.json", "utf8"));
+const example = JSON.parse(readFileSync("examples/pi-hud.json", "utf8"));
+assert.equal(schema.additionalProperties, false, "Schema must reject unknown keys like the runtime validator");
+for (const key of Object.keys(DEFAULT_CONFIG)) assert.ok(schema.properties[key], `Schema is missing ${key}`);
+assert.deepEqual(Object.keys(example).sort(), Object.keys(DEFAULT_CONFIG).sort(), "Example must list exactly the runtime keys");
+for (const [key, spec] of Object.entries(schema.properties)) {
+  if (spec.enum) for (const value of spec.enum) assert.doesNotThrow(() => normalizeConfig({ [key]: value }), `Schema enum ${key}=${value} is rejected at runtime`);
+  if (spec.type === "boolean") assert.doesNotThrow(() => normalizeConfig({ [key]: true }), `Schema boolean ${key} is rejected at runtime`);
+}
+assert.deepEqual(normalizeConfig(example), normalizeConfig(), "Example must stay equal to runtime defaults");
+console.log("PASS: configuration defaults, JSON schema and example are in sync");
+
+// The committed preview is generated from the real renderer, so it cannot drift.
+const preview = readFileSync("docs/preview.txt", "utf8");
+assert.equal(preview, renderPreview(), "docs/preview.txt is stale; run: npm run demo -- --write docs/preview.txt");
+console.log("PASS: docs/preview.txt matches the deterministic renderer output");

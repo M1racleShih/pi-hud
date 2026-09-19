@@ -10,6 +10,7 @@ import json
 import os
 import pathlib
 import pty
+import re
 import select
 import shutil
 import signal
@@ -34,7 +35,7 @@ def main() -> None:
         home = pathlib.Path(directory)
         agent = home / "agent"
         agent.mkdir()
-        (agent / "pi-hud.json").write_text(json.dumps({"color": False, "preset": "balanced"}))
+        (agent / "pi-hud.json").write_text(json.dumps({"preset": "balanced", "palette": "pastel"}))
         env = {"PATH": os.environ.get("PATH", ""), "HOME": str(home), "TERM": "xterm-256color",
                "LANG": "C.UTF-8", "PI_CODING_AGENT_DIR": str(agent), "PI_HUD_CONFIG": str(agent / "pi-hud.json"),
                # Without fd on PATH Pi would download it from github.com before the
@@ -47,10 +48,10 @@ def main() -> None:
         alive = True
         seen = bytearray()
 
-        def wait_for(text: bytes, timeout: float = 20.0) -> None:
-            deadline = time.monotonic() + timeout
+        def wait_for(text: bytes, timeout: float = 20.0) -> bytes:
+            wait_deadline = time.monotonic() + timeout
             seen.clear()
-            while time.monotonic() < deadline:
+            while time.monotonic() < wait_deadline:
                 readable, _, _ = select.select([fd], [], [], 0.1)
                 if not readable:
                     continue
@@ -66,23 +67,36 @@ def main() -> None:
                 if len(seen) > 2_000_000:
                     raise RuntimeError("Unexpected unbounded PTY output")
                 if text in seen:
-                    return
+                    return bytes(seen)
             raise RuntimeError(f"Timed out waiting for {text!r}; inspect Pi/terminal compatibility")
+
+        # A field-colored segment (TRUEcolor or 256-color) immediately before the label.
+        colored_context = re.compile(rb"\x1b\[38;(?:2|5);[0-9;]+mctx\(last\)")
 
         try:
             fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-            wait_for(b"ctx(last)")
+            mounted = wait_for(b"ctx(last)")
+            if not colored_context.search(mounted):
+                raise RuntimeError("HUD mounted without the default pastel field colors")
             os.write(fd, b"/hud preset full\r")
             wait_for(b"no bridged activity")
             fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 70, 0, 0))
             os.kill(pid, signal.SIGWINCH)
             # The full preset's unchanged ASCII activity line also survives narrow redraws.
             wait_for(b"no bridged activity")
+            os.write(fd, b"/hud palette mono\r")
+            plain = wait_for(b"ctx(last)")
+            if colored_context.search(plain):
+                raise RuntimeError("mono palette still emitted field colors")
+            os.write(fd, b"/hud palette pastel\r")
+            recolored = wait_for(b"ctx(last)")
+            if not colored_context.search(recolored):
+                raise RuntimeError("pastel palette did not restore field colors")
             os.write(fd, b"/hud off\r")
             wait_for(b"pi-hud off")
             os.write(fd, b"/hud on\r")
             wait_for(b"ctx(last)")
-            print("PASS: real Pi TUI mounts HUD, switches layout, resizes, and toggles off/on without a model call")
+            print("PASS: real Pi TUI mounts HUD, switches layout/palette, resizes, and toggles off/on without a model call")
         finally:
             try:
                 os.kill(pid, signal.SIGTERM)

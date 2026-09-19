@@ -13,11 +13,11 @@ A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works
 Balanced, 120 columns; synthetic data rendered by the actual renderer, not a screenshot of a live session:
 
 ```text
-[Example Model] | ctx(last) █████░░░░░ 45% 90k/200k | pi-hud | high
-● edit state.ts | tools* ✓5 !0 | agents 1 | tasks 3/7 | est* $0.042
+[Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
+● edit state.ts · tools* ✓4 !1 · est* $0.042 · agents 1 · tasks 3/7
 ```
 
-`minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including when tools start or finish. Segments are removed by priority on narrow terminals; text is grapheme-aware and width-bounded. Colors follow Pi's theme. See [all six previews](docs/preview.txt).
+`minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including when tools start or finish. Segments are removed by priority on narrow terminals; the context meter keeps its space, so a long model name is clipped before a high-usage warning can disappear. Text is grapheme-aware and width-bounded — Chinese, emoji and long paths are measured in terminal cells, not code units. See [all generated previews](docs/preview.txt).
 
 ## Install
 
@@ -45,6 +45,7 @@ To remove a registered local package, use Pi's package management (`pi remove /a
 | --- | --- |
 | `/hud on`, `/hud off`, `/hud toggle` | Enable or disable the HUD. Enabling starts fresh observation counters. |
 | `/hud preset minimal\|balanced\|full` | Select a fixed one-, two-, or three-row layout. |
+| `/hud palette pastel\|theme\|mono` | Select the field colors: the HUD's pastel palette (default), host theme tokens, or no color. |
 | `/hud lang en` or `/hud lang zh-CN` | Switch display labels. Command help remains English. |
 | `/hud placement aboveEditor\|belowEditor` | Move only the named HUD widget. |
 | `/hud git on` or `/hud git off` | Opt in/out of an additional, bounded, tracked-files-only Git probe. |
@@ -60,12 +61,31 @@ Use one alternative, not a literal `|`, in commands. Changes are in-memory and a
   "version": 1,
   "preset": "balanced",
   "language": "en",
+  "palette": "pastel",
   "refreshMs": 250,
   "git": { "enabled": false }
 }
 ```
 
 The directory follows `PI_CODING_AGENT_DIR` when set. An absolute `PI_HUD_CONFIG` overrides the full file path. Relative overrides are rejected. Configuration is regular-file-only, read asynchronously with a 32 KiB hard cap, and never watched or rewritten. Unknown fields/types are rejected; a failed reload retains the previous configuration. Startup errors use defaults and remain visible through `/hud status`. See [configuration reference](docs/CONFIGURATION.md), [example](examples/pi-hud.json), and [JSON schema](docs/config.schema.json).
+
+## Colors
+
+Styling is semantic and per field, not per row. Plain text is laid out and truncated to the visible width first; only then is each segment colored, so a color can never change the layout. An alert recolors only its own field: a high context percentage does not tint the model, and one failed tool does not tint the whole line.
+
+| Field | Role | Dark pastel | Light pastel | `theme` palette token |
+| --- | --- | --- | --- | --- |
+| Model | `model` | `#e5c890` | `#df8e1d` | `accent` |
+| Thinking level | `thinking` | `#d8c39a` | `#c08a2e` | `thinkingText` |
+| Project / path | `path` | `#a6d189` | `#40a02b` | `success` |
+| Git branch | `git` | `#8caaee` | `#1e66f5` | `mdLink` |
+| Phase / active tool | `phase` | `#ca9ee6` | `#8839ef` | `customMessageLabel` |
+| Context value and bar | `context`, `barUsed` | `#ef9f76` | `#fe640b` | `mdHeading` |
+| Numbers, cost, labels | `body`, `label` | `#c6d0f5`, `#838ba7` | `#4c4f69`, `#9ca0b0` | `text`, `muted` |
+| Separators, empty bar | `separator`, `barEmpty` | `#838ba7`, `#6c7086` | `#9ca0b0`, `#ccd0da` | `dim` |
+| Completion / waiting / failure | `success`, `warning`, `error` | `#a6d189`, `#f9e2af`, `#e78284` | `#40a02b`, `#9a6700`, `#d20f39` | `success`, `warning`, `error` |
+
+`palette: pastel` (default) selects the soft dark-terminal candidates, or their deeper same-family variants when the host theme reports light text. `palette: theme` uses host theme tokens so the HUD follows a user theme. `palette: mono` and `color: false` render plain text; `ascii: true` swaps `·`, `█`, `░`, `✓`, `↑`, `↓` and `…` for ASCII equivalents while keeping translated labels. The full generated role table is in [preview.txt](docs/preview.txt).
 
 ## What the numbers actually mean
 
@@ -89,7 +109,7 @@ native lifecycle/tool/final-message events
                                    -> requestRender only when lines change
 ```
 
-There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getEntries()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. Stream-driven host renders reuse the same cached line array unless width/state/theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
+There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getEntries()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. A row is a fixed-length list of semantic segments; the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
 
 A startup file read is deferred and asynchronous. A bridge record may schedule one bounded expiration timer. The optional Git subprocess has a timeout, output cap, single-flight gate, cooldown, cancellation, and stale-result protection; “asynchronous” does **not** mean it is free of CPU/I/O contention.
 

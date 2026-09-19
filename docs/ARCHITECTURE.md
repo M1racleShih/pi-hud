@@ -30,7 +30,7 @@ Pi's own stream/keyboard render -> HudView.render(width)
 
 `scheduler.ts` is a trailing coalescer with non-starving throttling. The first dirty publication can be immediate; subsequent scheduled publications are at least `refreshMs` apart. Multiple events share one pending timer. No `setInterval`, animation clock or idle heartbeat exists. Cancellation is idempotent and timers are unreferenced when supported.
 
-`render.ts` consumes an already-sanitized snapshot, uses fixed row counts, and drops lower-priority segments before overflowing. Cached unchanged frames reuse the same array. Width changes and host theme invalidation legitimately recompute. Publishing an unchanged visual result makes no render request. Host `invalidate()` behavior can cause extra recomputation; the cache is not a claim that a host never invalidates on its own.
+`render.ts` consumes an already-sanitized snapshot, uses fixed row counts, and drops lower-priority fields before overflowing. Each row is a bounded list of semantic segments (`role`, plain `text`): widths are measured and truncation happens on the plain text first, and `palette.ts` styles the surviving segments afterwards, so color can never change the layout. The identity row measures the context field first and reserves it (plus its separator) before clipping the model name; below 45 columns the context meter outranks the model, so a long model name cannot hide a high-usage warning. A field-level alert recolors only its own segments. Cached unchanged frames reuse the same array. Width changes and host theme invalidation legitimately recompute; both clear the memoized styler so a light/dark switch or palette change is re-detected. Publishing an unchanged visual result makes no render request. Host `invalidate()` behavior can cause extra recomputation; the cache is not a claim that a host never invalidates on its own.
 
 `config.ts` reads one bounded regular file asynchronously after the lifecycle hook has returned, or on an explicit reload command. `git.ts` is an optional, isolated, asynchronous child-process wrapper. Neither runs during rendering. Async operations still involve completion callbacks on the shared event loop; only the synchronous acquisition/CPU-heavy paths are eliminated.
 
@@ -46,6 +46,7 @@ Pi's own stream/keyboard render -> HudView.render(width)
 | Config file | 32 KiB | Rejected, including growth beyond the stat size. |
 | Git stdout/stderr buffer | 16 KiB | Probe fails to unknown rather than treating truncated status as clean. |
 | Display | 1/2/3 rows, at most 4096 columns accepted | Smaller widths clip safely; width zero returns empty row text. |
+| Row segments | `MAX_ROW_FIELDS` 12 fields, `MAX_ROW_SEGMENTS` 32 segments | Lower-priority fields are dropped, then the row is clipped at the right edge. |
 
 Snapshot iteration is over these fixed caps, never over session length. Diagnostic scalars and totals do not create a growing ledger. A high-rate malicious extension can still spend CPU invoking the shared bus; a HUD cannot isolate arbitrary code already trusted inside Pi's process.
 

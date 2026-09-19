@@ -36,7 +36,7 @@
 
 ### 证据摘要（P1 阶段 A）
 
-197 项测试通过；`npm run verify`、`npm run package:check` 通过。8 组同机交替 A/B（before 为 `af3a5e4`，probe 文件两侧一致）显示：含 usage 的 widget 渲染均值因新增分项用量与 CH 上升约 +0.47 µs（7.06 → 7.54 µs），缓存路径略降，hook p99 在噪声内（tool-pair 配对 +0.06 µs）；footer 场景为新场景无基线（full 均值 12.9 µs、p99 86.6 µs；40 列 8.8 µs），12 条状态下的缓存 footer 渲染 0.095 µs，新增门槛沿用 5 µs。锁定的 SDK 类型契约（新增 footer/status 合约）、真实 RPC 与真实 PTY 检查均通过；PTY 新增 footer 启停、原生恢复与独立扩展状态更新场景。原始数据见 [performance-phase3-ab.json](PERFORMANCE.md)。
+197 项测试通过；`npm run verify`、`npm run package:check` 通过。8 组同机交替 A/B（before 为 `af3a5e4`，after 为已提交的 `d64cbb3` 干净工作区，probe 文件两侧一致）显示：含 usage 的 widget 渲染均值因新增分项用量与 CH 上升 +0.65 ± 0.33 µs（7.76 → 8.41 µs，8/8 组为正），缓存路径持平略降，hook p99 在噪声内（tool-pair 配对 +0.047 µs）；footer 场景为新场景无基线（full 均值 14.32 µs、p99 99.2 µs；40 列 9.64 µs），12 条状态下的缓存 footer 渲染 0.104 µs，新增门槛沿用 5 µs。锁定的 SDK 类型契约（新增 footer/status 合约）、真实 RPC 与真实 PTY 检查均通过；PTY 新增 footer 启停、原生恢复与独立扩展状态更新场景。原始数据见 [performance-phase3-ab.json](PERFORMANCE.md)。
 
 ### 证据摘要（P2）
 

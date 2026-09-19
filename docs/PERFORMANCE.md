@@ -85,34 +85,34 @@ The worst uncached p99 in this phase (68 µs) leaves roughly 73× headroom again
 
 The optional `surface: footer` slot, the cached identity data and the bounded extension-status comparison changed `extension.ts`, `state.ts`, `render.ts` and added `footer.ts`, so the phase was measured against the pre-change commit (`af3a5e4`) on the same host in one session. The gates were **not** changed; a cached-footer gate with the existing 5 µs budget was **added** for the new hot path. Raw per-run data is in [performance-phase3-ab.json](performance-phase3-ab.json).
 
-Method: `git worktree` of the pre-change commit as the before side, the same tree-agnostic probe file (`scripts/perf-ab.mjs`) copied into both worktrees, identical fixtures and sample counts as phase 2. The before tree has no `src/footer.ts`, so the probe imports it dynamically and reports the footer scenarios as **new scenarios without a baseline**; the runner records them as `before: null` instead of inventing a comparison. Eight pairs ran, alternating before-then-after and after-then-before, for 8 runs per side. The shared render fixture now also carries `cacheRead`/`cacheWrite`/`cacheHit`, which the pre-change renderer ignores, so both sides render the same information density. The after side was the phase-3 working tree (recorded as `workingTree: true`; the only later source change was inside `/hud on`'s epoch reset, which no measured scenario calls).
+Method: `git worktree` of the pre-change commit (`af3a5e4`) as the before side, the same tree-agnostic probe file (`scripts/perf-ab.mjs`) copied into both worktrees, identical fixtures and sample counts as phase 2. The before tree has no `src/footer.ts`, so the probe imports it dynamically and reports the footer scenarios as **new scenarios without a baseline**; the runner records them as `before: null` instead of inventing a comparison. Eight pairs ran, alternating before-then-after and after-then-before, for 8 runs per side. The after side is the committed phase-3 tree (`d64cbb3`) with a clean working tree at measurement start (`dirtyPathsAtStart: 0`); only the JSON record is written afterwards. The before tree's single listed dirty path is the copied probe file, which is byte-identical in both trees.
 
 | Measurement | Before (mean of 8) | After (mean of 8) | Delta |
 | --- | ---: | ---: | ---: |
-| Final assistant-message handler, p99 | 1.196 µs | 1.120 µs | −6.3% (paired −0.08 ± 0.18 µs) |
-| Tool start + end pair, p99 | 2.139 µs | 2.196 µs | +2.7% (paired +0.06 ± 0.18 µs) |
-| Uncached full render, baseline fixture, p50 | 4.850 µs | 5.118 µs | +5.5% |
-| Uncached full render, baseline fixture, mean | 6.163 µs | 6.292 µs | +2.1% (paired +0.13 ± 0.39 µs) |
-| Uncached full render, baseline fixture, p99 | 38.95 µs | 37.91 µs | −2.7% |
-| Uncached full render, category-saturated, p50 | 5.852 µs | 6.153 µs | +5.1% |
-| Uncached full render, category-saturated, mean | 7.064 µs | 7.539 µs | +6.7% (paired +0.47 ± 0.46 µs, 7/8 pairs) |
-| Uncached full render, category-saturated, p95 | 8.936 µs | 9.673 µs | +8.2% |
-| Uncached full render, category-saturated, p99 | 53.10 µs | 47.78 µs | −10.0% (paired −5.3 ± 22.9 µs) |
-| Uncached full render, category-saturated, 180 columns, mean | 7.054 µs | 7.181 µs | +1.8% |
-| Uncached full render, category-saturated, mono, mean | 5.947 µs | 6.324 µs | +6.3% |
-| Uncached balanced render, concurrent activity, mean | 5.135 µs | 5.174 µs | +0.8% |
-| Uncached balanced render, concurrent activity, p99 | 14.72 µs | 16.92 µs | +15.0% (paired +2.2 ± 6.5 µs) |
-| Uncached balanced render, concurrent activity, 40 columns, mean | 3.859 µs | 3.774 µs | −2.2% |
-| Uncached full render, empty idle row, mean | 2.719 µs | 2.662 µs | −2.1% |
-| Cached render, bulk-loop mean | 0.0049 µs | 0.0046 µs | −6.1% |
-| Footer full render, category-saturated, mean | n/a | 12.90 µs | new scenario |
-| Footer full render, category-saturated, p99 | n/a | 86.6 µs | new scenario |
-| Footer balanced render, category-saturated, mean | n/a | 11.52 µs | new scenario |
-| Footer balanced render, 40 columns, mean | n/a | 8.82 µs | new scenario |
-| Footer full render without statuses, mean | n/a | 7.38 µs | new scenario |
-| Footer cached render with 12 statuses, bulk-loop mean | n/a | 0.0954 µs | new gate ≤ 5 µs |
+| Final assistant-message handler, p99 | 1.203 µs | 1.209 µs | +0.5% (paired +0.006 ± 0.07 µs, 6/8 pairs) |
+| Tool start + end pair, p99 | 2.485 µs | 2.532 µs | +1.9% (paired +0.047 ± 0.67 µs, 6/8 pairs) |
+| Uncached full render, baseline fixture, p50 | 5.136 µs | 5.513 µs | +7.4% |
+| Uncached full render, baseline fixture, mean | 6.449 µs | 6.784 µs | +5.2% (paired +0.335 ± 0.19 µs, 7/8 pairs) |
+| Uncached full render, baseline fixture, p99 | 40.691 µs | 44.161 µs | +8.5% |
+| Uncached full render, category-saturated, p50 | 6.207 µs | 6.639 µs | +7.0% |
+| Uncached full render, category-saturated, mean | 7.759 µs | 8.407 µs | +8.4% (paired +0.648 ± 0.33 µs, 8/8 pairs) |
+| Uncached full render, category-saturated, p95 | 10.450 µs | 12.207 µs | +16.8% |
+| Uncached full render, category-saturated, p99 | 53.779 µs | 49.069 µs | -8.8% (paired -4.710 ± 16.48 µs, 2/8 pairs) |
+| Uncached full render, category-saturated, 180 columns, mean | 7.494 µs | 7.904 µs | +5.5% |
+| Uncached full render, category-saturated, mono, mean | 6.459 µs | 6.847 µs | +6.0% |
+| Uncached balanced render, concurrent activity, mean | 5.570 µs | 5.670 µs | +1.8% |
+| Uncached balanced render, concurrent activity, p99 | 17.870 µs | 19.966 µs | +11.7% (paired +2.096 ± 4.55 µs, 5/8 pairs) |
+| Uncached balanced render, concurrent activity, 40 columns, mean | 4.149 µs | 4.149 µs | +0.0% |
+| Uncached full render, empty idle row, mean | 2.962 µs | 2.885 µs | -2.6% |
+| Cached render, bulk-loop mean | 0.005 µs | 0.005 µs | -7.7% (paired -0.000 ± 0.00 µs, 0/8 pairs) |
+| Footer full render, category-saturated, mean | n/a | 14.3220 µs | new scenario |
+| Footer full render, category-saturated, p99 | n/a | 99.2286 µs | new scenario |
+| Footer balanced render, category-saturated, mean | n/a | 12.3578 µs | new scenario |
+| Footer balanced render, 40 columns, mean | n/a | 9.6393 µs | new scenario |
+| Footer full render without statuses, mean | n/a | 7.9250 µs | new scenario |
+| Footer cached render with 12 statuses, bulk-loop mean | n/a | 0.1044 µs | new scenario (new gate ≤ 5 µs) |
 
-The widget path with observed usage is the only comparable scenario that got measurably slower: the usage row now renders four separate counters plus `CH` instead of two merged numbers, which costs about **+0.47 µs mean** on the saturated fixture (7.1 → 7.5 µs) and +0.13 µs on the baseline fixture. That is a deliberate information increase of roughly 0.006% of one core at the strictest one-recompute-per-250 ms cadence, not a structural regression: every gate is unchanged, the worst after-side render p99 (47.8 µs) still leaves ~100× headroom against the 5 ms gate, and the cached path got slightly cheaper. The 12-status footer hot path (every host-invoked render re-checks the status map) measures 0.095 µs per cached frame against the new 5 µs gate, so it is ~52× inside budget.
+The widget path with observed usage is the only comparable scenario that got measurably slower: the usage row now renders four separate counters plus `CH` instead of two merged numbers, which costs about **+0.65 ± 0.33 µs mean** on the saturated fixture (7.76 → 8.41 µs, 8/8 pairs) and +0.33 ± 0.19 µs on the baseline fixture (7/8 pairs). That is a deliberate information increase, not a structural regression: every gate is unchanged, the worst comparable after-side widget render p99 (49.1 µs) still leaves ~102× headroom against the 5 ms gate (the new footer p99 is 99.2 µs, ~50× inside it), the cached path is unchanged to marginally cheaper, and the footer's own cached hot path re-checks up to eight statuses for 0.104 µs per frame — ~48× inside the new 5 µs gate. At the strictest one-recompute-per-250 ms cadence the extra widget work is roughly 0.00026% of one core.
 
 **These are synthetic microbenchmarks, not a live Pi/provider/terminal A/B.** The real-host streaming, tool-dispatch and keyboard-latency acceptance procedure below is still required before any release claim.
 

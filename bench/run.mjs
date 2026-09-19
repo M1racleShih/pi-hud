@@ -5,9 +5,10 @@ import { writeFileSync } from "node:fs";
 import { controllerFixture, assistant, MODEL } from "../tests/helpers.mjs";
 import { HudState } from "../src/state.ts";
 import { HudView } from "../src/render.ts";
+import { HudFooterView, formatFooter } from "../src/footer.ts";
 import { normalizeConfig } from "../src/config.ts";
 
-const GATES = Object.freeze({ hookP99Us: 250, uncachedRenderP99Us: 5_000, cachedRenderMeanUs: 5 });
+const GATES = Object.freeze({ hookP99Us: 250, uncachedRenderP99Us: 5_000, cachedRenderMeanUs: 5, cachedFooterRenderMeanUs: 5 });
 function sample(callback, count = 12_000) {
   for (let i = 0; i < 2_000; i++) callback(i);
   const times = new Float64Array(count);
@@ -90,6 +91,43 @@ const uncachedRenderConcurrent = sample(() => { concurrentView.invalidate(); con
 const concurrentNarrowView = new HudView({ requestRender() {} }, null, concurrent.snapshot(), normalizeConfig({ preset: "balanced" }));
 concurrentNarrowView.render(40);
 const uncachedRenderConcurrentNarrow = sample(() => { concurrentNarrowView.invalidate(); concurrentNarrowView.render(40); }, 3_000);
+// ---------------------------------------------------------------------------
+// Phase 3: footer surface and bounded status comparison
+// ---------------------------------------------------------------------------
+const FOOTER_IDENTITY = Object.freeze({ cwd: "~/opensource/pi-hud", provider: "bench", title: "Compare HUDs", branch: "main", branchDirty: true });
+const footerStatuses = new Map();
+for (let index = 0; index < 12; index++) footerStatuses.set(`ext-${index}`, `status text number ${index} with a bounded tail`);
+const footerData = {
+  getGitBranch: () => "main",
+  onBranchChange: () => () => {},
+  getExtensionStatuses: () => footerStatuses,
+};
+const footerView = (snapshot, preset, width, data = footerData) => {
+  const instance = new HudFooterView({ requestRender() {} }, null, data, snapshot, normalizeConfig({ preset }), FOOTER_IDENTITY, () => {});
+  instance.render(width);
+  return instance;
+};
+const footerFull = footerView(saturatedSnapshot, "full", 120);
+const uncachedFooterFull = sample(() => { footerFull.invalidate(); footerFull.render(120); }, 3_000);
+const footerBalanced = footerView(saturatedSnapshot, "balanced", 120);
+const uncachedFooterBalanced = sample(() => { footerBalanced.invalidate(); footerBalanced.render(120); }, 3_000);
+const footerNarrow = footerView(saturatedSnapshot, "balanced", 40);
+const uncachedFooterNarrow = sample(() => { footerNarrow.invalidate(); footerNarrow.render(40); }, 3_000);
+const footerNoStatus = footerView(saturatedSnapshot, "full", 120, { ...footerData, getExtensionStatuses: () => new Map() });
+const uncachedFooterNoStatus = sample(() => { footerNoStatus.invalidate(); footerNoStatus.render(120); }, 3_000);
+// The status comparison runs on every host-invoked render, including cached frames, so its
+// cost is measured on the hot cached path with 12 statuses attached.
+const footerStatusCompare = footerView(saturatedSnapshot, "full", 120);
+const cachedFooterLines = footerStatusCompare.render(120);
+let footerCacheHits = 0;
+const footerFrames = 1_000_000;
+const footerStatusStart = performance.now();
+for (let index = 0; index < footerFrames; index++) if (footerStatusCompare.render(120) === cachedFooterLines) footerCacheHits++;
+const cachedFooterRenderMeanUs = (performance.now() - footerStatusStart) * 1_000 / footerFrames;
+assert.equal(footerCacheHits, footerFrames, "an unchanged footer frame reuses the same array");
+assert.equal(footerStatusCompare.statusChanges, 1, "the bounded comparison detects the initial statuses once");
+assert.equal(footerStatusCompare.statusChecks, footerFrames + 2, "every host render runs the bounded comparison");
+
 const cached = view.render(120);
 let cacheHits = 0;
 const cachedFrames = 1_000_000;
@@ -129,7 +167,20 @@ const report = {
   uncachedRenderMono, uncachedRenderNarrow,
   uncachedRenderSaturated, uncachedRenderSaturatedWide,
   uncachedRenderConcurrent, uncachedRenderConcurrentNarrow,
+  uncachedFooterFull, uncachedFooterBalanced, uncachedFooterNarrow, uncachedFooterNoStatus,
   cachedRender: { frames: cachedFrames, identicalCacheHits: cacheHits, meanUs: cachedRenderMeanUs },
+  cachedFooterRender: {
+    frames: footerFrames, identicalCacheHits: footerCacheHits, statusChecks: footerStatusCompare.statusChecks,
+    statusChanges: footerStatusCompare.statusChanges, meanUs: cachedFooterRenderMeanUs,
+  },
+  footerShape: {
+    bodyRows: { minimal: formatFooter(saturatedSnapshot, normalizeConfig({ preset: "minimal" }), 120, FOOTER_IDENTITY).length,
+      balanced: formatFooter(saturatedSnapshot, normalizeConfig({ preset: "balanced" }), 120, FOOTER_IDENTITY).length,
+      full: formatFooter(saturatedSnapshot, normalizeConfig({ preset: "full" }), 120, FOOTER_IDENTITY).length },
+    statusEntries: footerStatuses.size,
+    footerFullLines: footerFull.render(120).length,
+    footerNarrowLines: footerNarrow.render(40).length,
+  },
   structural: {
     perTokenSubscriptions: 0, runtimeDependencies: 0,
     burstToolEvents: 100_000, pendingPublicationTimers: 1, burstPublications: 1,
@@ -146,10 +197,12 @@ const report = {
     Math.max(uncachedRender.p99Us, uncachedRenderMono.p99Us, uncachedRenderNarrow.p99Us,
       uncachedRenderSaturated.p99Us, uncachedRenderSaturatedWide.p99Us,
       uncachedRenderConcurrent.p99Us, uncachedRenderConcurrentNarrow.p99Us) <= GATES.uncachedRenderP99Us &&
-    cachedRenderMeanUs <= GATES.cachedRenderMeanUs,
+    cachedRenderMeanUs <= GATES.cachedRenderMeanUs &&
+    cachedFooterRenderMeanUs <= GATES.cachedFooterRenderMeanUs,
 };
 f.emit("session_shutdown"); flood.emit("session_shutdown"); categoryFlood.emit("session_shutdown");
 view.dispose(); monoView.dispose(); narrowView.dispose();
+footerFull.dispose(); footerBalanced.dispose(); footerNarrow.dispose(); footerNoStatus.dispose(); footerStatusCompare.dispose();
 saturatedView.dispose(); saturatedWideView.dispose(); concurrentView.dispose(); concurrentNarrowView.dispose();
 const destination = process.argv.find((arg) => arg.startsWith("--json="))?.slice(7);
 if (destination) writeFileSync(destination, JSON.stringify(report, null, 2) + "\n");

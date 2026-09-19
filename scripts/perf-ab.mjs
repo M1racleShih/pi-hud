@@ -59,7 +59,8 @@ const fixture = (overrides = {}) => ({
   contextWindow: 200_000, contextTokens: 90_000, phase: "tools",
   activeTools: ["edit /workspace/pi-hud/src/render.ts", "bash", "read /workspace/pi-hud/README.md"],
   activeCount: 3, done: 60, errors: 7, interrupted: 3, dropped: 0,
-  input: 87_000, output: 3_000, cost: 0.042, usageReports: 1, costReports: 1, compactions: 0,
+  input: 87_000, output: 3_000, cacheRead: 355_000, cacheWrite: 0, cacheHit: 355_000 / 442_000,
+  cost: 0.042, usageReports: 1, costReports: 1, compactions: 0,
   lastTool: "edit render.ts",
   runningAgents: 1, agentErrors: 0, agentLabel: "Review implementation",
   taskTotal: 7, taskDone: 3, taskLabel: "Build Pi HUD", taskSources: 1,
@@ -87,6 +88,51 @@ const renders = {
   emptyIdle120: measure(fixture({ activeTools: [], activeCount: 0, phase: "idle", toolCategories: [], done: 0, errors: 0, interrupted: 0, usageReports: 0, costReports: 0, cost: 0, taskSources: 0, taskTotal: 0, taskDone: 0, runningAgents: 0 }), { preset: "full" }, 120),
 };
 
+// ---------------------------------------------------------------------------
+// Phase-3 footer surface and bounded status comparison.
+// The pre-change tree has no `src/footer.ts`, so the module is imported dynamically and the
+// footer scenarios are reported as unavailable there instead of failing the probe.
+// ---------------------------------------------------------------------------
+let footerModule = null;
+try { footerModule = await import("../src/footer.ts"); } catch { footerModule = null; }
+const footer = footerModule ? (() => {
+  const identity = { cwd: "~/opensource/pi-hud", provider: "bench", title: "Compare HUDs", branch: "main", branchDirty: true };
+  const statuses = new Map();
+  for (let index = 0; index < 12; index++) statuses.set(`ext-${index}`, `status text number ${index} with a bounded tail`);
+  const data = { getGitBranch: () => "main", onBranchChange: () => () => {}, getExtensionStatuses: () => statuses };
+  const emptyData = { ...data, getExtensionStatuses: () => new Map() };
+  const make = (snapshot, preset, width, footerData = data) => {
+    const instance = new footerModule.HudFooterView({ requestRender() {} }, null, footerData, snapshot, normalizeConfig({ preset }), identity, () => {});
+    instance.render(width);
+    return instance;
+  };
+  const full = make(saturated, "full", 120);
+  const balanced = make(saturated, "balanced", 120);
+  const narrow = make(saturated, "balanced", 40);
+  const noStatus = make(saturated, "full", 120, emptyData);
+  const renders = {
+    footerFull120: sample(() => { full.invalidate(); full.render(120); }, 3_000),
+    footerBalanced120: sample(() => { balanced.invalidate(); balanced.render(120); }, 3_000),
+    footerNarrow40: sample(() => { narrow.invalidate(); narrow.render(40); }, 3_000),
+    footerNoStatus120: sample(() => { noStatus.invalidate(); noStatus.render(120); }, 3_000),
+  };
+  const cached = full.render(120);
+  let hits = 0;
+  const frames = 1_000_000;
+  const started = performance.now();
+  for (let index = 0; index < frames; index++) if (full.render(120) === cached) hits++;
+  const cachedRender = { frames, identicalCacheHits: hits, statusChecks: full.statusChecks, statusChanges: full.statusChanges, meanUs: (performance.now() - started) * 1_000 / frames };
+  full.dispose(); balanced.dispose(); narrow.dispose(); noStatus.dispose();
+  return {
+    bodyRows: {
+      minimal: footerModule.formatFooter(saturated, normalizeConfig({ preset: "minimal" }), 120, identity).length,
+      balanced: footerModule.formatFooter(saturated, normalizeConfig({ preset: "balanced" }), 120, identity).length,
+      full: footerModule.formatFooter(saturated, normalizeConfig({ preset: "full" }), 120, identity).length,
+    },
+    renders, cachedRender,
+  };
+})() : null;
+
 const cachedView = new HudView({ requestRender() {} }, null, saturated, normalizeConfig({ preset: "full" }));
 const cached = cachedView.render(120);
 let cacheHits = 0;
@@ -103,7 +149,7 @@ const report = {
   generatedAt: new Date().toISOString(),
   environment: { node: process.version, platform: platform(), arch: arch(), cpu: cpus()[0]?.model ?? "unknown" },
   methodology: "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
-  hooks, renders,
+  hooks, renders, footer,
   cachedRender: { frames: cachedFrames, identicalCacheHits: cacheHits, meanUs: cachedRenderMeanUs },
 };
 if (destination) writeFileSync(destination, JSON.stringify(report, null, 2) + "\n");

@@ -139,7 +139,9 @@ test("field colors are capped by the fixed field and segment budgets", () => {
   s.activeTools = Array.from({ length: 3 }, () => "a-very-long-tool-name-with-target.ts");
   for (const width of [0, 10, 40, 120, 180]) {
     for (const row of formatHud(s, normalizeConfig({ preset: "full" }), width)) {
-      assert.ok(row.segments.filter((segment) => segment.role !== "separator").length <= MAX_ROW_FIELDS + 1);
+      // Each field may contribute a small, fixed number of colored segments (a label and a
+      // value); the hard per-row bound is MAX_ROW_SEGMENTS below.
+      assert.ok(row.segments.filter((segment) => segment.role !== "separator").length <= MAX_ROW_FIELDS + 4);
       assert.ok(row.segments.length <= MAX_ROW_SEGMENTS);
       assert.ok(visibleWidth(row.text) <= width);
     }
@@ -366,7 +368,7 @@ test("zero-compaction and zero-usage fields stay hidden, and appear once observe
   state.compact();
   const observed = formatHud(state.snapshot(), config, 120)[2];
   assert.match(observed.text, /compactions\* 1/);
-  assert.match(observed.text, /↑3\.4k ↓300/);
+  assert.match(observed.text, /obs\* ↑1\.0k ↓300 R2\.0k W400 CH\?/, "compaction invalidates the cached hit-rate observation");
   assert.equal(observed.segments.find((segment) => segment.text.includes("compactions"))?.role, "label");
 });
 
@@ -395,7 +397,7 @@ test("bridge agents/tasks appear only with real bridge data", () => {
   const withoutBridge = formatHud(state.snapshot(), config, 120);
   assert.equal(withoutBridge.length, 3);
   for (const row of withoutBridge) assert.doesNotMatch(row.text, /no bridged activity|暂无桥接活动/);
-  assert.match(withoutBridge[2].text, /↑3\.4k ↓300/);
+  assert.match(withoutBridge[2].text, /obs\* ↑1\.0k ↓300 R2\.0k W400 CH58\.8%/);
 
   state.bridge({ version: 1, source: "s", kind: "agent", id: "a", status: "running", label: "Review implementation" }, 0);
   state.bridge({ version: 1, source: "s", kind: "tasks", id: "t", completed: 2, total: 5, label: "Bridge goal" }, 0);

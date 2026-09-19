@@ -8,11 +8,20 @@ function state() { return new HudState("/tmp/example", MODEL, 100); }
 test("fresh attachment has unknown context, not a fictional 0 percent", () => {
   const s = state(); assert.equal(s.contextTokens, null); assert.equal(s.contextWindow, 200_000); assert.equal(s.costReports, 0);
 });
-test("context includes input, both caches and output exactly once", () => {
+test("usage counters stay split: input never absorbs the cache counters", () => {
   const s = state(); s.messageEnd(assistant(), 200);
-  assert.equal(s.contextTokens, 3_700); assert.equal(s.input, 3_400); assert.equal(s.output, 300); assert.equal(s.cost, 0.012);
+  assert.equal(s.input, 1_000); assert.equal(s.output, 300);
+  assert.equal(s.cacheRead, 2_000); assert.equal(s.cacheWrite, 400);
+  // The context snapshot keeps its previous meaning: every prompt token plus the output.
+  assert.equal(s.contextTokens, 3_700);
+  assert.equal(s.cacheHit, 2_000 / 3_400);
+  assert.equal(s.cost, 0.012);
   s.messageEnd(assistant(), 300);
-  assert.equal(s.contextTokens, 3_700); assert.equal(s.input, 6_800); assert.equal(s.cost, 0.024);
+  assert.equal(s.input, 2_000); assert.equal(s.output, 600);
+  assert.equal(s.cacheRead, 4_000); assert.equal(s.cacheWrite, 800);
+  assert.equal(s.contextTokens, 3_700); assert.equal(s.cost, 0.024);
+  const snapshot = s.snapshot();
+  assert.equal(snapshot.input + snapshot.cacheRead + snapshot.cacheWrite, 6_800, "no cache token is counted as fresh input twice");
 });
 for (const reason of ["error", "aborted"]) {
   test(`${reason} invalidates possibly partial context but preserves reported spend`, () => {
@@ -89,6 +98,83 @@ test("reset starts a new honest observation epoch and drops all old counters", (
   const s = state(); s.messageEnd(assistant(), 200); s.compact();
   s.reset("/tmp/new", MODEL, 500);
   assert.equal(s.since, 500); assert.equal(s.cost, 0); assert.equal(s.contextTokens, null); assert.equal(s.compactions, 0); assert.equal(s.project, "new");
+});
+
+// ---------------------------------------------------------------------------
+// Cache-hit observation: numerator/denominator source and invalidation
+// ---------------------------------------------------------------------------
+
+test("cache-hit rate is the latest valid assistant's cacheRead over the prompt total", () => {
+  const s = state();
+  s.messageEnd(assistant(), 200);
+  assert.equal(s.cacheHit, 2_000 / 3_400);
+  s.messageEnd(assistant({ usage: { input: 0, output: 10, cacheRead: 900, cacheWrite: 100, cost: { total: 0 } } }), 300);
+  assert.equal(s.cacheHit, 0.9, "the latest valid response replaces the previous rate");
+});
+
+test("cache-hit rate is unknown when the denominator is zero or the provider omits cache data", () => {
+  const s = state();
+  s.messageEnd(assistant({ usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } } }), 200);
+  assert.equal(s.cacheHit, null, "a zero prompt total cannot be turned into 0%");
+  s.messageEnd(assistant({ usage: { input: 50, output: 5 } }), 300);
+  assert.equal(s.cacheHit, null, "missing cache counters are unknown, not a real zero");
+  s.messageEnd(assistant({ usage: { input: 50, output: 5, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } } }), 400);
+  assert.equal(s.cacheHit, 0, "explicit zeros are a measured miss");
+});
+
+test("aborted and error responses never replace the last valid cache observation", () => {
+  for (const reason of ["error", "aborted"]) {
+    const s = state();
+    s.messageEnd(assistant(), 200);
+    s.messageEnd(assistant({ stopReason: reason, usage: { input: 7, output: 7, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } } }), 300);
+    assert.equal(s.contextTokens, null, `${reason}: partial context is not trustworthy`);
+    assert.equal(s.cacheHit, 2_000 / 3_400, `${reason}: the last valid rate is preserved`);
+    assert.equal(s.input, 1_007, `${reason}: reported usage still counts once`);
+  }
+});
+
+test("model switch, compaction and reset drop a cache observation that no longer applies", () => {
+  const byModel = state();
+  byModel.messageEnd(assistant(), 200);
+  byModel.setModel({ ...MODEL, id: "switched", contextWindow: 100_000 });
+  assert.equal(byModel.cacheHit, null);
+
+  const byCompaction = state();
+  byCompaction.messageEnd(assistant(), 200);
+  byCompaction.compact();
+  assert.equal(byCompaction.cacheHit, null);
+
+  const byReset = state();
+  byReset.messageEnd(assistant(), 200);
+  byReset.reset("/tmp/next", MODEL, 900);
+  assert.equal(byReset.cacheHit, null);
+});
+
+test("the same model selection keeps the observation and a late response from the old model still counts", () => {
+  const s = state();
+  s.messageEnd(assistant(), 200);
+  s.setModel(MODEL);
+  assert.equal(s.cacheHit, 2_000 / 3_400, "selecting the same model invalidates nothing");
+  s.setModel({ ...MODEL, id: "new-model", contextWindow: 8_000 });
+  assert.equal(s.cacheHit, null);
+  s.messageEnd(assistant({ model: MODEL.id, provider: MODEL.provider }), 300);
+  assert.equal(s.cacheHit, null, "another model's cache behaviour never becomes the current model's rate");
+  assert.equal(s.contextTokens, null);
+  s.messageEnd(assistant({ model: "new-model", provider: MODEL.provider }), 400);
+  assert.equal(s.cacheHit, 2_000 / 3_400, "a response from the selected model restores the observation");
+  assert.equal(s.contextTokens, 3_700);
+});
+
+test("snapshot exposes split usage without recombining cache tokens into input", () => {
+  const s = state();
+  s.messageEnd(assistant(), 200);
+  const snapshot = s.snapshot();
+  assert.deepEqual(
+    { input: snapshot.input, output: snapshot.output, cacheRead: snapshot.cacheRead, cacheWrite: snapshot.cacheWrite },
+    { input: 1_000, output: 300, cacheRead: 2_000, cacheWrite: 400 },
+  );
+  assert.equal(snapshot.cacheHit, 2_000 / 3_400);
+  assert.equal(snapshot.contextTokens, 3_700);
 });
 
 test("late response from previous model counts usage but not current context", () => {

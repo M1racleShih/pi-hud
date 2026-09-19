@@ -93,9 +93,44 @@ This phase added the bounded per-tool-name category ledger (16 names plus one `o
 
 Passing the checks above must not be described as human visual acceptance or as live-stream performance equivalence. Those two claims are still unproven.
 
+## Phase 3: optional footer surface (2026-09-20)
+
+This phase added the opt-in `surface: footer` slot (Pi 0.85.1 `ctx.ui.setFooter`), its ownership
+lifecycle, cached identity data (display cwd, provider, session title, host Git branch), split
+usage counters with a cache-hit rate, and a separate bounded extension-status area. The default
+surface is still `widget`; no history is scanned and the counters keep their observed scope. The
+environment is the same as the phase-1/2 records: Linux x64, Node **v24.19.0**, npm 11.17.0,
+AMD Ryzen 7 9700X, Pi `@earendil-works/pi-coding-agent@0.85.1` under ignored `.tmp/sdk`.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | **196 tests passed**, zero failed/skipped (47 more than the 149 in the phase-2 record). New coverage: surface configuration defaults/validation and `/hud surface`; footer-only mounting; live widget↔footer switching; `placement` never touching the footer; host-without-`setFooter` fallback with a recorded reason; off/on, shutdown and session replacement releasing views, subscriptions and timers; both ownership orders for two footer extensions (a later footer is never cleared by `off`/dispose/refresh, and only an explicit surface command re-claims); host-driven disposal isolating old branch callbacks; identity updates for title/provider/thinking/model; branch reads only at install and on `onBranchChange` (never in render); non-TUI modes performing zero terminal UI operations; footer body rows fixed at 2/3/4 for 0–180 columns × three presets × two languages × ASCII; the bounded status area (sanitize, 8-entry sample, 64-char text, 2 rows, `+N` fold, total ≤ 6 rows); in-place status `Map` add/change/delete detection with no HUD event; a 50,000-entry status map sampled rather than iterated; a throwing status provider still rendering the body; cached-array reuse with 12 statuses; and the split usage/cache-hit lifecycle (zero denominator, missing cache data, explicit zeros, aborted/error, model switch, compaction, reset). |
+| `npm run check` | Passed. The forbidden-API group now allows `setFooter` **only** inside the marked boundary section of `src/footer.ts`, and asserts that both the capability guard and the install/release helpers stay inside it; every other source file keeps the full list. Schema/example/preview checks were updated for `surface` and the new footer previews. |
+| `npm run verify` | Passed end to end with the new footer scenarios and one added gate (`cachedFooterRenderMeanUs ≤ 5 µs`); every existing gate is unchanged. |
+| `npm run package:check` | Passed: `pi-hud-0.1.0.tgz`, 37 files, 129,803 bytes, empty-cache offline production install and packed entry import. |
+| Same-machine A/B | 8 interleaved pairs against `af3a5e4` with the identical probe file and shared fixtures. The widget path with observed usage is ~+0.47 µs mean slower (7.06 → 7.54 µs) because the usage row now renders four separate counters plus `CH`; the cached path is slightly cheaper, hooks are within noise (+0.06 µs paired tool-pair p99), and all gates pass unchanged. Footer scenarios are new and have no pre-change baseline: full 12.9 µs mean / 86.6 µs p99 uncached, balanced 11.5 µs, 40-column 8.8 µs, and 0.095 µs per cached frame with 12 statuses against the new 5 µs gate. Full data: [performance-phase3-ab.json](performance-phase3-ab.json). |
+| `node scripts/sdk-check.mjs` | Passed against the real pinned package. Extended to type-check the footer contract: the HUD's `FooterDataLike` must accept Pi's real `ReadonlyFooterDataProvider`, `ctx.ui.setFooter(factory)`/`setFooter(undefined)` must type-check against `Component & { dispose? }`, `ctx.sessionManager.getSessionName()` must exist, and `pi.on("session_info_changed")` must expose `name`. |
+| `node scripts/pi-rpc-smoke.mjs` | Passed: real Pi loads `index.ts`, registers `/hud`, strict JSON framing, and no HUD UI output in RPC mode (so no `setWidget`/`setFooter` call leaks into a headless session). |
+| `python3 scripts/pi-pty-smoke.py` | Passed in a disposable PTY. It now also loads `examples/status-demo.ts`, switches to the footer surface, asserts that no native-footer-only marker (`(auto)`, one-decimal `%/`) is rendered — including after a forced full repaint — verifies that an independent extension's `setStatus` reaches the footer without any HUD event, switches back and confirms the built-in footer returns, then exercises `/hud off` in footer mode and confirms the native footer is restored. No model request or credentials. |
+
+### Pending, not executed
+
+| Item | Why it remains open |
+| --- | --- |
+| Real dark/light terminal visual acceptance of the footer | No human observer drove the footer surface in a real terminal, on either background. The layout is covered by 0–180-column renderer tests, the generated preview and one PTY run at 100–102 columns; contrast, line stability and legibility still need an observer at 40/80/120/180 columns. |
+| Live model-stream / tool-dispatch / keyboard A/B | Unchanged from phase 1: requires a deterministic provider fixture and external instrumentation per [PERFORMANCE.md](PERFORMANCE.md). Not run. |
+| Real-session footer data parity | The PTY smoke makes no model or tool call, so the footer's usage split, `CH`, session title and branch are verified by unit tests, the generated preview and the synthetic A/B, not by a live comparison against the built-in footer's full-session aggregation. |
+| Two footer extensions in a real host | Ownership is covered by deterministic tests that mirror Pi's single-slot semantics (`setExtensionFooter` disposes the previous component first). A second real footer extension was not loaded in the PTY run. |
+| Cross-platform matrix | Only local Linux was executed; the workflow still prepares macOS/Windows and Node 22.19.0/24. |
+
+Passing the checks above must not be described as human visual acceptance, as live-stream
+performance equivalence, or as a byte-for-byte replacement of the built-in footer.
+
 ## What to verify on the first real installation
 
-Load the extension once, inspect `/hud status`, try the three presets, Chinese labels, resizing, compaction, model switching, reload and off/on. Keep Git disabled initially. A loaded extension should not cause tool prompts, network access or extra model messages; the built-in footer and editor should remain intact. With no completed response after attachment, `ctx(last) ?` is expected. Subagent/task rows without adapters are not expected to populate automatically.
+Load the extension once, inspect `/hud status`, try the three presets, Chinese labels, resizing, compaction, model switching, reload and off/on. Keep Git disabled initially. A loaded extension should not cause tool prompts, network access or extra model messages; the editor and, in the default widget surface, the built-in footer should remain intact. With no completed response after attachment, `ctx(last) ?` is expected. Subagent/task rows without adapters are not expected to populate automatically.
+
+For a first look at the optional footer surface, run `/hud surface footer` in a real terminal, compare it against the built-in footer side by side (model, provider, context, tokens, cache, cost, branch, session title, other extensions' statuses), resize to 40/80/120/180 columns, switch theme and palette, then `/hud surface widget` or `/hud off` and confirm the built-in footer returns exactly once. That side-by-side comparison is the visual acceptance that this record still lists as pending.
 
 For a public stable release, the owner should review passing pinned-SDK/RPC/PTY checks and real-terminal A/B evidence before publishing the generated draft. Source-level compatibility review and microbenchmarks are valuable but not substitutes for that gate.
 

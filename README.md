@@ -4,7 +4,7 @@ Planned provider quota and API balance support: [implementation plan (Chinese)](
 
 English | [简体中文](README.zh-CN.md)
 
-A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, and opt-in agent/task progress without replacing Pi's editor or footer.
+A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, and opt-in agent/task progress. The default surface is a named widget next to Pi's built-in footer; an **opt-in footer surface** can replace that footer instead so the same information is not shown twice.
 
 **No runtime dependencies. No token-stream listeners. No transcript scans. No prompt injection. No network requests. Git probing is off by default.**
 
@@ -18,6 +18,24 @@ Balanced, 120 columns; synthetic data rendered by the actual renderer, not a scr
 ```
 
 `minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including while tools start, finish, fail or settle. Segments are removed by priority on narrow terminals: the context percentage, the currently running tool and the error alert survive first, then tool categories fold away. The context meter keeps its space, so a long model name is clipped before a high-usage warning can disappear. Text is grapheme-aware and width-bounded — Chinese, emoji and long paths are measured in terminal cells, not code units. See [all generated previews](docs/preview.txt).
+
+## Surfaces: widget (default) or footer
+
+`surface` selects where the HUD is drawn. The default is `widget`, so nothing changes for an existing installation. `footer` replaces Pi's built-in footer through the official `ctx.ui.setFooter` slot and does **not** mount the HUD widget, which removes the duplicate model/context/cost display:
+
+```text
+[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+ctx(last) ██░░░░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042
+● edit state.ts · interrupted 1 · errors 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
+```
+
+The footer body uses **2 rows for `minimal`, 3 for `balanced` and 4 for `full`**. Statuses published by other extensions (`ctx.ui.setStatus`) are displayed in a separate bounded area: at most 8 entries, 64 sanitized characters each, at most 2 rows, and at most 6 footer rows in total. A status change is detected inside the footer's own render pass — no polling, no HUD event and no host patch is required.
+
+The footer adds identity data that the widget does not show: the working directory (home is abbreviated to `~`), the model, the provider, the thinking level, the session title, and the host's Git branch. The branch comes from Pi's own `footerData.getGitBranch()`/`onBranchChange()` cache, so no extra Git process is started for it; the optional dirty marker still requires the separate `git.enabled` probe.
+
+The footer is **not** a byte-for-byte replacement of the built-in footer. This round does not read session history, so its counters remain "observed since this attachment/reset" and its context value stays the labelled `ctx(last)` snapshot. The host's full-session totals, live context estimate, auto-compaction/subscription flags and provider count are intentionally not imitated. `/hud status` prints the exact data-coverage differences.
+
+Ownership rules: `/hud off` restores the built-in footer while the HUD still owns the slot; if another extension replaced the HUD footer, the HUD neither clears that footer on `off`/dispose nor takes the slot back during a refresh — only an explicit `/hud surface footer` re-claims it. A host without `ui.setFooter` falls back to the widget and records the reason for `/hud status`.
 
 ## Activity information
 
@@ -50,7 +68,8 @@ To remove a registered local package, use Pi's package management (`pi remove /a
 | Command | Effect |
 | --- | --- |
 | `/hud on`, `/hud off`, `/hud toggle` | Enable or disable the HUD. Enabling starts fresh observation counters. |
-| `/hud preset minimal\|balanced\|full` | Select a fixed one-, two-, or three-row layout. |
+| `/hud preset minimal\|balanced\|full` | Select a fixed one-, two-, or three-row widget layout, or a two-, three-, or four-row footer body. |
+| `/hud surface widget\|footer` | Select the surface. `footer` replaces the built-in footer and mounts no widget; an explicit command re-claims a slot taken by another extension. |
 | `/hud palette pastel\|theme\|mono` | Select the field colors: the HUD's pastel palette (default), host theme tokens, or no color. |
 | `/hud lang en` or `/hud lang zh-CN` | Switch display labels. Command help remains English. |
 | `/hud placement aboveEditor\|belowEditor` | Move only the named HUD widget. |
@@ -66,6 +85,7 @@ Use one alternative, not a literal `|`, in commands. Changes are in-memory and a
 {
   "version": 1,
   "preset": "balanced",
+  "surface": "widget",
   "language": "en",
   "palette": "pastel",
   "refreshMs": 250,
@@ -99,11 +119,13 @@ Styling is semantic and per field, not per row. Plain text is laid out and trunc
 
 **`*` means “observed since this HUD attachment/reset.”** Tool outcomes, token totals, compaction count, and `est*` cost exclude earlier history. Resuming a long session does not scan it. Tree navigation and re-enabling reset the observation scope; manual compaction invalidates context but retains the observed cumulative counters. The category ledger follows that same observation scope — it is cleared on reset, tree navigation and re-enabling, so old activity never leaks into a new session. Duplicate tool completions are deduplicated within a bounded recent-ID window. `limited*` means a record was dropped because a fixed cap was reached; unfinished tools are counted as interrupted after the run settles, never as success. Counts can be incomplete in that case and the per-category marks make it visible.
 
+**`obs*` reports input, output and both cache counters separately.** Cached tokens are never added to fresh input again, so `↑in`, `↓out`, `RcacheRead` and `WcacheWrite` are the four reported fields instead of one merged number. `CH` is the cache-hit rate of the most recent assistant response with valid usage: `cacheRead / (input + cacheRead + cacheWrite)`, shown as `?` when that denominator is zero or the provider reported no cache data. Reset, a model switch and compaction clear a rate that no longer applies; aborted or errored responses never replace the last valid one. `obs*`, `last` and `est*` all mean the same thing: a bounded observation from this attachment, not the built-in footer's full-session ledger.
+
 **`est*` is a model-pricing estimate**, using Pi's reported `usage.cost.total`, not a bill or subscription allowance. Missing reports display `?`; partly known costs have `+?`. Historical, compaction-model, and unreported child-agent usage are not silently included. No provider credentials or subscription endpoints are read.
 
 **Agents/tasks appear only through an explicit extension bridge.** A native `subagent` tool can appear as a bounded tool category, but that alone does not reveal its internal children. [Bridge protocol and examples](docs/BRIDGE.md) let a subagent or `/goal` extension publish small lifecycle records. There is no universal, preinstalled adapter for every third-party extension.
 
-**Optional Git is a cached, idle-boundary snapshot.** It deliberately ignores untracked files, submodule state, line diffs, and ahead/behind counts. `*` means tracked changes; `git:?` means unavailable, not clean. Leave it off for the strictest low-contention configuration and use Pi's existing footer branch display.
+**Optional Git is a cached, idle-boundary snapshot.** It deliberately ignores untracked files, submodule state, line diffs, and ahead/behind counts. `*` means tracked changes; `git:?` means unavailable, not clean. Leave it off for the strictest low-contention configuration; the footer surface still shows Pi's own cached branch name, and the widget can keep using Pi's existing footer branch display.
 
 ## Core-loop protection
 
@@ -115,7 +137,7 @@ native lifecycle/tool/final-message events
                                    -> requestRender only when lines change
 ```
 
-There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getEntries()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. A row is a bounded list of semantic segments (at most 12 fields and 40 segments); the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
+There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getEntries()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. `ctx.ui.setFooter` is called only from the dedicated footer surface module (`src/footer.ts`), behind a capability check and a `tui`-mode guard; `scripts/check.mjs` fails the build if any other file calls it. A row is a bounded list of semantic segments (at most 12 fields and 40 segments); the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, a status change or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
 
 A startup file read is deferred and asynchronous. A bridge record may schedule one bounded expiration timer. The optional Git subprocess has a timeout, output cap, single-flight gate, cooldown, cancellation, and stale-result protection; “asynchronous” does **not** mean it is free of CPU/I/O contention.
 

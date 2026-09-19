@@ -59,13 +59,30 @@ const metricPaths = [
   ["renders.concurrentBalanced40.meanUs", (report) => report.renders.concurrentBalanced40.meanUs],
   ["renders.emptyIdle120.meanUs", (report) => report.renders.emptyIdle120.meanUs],
   ["cachedRender.meanUs", (report) => report.cachedRender.meanUs],
+  // Phase 3: present only on a tree that has the footer surface module.
+  ["footer.renders.footerFull120.meanUs", (report) => report.footer?.renders?.footerFull120?.meanUs],
+  ["footer.renders.footerFull120.p99Us", (report) => report.footer?.renders?.footerFull120?.p99Us],
+  ["footer.renders.footerBalanced120.meanUs", (report) => report.footer?.renders?.footerBalanced120?.meanUs],
+  ["footer.renders.footerNarrow40.meanUs", (report) => report.footer?.renders?.footerNarrow40?.meanUs],
+  ["footer.renders.footerNoStatus120.meanUs", (report) => report.footer?.renders?.footerNoStatus120?.meanUs],
+  ["footer.cachedRender.meanUs", (report) => report.footer?.cachedRender?.meanUs],
 ];
 
 const mean = (values) => values.reduce((total, value) => total + value, 0) / values.length;
 const summary = {};
+const unavailable = [];
 for (const [path, read] of metricPaths) {
-  const before = mean(runs.filter((run) => run.side === "before").map((run) => read(run.report)));
-  const after = mean(runs.filter((run) => run.side === "after").map((run) => read(run.report)));
+  const beforeValues = runs.filter((run) => run.side === "before").map((run) => read(run.report));
+  const afterValues = runs.filter((run) => run.side === "after").map((run) => read(run.report));
+  // A scenario added in this phase exists only on the after side; it is reported as new
+  // instead of being compared against an absent baseline.
+  if (!beforeValues.every((value) => Number.isFinite(value)) || !afterValues.every((value) => Number.isFinite(value))) {
+    summary[path] = { before: null, after: Number.isFinite(afterValues[0]) ? mean(afterValues.filter(Number.isFinite)) : null, deltaPercent: null, note: "new scenario; no pre-change baseline" };
+    unavailable.push(path);
+    continue;
+  }
+  const before = mean(beforeValues);
+  const after = mean(afterValues);
   summary[path] = { before, after, deltaPercent: before === 0 ? null : ((after - before) / before) * 100 };
 }
 
@@ -75,6 +92,7 @@ const record = {
   before: { directory: beforeDirectory, commit: spawnSync("git", ["rev-parse", "HEAD"], { cwd: beforeDirectory, encoding: "utf8" }).stdout.trim() },
   after: { directory: afterDirectory, commit: spawnSync("git", ["rev-parse", "HEAD"], { cwd: afterDirectory, encoding: "utf8" }).stdout.trim(), workingTree: true },
   pairs, runsPerSide: runs.length / 2,
+  newScenariosWithoutBaseline: unavailable,
   environment: runs[0].report.environment,
   summary,
   runs: runs.map((run) => ({ pair: run.pair, side: run.side, report: run.report })),

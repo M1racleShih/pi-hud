@@ -2,6 +2,7 @@
   "version": 1,
   "enabled": true,
   "preset": "balanced",
+  "surface": "widget",
   "placement": "belowEditor",
   "language": "en",
   "palette": "pastel",

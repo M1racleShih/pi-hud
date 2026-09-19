@@ -1,0 +1,1901 @@
+{
+  "generatedAt": "2026-09-19T17:02:42.210Z",
+  "methodology": "Interleaved same-machine synthetic microbenchmarks across pairs of before/after runs, alternating order inside each pair. The pre-change worktree ignores the phase-2 snapshot fields; both sides use identical fixtures, sample counts and the copied probe file. Gates are unchanged (hook p99 <= 250 us, uncached render p99 <= 5 ms, cached mean <= 5 us). NOT a live Pi/provider/terminal A/B.",
+  "before": {
+    "directory": "/home/yan/opensource/pi-hud/.tmp/phase3-before",
+    "commit": "af3a5e450f785793efa8211463608c7fc8b51636"
+  },
+  "after": {
+    "directory": "/home/yan/opensource/pi-hud",
+    "commit": "af3a5e450f785793efa8211463608c7fc8b51636",
+    "workingTree": true
+  },
+  "pairs": 8,
+  "runsPerSide": 8,
+  "newScenariosWithoutBaseline": [
+    "footer.renders.footerFull120.meanUs",
+    "footer.renders.footerFull120.p99Us",
+    "footer.renders.footerBalanced120.meanUs",
+    "footer.renders.footerNarrow40.meanUs",
+    "footer.renders.footerNoStatus120.meanUs",
+    "footer.cachedRender.meanUs"
+  ],
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+  },
+  "summary": {
+    "hooks.messageEnd.p99Us": {
+      "before": 1.1961250000016577,
+      "after": 1.1202500000022653,
+      "deltaPercent": -6.343400564262702
+    },
+    "hooks.toolPair.p99Us": {
+      "before": 2.1388749999990964,
+      "after": 2.195875000004399,
+      "deltaPercent": 2.664952370069634
+    },
+    "renders.baselineFull120.p50Us": {
+      "before": 4.850249999998724,
+      "after": 5.118249999998881,
+      "deltaPercent": 5.52548837689248
+    },
+    "renders.baselineFull120.meanUs": {
+      "before": 6.162553458333341,
+      "after": 6.291884375000092,
+      "deltaPercent": 2.098657927126986
+    },
+    "renders.baselineFull120.p99Us": {
+      "before": 38.95124999999844,
+      "after": 37.91325000000256,
+      "deltaPercent": -2.664869548463572
+    },
+    "renders.saturatedFull120.p50Us": {
+      "before": 5.851874999997619,
+      "after": 6.152500000002448,
+      "deltaPercent": 5.1372423369424425
+    },
+    "renders.saturatedFull120.meanUs": {
+      "before": 7.064304708333319,
+      "after": 7.539197958333367,
+      "deltaPercent": 6.7224344023530875
+    },
+    "renders.saturatedFull120.p95Us": {
+      "before": 8.936000000000277,
+      "after": 9.672749999998231,
+      "deltaPercent": 8.244740375984014
+    },
+    "renders.saturatedFull120.p99Us": {
+      "before": 53.10137500000067,
+      "after": 47.78237499999527,
+      "deltaPercent": -10.016689774992333
+    },
+    "renders.saturatedFull180.meanUs": {
+      "before": 7.053528499999969,
+      "after": 7.180932333333347,
+      "deltaPercent": 1.8062425541114497
+    },
+    "renders.saturatedMono120.meanUs": {
+      "before": 5.946857083333162,
+      "after": 6.324154583333404,
+      "deltaPercent": 6.344485746221593
+    },
+    "renders.concurrentBalanced120.meanUs": {
+      "before": 5.134551083333331,
+      "after": 5.173712166666584,
+      "deltaPercent": 0.7626973166236195
+    },
+    "renders.concurrentBalanced120.p99Us": {
+      "before": 14.717874999995217,
+      "after": 16.920250000012516,
+      "deltaPercent": 14.963946901424382
+    },
+    "renders.concurrentBalanced40.meanUs": {
+      "before": 3.8591029166669517,
+      "after": 3.774386666666834,
+      "deltaPercent": -2.1952316854323715
+    },
+    "renders.emptyIdle120.meanUs": {
+      "before": 2.718721833333197,
+      "after": 2.6622094583335003,
+      "deltaPercent": -2.078637626947353
+    },
+    "cachedRender.meanUs": {
+      "before": 0.0048571140000000105,
+      "after": 0.004560208125000002,
+      "deltaPercent": -6.1128043319553065
+    },
+    "footer.renders.footerFull120.meanUs": {
+      "before": null,
+      "after": 12.903761583333333,
+      "deltaPercent": null,
+      "note": "new scenario; no pre-change baseline"
+    },
+    "footer.renders.footerFull120.p99Us": {
+      "before": null,
+      "after": 86.64237499998961,
+      "deltaPercent": null,
+      "note": "new scenario; no pre-change baseline"
+    },
+    "footer.renders.footerBalanced120.meanUs": {
+      "before": null,
+      "after": 11.518868624999909,
+      "deltaPercent": null,
+      "note": "new scenario; no pre-change baseline"
+    },
+    "footer.renders.footerNarrow40.meanUs": {
+      "before": null,
+      "after": 8.818730624999986,
+      "deltaPercent": null,
+      "note": "new scenario; no pre-change baseline"
+    },
+    "footer.renders.footerNoStatus120.meanUs": {
+      "before": null,
+      "after": 7.376720708333499,
+      "deltaPercent": null,
+      "note": "new scenario; no pre-change baseline"
+    },
+    "footer.cachedRender.meanUs": {
+      "before": null,
+      "after": 0.09543581650000002,
+      "deltaPercent": null,
+      "note": "new scenario; no pre-change baseline"
+    }
+  },
+  "runs": [
+    {
+      "pair": 0,
+      "side": "before",
+      "report": {
+        "label": "before",
+        "generatedAt": "2026-09-19T17:02:35.336Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.5080782500000046,
+            "p50Us": 0.3679999999945949,
+            "p95Us": 0.5170000000020991,
+            "p99Us": 1.2430000000023256
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7276351666666953,
+            "p50Us": 0.6060000000047694,
+            "p95Us": 1.0540000000105465,
+            "p99Us": 1.8999999999991246
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.467140333333164,
+            "p50Us": 5.070000000003461,
+            "p95Us": 9.74300000000028,
+            "p99Us": 38.281000000012
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.376873333333805,
+            "p50Us": 6.1289999999871725,
+            "p95Us": 8.032999999983303,
+            "p99Us": 54.58600000000047
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.918232333333457,
+            "p50Us": 6.271999999995614,
+            "p95Us": 12.501999999983582,
+            "p99Us": 30.512999999984913
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 5.640885999999739,
+            "p50Us": 5.000000000023874,
+            "p95Us": 5.662999999998419,
+            "p99Us": 21.982999999977437
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 4.89242433333307,
+            "p50Us": 4.356000000001359,
+            "p95Us": 4.715000000004466,
+            "p99Us": 12.478999999984808
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.6307223333338747,
+            "p50Us": 3.241000000002714,
+            "p95Us": 3.627999999991971,
+            "p99Us": 8.435999999960586
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.5669379999999054,
+            "p50Us": 2.2749999999973625,
+            "p95Us": 2.64300000003459,
+            "p99Us": 4.217999999980293
+          }
+        },
+        "footer": null,
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004463318000000016
+        }
+      }
+    },
+    {
+      "pair": 0,
+      "side": "after",
+      "report": {
+        "label": "after",
+        "generatedAt": "2026-09-19T17:02:35.905Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.47630033333329486,
+            "p50Us": 0.2760000000066043,
+            "p95Us": 0.4789999999985639,
+            "p99Us": 1.0590000000050281
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7145535833333739,
+            "p50Us": 0.5439999999978795,
+            "p95Us": 1.0680000000036216,
+            "p99Us": 1.9610000000014338
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 5.7909650000000825,
+            "p50Us": 4.9080000000003565,
+            "p95Us": 5.903000000003544,
+            "p99Us": 28.741000000010786
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.148308333333497,
+            "p50Us": 5.86699999999496,
+            "p95Us": 9.355999999996811,
+            "p99Us": 39.01000000000465
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 6.99438399999997,
+            "p50Us": 6.00400000001855,
+            "p95Us": 7.85600000000386,
+            "p99Us": 24.064000000009855
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 5.965275666666317,
+            "p50Us": 5.359999999996035,
+            "p95Us": 5.986000000007152,
+            "p99Us": 17.395999999990863
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 4.832979999999766,
+            "p50Us": 4.336999999992486,
+            "p95Us": 4.992000000015651,
+            "p99Us": 11.731999999994969
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.5773963333329535,
+            "p50Us": 3.1869999999969423,
+            "p95Us": 3.581999999994423,
+            "p99Us": 7.975000000016053
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.4655856666665943,
+            "p50Us": 2.2189999999682186,
+            "p95Us": 2.3669999999924585,
+            "p99Us": 3.7750000000187356
+          }
+        },
+        "footer": {
+          "bodyRows": {
+            "minimal": 2,
+            "balanced": 3,
+            "full": 4
+          },
+          "renders": {
+            "footerFull120": {
+              "samples": 3000,
+              "meanUs": 12.288767666666914,
+              "p50Us": 10.074999999972079,
+              "p95Us": 16.281999999989694,
+              "p99Us": 62.0049999999992
+            },
+            "footerBalanced120": {
+              "samples": 3000,
+              "meanUs": 10.705495666666687,
+              "p50Us": 9.145000000046366,
+              "p95Us": 11.097000000006574,
+              "p99Us": 43.881999999996424
+            },
+            "footerNarrow40": {
+              "samples": 3000,
+              "meanUs": 8.662258999999617,
+              "p50Us": 7.054999999979827,
+              "p95Us": 11.594000000002325,
+              "p99Us": 37.40800000002764
+            },
+            "footerNoStatus120": {
+              "samples": 3000,
+              "meanUs": 6.915750000000033,
+              "p50Us": 6.123999999999796,
+              "p95Us": 8.168000000011943,
+              "p99Us": 21.613999999999578
+            }
+          },
+          "cachedRender": {
+            "frames": 1000000,
+            "identicalCacheHits": 1000000,
+            "statusChecks": 1005002,
+            "statusChanges": 1,
+            "meanUs": 0.09011457000000002
+          }
+        },
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.00416833900000006
+        }
+      }
+    },
+    {
+      "pair": 1,
+      "side": "after",
+      "report": {
+        "label": "after",
+        "generatedAt": "2026-09-19T17:02:36.481Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.4765949166666329,
+            "p50Us": 0.3030000000023847,
+            "p95Us": 0.4789999999985639,
+            "p99Us": 1.0690000000010969
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7274219166665983,
+            "p50Us": 0.5530000000035784,
+            "p95Us": 1.0589999999979227,
+            "p99Us": 2.1640000000076043
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.098115666666815,
+            "p50Us": 4.844000000005622,
+            "p95Us": 8.370999999996798,
+            "p99Us": 35.381000000000995
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.248845333333292,
+            "p50Us": 5.8760000000006585,
+            "p95Us": 9.660000000010882,
+            "p99Us": 47.74000000000456
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 6.780344666666811,
+            "p50Us": 5.940000000009604,
+            "p95Us": 7.182999999997719,
+            "p99Us": 25.334000000015067
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.055889999999818,
+            "p50Us": 5.313999999998487,
+            "p95Us": 7.11800000001972,
+            "p99Us": 21.080000000011978
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 4.83451766666663,
+            "p50Us": 4.281999999989239,
+            "p95Us": 5.222000000003391,
+            "p99Us": 14.69800000000987
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.596550666666804,
+            "p50Us": 3.17700000002219,
+            "p95Us": 3.673999999989519,
+            "p99Us": 7.920000000012806
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.5128763333330366,
+            "p50Us": 2.200999999956821,
+            "p95Us": 2.4679999999648317,
+            "p99Us": 5.294999999989614
+          }
+        },
+        "footer": {
+          "bodyRows": {
+            "minimal": 2,
+            "balanced": 3,
+            "full": 4
+          },
+          "renders": {
+            "footerFull120": {
+              "samples": 3000,
+              "meanUs": 12.321815999999506,
+              "p50Us": 10.102000000017597,
+              "p95Us": 16.216999999983273,
+              "p99Us": 69.36300000000983
+            },
+            "footerBalanced120": {
+              "samples": 3000,
+              "meanUs": 10.704837000000051,
+              "p50Us": 9.144999999989523,
+              "p95Us": 12.38600000004908,
+              "p99Us": 42.8410000000099
+            },
+            "footerNarrow40": {
+              "samples": 3000,
+              "meanUs": 8.6609926666663,
+              "p50Us": 7.044999999948232,
+              "p95Us": 11.574999999993452,
+              "p99Us": 42.00300000002244
+            },
+            "footerNoStatus120": {
+              "samples": 3000,
+              "meanUs": 7.168710333333091,
+              "p50Us": 6.114999999965676,
+              "p95Us": 8.996999999965283,
+              "p99Us": 30.427999999972144
+            }
+          },
+          "cachedRender": {
+            "frames": 1000000,
+            "identicalCacheHits": 1000000,
+            "statusChecks": 1005002,
+            "statusChanges": 1,
+            "meanUs": 0.09227020399999998
+          }
+        },
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.0042572169999999685
+        }
+      }
+    },
+    {
+      "pair": 1,
+      "side": "before",
+      "report": {
+        "label": "before",
+        "generatedAt": "2026-09-19T17:02:36.757Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.46322358333336516,
+            "p50Us": 0.36899999999917554,
+            "p95Us": 0.4879999999971574,
+            "p99Us": 1.0869999999982838
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.6818883333333483,
+            "p50Us": 0.5519999999989977,
+            "p95Us": 0.9949999999960824,
+            "p99Us": 1.9429999999971415
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.203414666666495,
+            "p50Us": 4.604999999997972,
+            "p95Us": 9.0889999999888,
+            "p99Us": 39.47499999999593
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.035402000000239,
+            "p50Us": 5.590000000012196,
+            "p95Us": 9.043000000005463,
+            "p99Us": 58.506000000022595
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 6.619630999999698,
+            "p50Us": 5.673000000001593,
+            "p95Us": 9.596000000016147,
+            "p99Us": 25.38100000001009
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 5.5763303333333525,
+            "p50Us": 5.019000000004326,
+            "p95Us": 5.801000000019485,
+            "p99Us": 13.334999999983665
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 4.880848000000037,
+            "p50Us": 4.3370000000209075,
+            "p95Us": 4.723999999981743,
+            "p99Us": 12.359000000003562
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.6001013333334,
+            "p50Us": 3.224000000017213,
+            "p95Us": 3.500000000002501,
+            "p99Us": 8.444000000025653
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.5961776666663483,
+            "p50Us": 2.2839999999746396,
+            "p95Us": 2.441000000033,
+            "p99Us": 5.5629999999951
+          }
+        },
+        "footer": null,
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004515569000000027
+        }
+      }
+    },
+    {
+      "pair": 2,
+      "side": "before",
+      "report": {
+        "label": "before",
+        "generatedAt": "2026-09-19T17:02:37.029Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.44842491666660117,
+            "p50Us": 0.29500000000126647,
+            "p95Us": 0.4879999999971574,
+            "p99Us": 1.58400000000114
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7289871666666974,
+            "p50Us": 0.552999999996473,
+            "p95Us": 1.1790000000004852,
+            "p99Us": 2.2469999999970014
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 5.766108666666657,
+            "p50Us": 4.614000000003671,
+            "p95Us": 6.740999999991004,
+            "p99Us": 34.838000000007696
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 6.776083666666388,
+            "p50Us": 5.497999999988679,
+            "p95Us": 7.514000000000465,
+            "p99Us": 71.0019999999929
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 6.483017666666692,
+            "p50Us": 5.571000000003323,
+            "p95Us": 10.130000000003747,
+            "p99Us": 22.94900000001121
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 5.3394776666664825,
+            "p50Us": 4.935999999986507,
+            "p95Us": 5.230999999980668,
+            "p99Us": 14.513999999991256
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 4.7911403333330655,
+            "p50Us": 4.264000000006263,
+            "p95Us": 4.604999999997972,
+            "p99Us": 11.529999999993379
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.587577666666423,
+            "p50Us": 3.196000000002641,
+            "p95Us": 3.480999999993628,
+            "p99Us": 7.469000000014603
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.5346990000002227,
+            "p50Us": 2.256000000045333,
+            "p95Us": 2.440000000035525,
+            "p99Us": 5.323000000032607
+          }
+        },
+        "footer": null,
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004669989000000044
+        }
+      }
+    },
+    {
+      "pair": 2,
+      "side": "after",
+      "report": {
+        "label": "after",
+        "generatedAt": "2026-09-19T17:02:37.609Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.49337141666663087,
+            "p50Us": 0.30400000000696537,
+            "p95Us": 0.47800000000108867,
+            "p99Us": 1.0680000000036216
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.6976662499999937,
+            "p50Us": 0.552999999996473,
+            "p95Us": 1.0039999999946758,
+            "p99Us": 1.9340000000056534
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 5.966441666666969,
+            "p50Us": 4.871999999991772,
+            "p95Us": 5.9769999999872425,
+            "p99Us": 42.961000000005356
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.153338000000027,
+            "p50Us": 5.8300000000031105,
+            "p95Us": 9.22799999997892,
+            "p99Us": 42.960999999991145
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 6.783241333333189,
+            "p50Us": 5.940000000009604,
+            "p95Us": 7.855000000006385,
+            "p99Us": 23.77799999999297
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 5.904195333333748,
+            "p50Us": 5.3230000000041855,
+            "p95Us": 5.838000000011334,
+            "p99Us": 14.062999999993053
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.180006333332976,
+            "p50Us": 4.291999999992413,
+            "p95Us": 8.519000000006827,
+            "p99Us": 25.684000000012475
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.575086333333523,
+            "p50Us": 3.149000000007618,
+            "p95Us": 3.489999999999327,
+            "p99Us": 8.371000000011009
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.4457613333339254,
+            "p50Us": 2.2010000000136642,
+            "p95Us": 2.4219999999672837,
+            "p99Us": 3.6830000000236396
+          }
+        },
+        "footer": {
+          "bodyRows": {
+            "minimal": 2,
+            "balanced": 3,
+            "full": 4
+          },
+          "renders": {
+            "footerFull120": {
+              "samples": 3000,
+              "meanUs": 12.438150333333116,
+              "p50Us": 10.038000000008651,
+              "p95Us": 18.97999999999911,
+              "p99Us": 98.74999999999545
+            },
+            "footerBalanced120": {
+              "samples": 3000,
+              "meanUs": 11.073077666667032,
+              "p50Us": 9.099000000048818,
+              "p95Us": 18.104999999991378,
+              "p99Us": 50.753999999983535
+            },
+            "footerNarrow40": {
+              "samples": 3000,
+              "meanUs": 8.755611333333357,
+              "p50Us": 6.999000000007527,
+              "p95Us": 13.804999999990741,
+              "p99Us": 39.03800000000501
+            },
+            "footerNoStatus120": {
+              "samples": 3000,
+              "meanUs": 7.24767733333286,
+              "p50Us": 6.069000000024971,
+              "p95Us": 8.803999999997814,
+              "p99Us": 33.02400000001171
+            }
+          },
+          "cachedRender": {
+            "frames": 1000000,
+            "identicalCacheHits": 1000000,
+            "statusChecks": 1005002,
+            "statusChanges": 1,
+            "meanUs": 0.09146592300000003
+          }
+        },
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004128251999999975
+        }
+      }
+    },
+    {
+      "pair": 3,
+      "side": "after",
+      "report": {
+        "label": "after",
+        "generatedAt": "2026-09-19T17:02:38.198Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.506909083333286,
+            "p50Us": 0.332000000000221,
+            "p95Us": 0.5059999999943443,
+            "p99Us": 1.1050000000025761
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7818775833333842,
+            "p50Us": 0.5530000000106838,
+            "p95Us": 1.0679999999894108,
+            "p99Us": 2.2739999999998872
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.182881333333464,
+            "p50Us": 4.972999999992567,
+            "p95Us": 7.568999999989501,
+            "p99Us": 50.30100000000459
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.751444333333441,
+            "p50Us": 5.949000000015303,
+            "p95Us": 10.148000000015145,
+            "p99Us": 56.32299999999191
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 6.9110916666666515,
+            "p50Us": 6.0320000000047,
+            "p95Us": 7.836999999994987,
+            "p99Us": 28.064999999998008
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.097654333333673,
+            "p50Us": 5.4149999999992815,
+            "p95Us": 6.316999999995687,
+            "p99Us": 20.65599999997403
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 4.922835000000264,
+            "p50Us": 4.365000000007058,
+            "p95Us": 5.708999999995967,
+            "p99Us": 14.541000000008353
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.5379756666674025,
+            "p50Us": 3.2329999999660686,
+            "p95Us": 3.4999999999740794,
+            "p99Us": 9.300999999993564
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.548476333334135,
+            "p50Us": 2.219000000025062,
+            "p95Us": 2.4679999999648317,
+            "p99Us": 6.2439999999810425
+          }
+        },
+        "footer": {
+          "bodyRows": {
+            "minimal": 2,
+            "balanced": 3,
+            "full": 4
+          },
+          "renders": {
+            "footerFull120": {
+              "samples": 3000,
+              "meanUs": 12.286568000000896,
+              "p50Us": 10.11199999999235,
+              "p95Us": 13.933000000008633,
+              "p99Us": 78.49799999996776
+            },
+            "footerBalanced120": {
+              "samples": 3000,
+              "meanUs": 11.474707999999788,
+              "p50Us": 9.218000000032589,
+              "p95Us": 15.507999999954336,
+              "p99Us": 54.351999999994405
+            },
+            "footerNarrow40": {
+              "samples": 3000,
+              "meanUs": 8.286349333333188,
+              "p50Us": 7.064000000013948,
+              "p95Us": 8.840999999961241,
+              "p99Us": 44.45700000002262
+            },
+            "footerNoStatus120": {
+              "samples": 3000,
+              "meanUs": 6.8107196666671665,
+              "p50Us": 6.104999999990923,
+              "p95Us": 7.238000000029388,
+              "p99Us": 24.468000000013035
+            }
+          },
+          "cachedRender": {
+            "frames": 1000000,
+            "identicalCacheHits": 1000000,
+            "statusChecks": 1005002,
+            "statusChanges": 1,
+            "meanUs": 0.09121685500000007
+          }
+        },
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004499455000000012
+        }
+      }
+    },
+    {
+      "pair": 3,
+      "side": "before",
+      "report": {
+        "label": "before",
+        "generatedAt": "2026-09-19T17:02:38.485Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.4626217500000103,
+            "p50Us": 0.34999999999740794,
+            "p95Us": 0.6169999999983133,
+            "p99Us": 1.1050000000025761
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7332898333333103,
+            "p50Us": 0.5439999999978795,
+            "p95Us": 1.0590000000050281,
+            "p99Us": 2.2100000000051523
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 5.6578123333334185,
+            "p50Us": 4.531000000000063,
+            "p95Us": 7.045000000005075,
+            "p99Us": 33.07999999999822
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 6.309828000000097,
+            "p50Us": 5.516000000000076,
+            "p95Us": 7.293999999987477,
+            "p99Us": 35.24300000000835
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.308336333333209,
+            "p50Us": 6.097999999980175,
+            "p95Us": 12.066000000004351,
+            "p99Us": 25.908999999984417
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.179682666666967,
+            "p50Us": 5.4149999999992815,
+            "p95Us": 6.64000000000442,
+            "p99Us": 21.619000000015376
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.300048666666838,
+            "p50Us": 4.691000000008216,
+            "p95Us": 5.113999999991847,
+            "p99Us": 18.93799999999146
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 4.219378666666882,
+            "p50Us": 3.476000000006252,
+            "p95Us": 5.9870000000046275,
+            "p99Us": 12.398000000018783
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.749994333332628,
+            "p50Us": 2.4510000000077525,
+            "p95Us": 2.621999999973923,
+            "p99Us": 4.11900000000287
+          }
+        },
+        "footer": null,
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.005469956000000025
+        }
+      }
+    },
+    {
+      "pair": 4,
+      "side": "before",
+      "report": {
+        "label": "before",
+        "generatedAt": "2026-09-19T17:02:38.784Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.5139959999999908,
+            "p50Us": 0.3910000000004743,
+            "p95Us": 0.5020000000044433,
+            "p99Us": 1.1450000000010618
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7999512500000114,
+            "p50Us": 0.6329999999934444,
+            "p95Us": 1.16599999999778,
+            "p99Us": 2.1500000000003183
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.3136303333333865,
+            "p50Us": 4.943000000011466,
+            "p95Us": 8.639999999999759,
+            "p99Us": 45.61999999999955
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.4596216666666475,
+            "p50Us": 5.988000000002103,
+            "p95Us": 11.825000000015962,
+            "p99Us": 71.60600000000272
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.054696666666811,
+            "p50Us": 6.118000000014945,
+            "p95Us": 6.901999999996633,
+            "p99Us": 30.710999999996602
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.39090699999986,
+            "p50Us": 5.425000000002456,
+            "p95Us": 9.191999999984546,
+            "p99Us": 22.87499999999909
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.366231666666678,
+            "p50Us": 4.711999999983618,
+            "p95Us": 5.5260000000032505,
+            "p99Us": 17.74199999999837
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.9014380000002697,
+            "p50Us": 3.4660000000030777,
+            "p95Us": 3.7970000000200343,
+            "p99Us": 9.243000000026314
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.776326999999971,
+            "p50Us": 2.471000000014101,
+            "p95Us": 2.652000000011867,
+            "p99Us": 4.5509999999922
+          }
+        },
+        "footer": null,
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.005021049000000005
+        }
+      }
+    },
+    {
+      "pair": 4,
+      "side": "after",
+      "report": {
+        "label": "after",
+        "generatedAt": "2026-09-19T17:02:39.417Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.5164703333333,
+            "p50Us": 0.3409999999988145,
+            "p95Us": 0.5329999999972301,
+            "p99Us": 1.1849999999995475
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7955603333334681,
+            "p50Us": 0.6229999999902702,
+            "p95Us": 1.185000000006653,
+            "p99Us": 2.130000000008181
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.381189999999997,
+            "p50Us": 5.364999999997622,
+            "p95Us": 7.132999999996059,
+            "p99Us": 27.948999999992452
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.67438066666682,
+            "p50Us": 6.418999999993957,
+            "p95Us": 10.006000000004178,
+            "p99Us": 33.2339999999931
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.496616333333366,
+            "p50Us": 6.580000000013797,
+            "p95Us": 7.70599999998467,
+            "p99Us": 29.165000000006103
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.626771000000064,
+            "p50Us": 5.876999999998134,
+            "p95Us": 6.741000000005215,
+            "p99Us": 22.37299999998754
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.519768333333117,
+            "p50Us": 4.761999999999489,
+            "p95Us": 7.484999999974207,
+            "p99Us": 16.295000000013715
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.9523026666667267,
+            "p50Us": 3.486000000009426,
+            "p95Us": 4.08900000002177,
+            "p99Us": 7.554999999968004
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.763378000000283,
+            "p50Us": 2.3810000000139553,
+            "p95Us": 2.8030000000285327,
+            "p99Us": 6.078000000002248
+          }
+        },
+        "footer": {
+          "bodyRows": {
+            "minimal": 2,
+            "balanced": 3,
+            "full": 4
+          },
+          "renders": {
+            "footerFull120": {
+              "samples": 3000,
+              "meanUs": 13.54382200000005,
+              "p50Us": 10.999999999967258,
+              "p95Us": 18.09400000001915,
+              "p99Us": 96.25399999998763
+            },
+            "footerBalanced120": {
+              "samples": 3000,
+              "meanUs": 11.881840666666434,
+              "p50Us": 9.955999999988308,
+              "p95Us": 12.476999999989857,
+              "p99Us": 58.157999999991716
+            },
+            "footerNarrow40": {
+              "samples": 3000,
+              "meanUs": 9.225546333333819,
+              "p50Us": 7.675000000006094,
+              "p95Us": 9.805999999969117,
+              "p99Us": 44.36500000002752
+            },
+            "footerNoStatus120": {
+              "samples": 3000,
+              "meanUs": 7.50749233333355,
+              "p50Us": 6.631000000027143,
+              "p95Us": 7.374000000027081,
+              "p99Us": 29.274999999984175
+            }
+          },
+          "cachedRender": {
+            "frames": 1000000,
+            "identicalCacheHits": 1000000,
+            "statusChecks": 1005002,
+            "statusChanges": 1,
+            "meanUs": 0.10043993799999998
+          }
+        },
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004747565000000008
+        }
+      }
+    },
+    {
+      "pair": 5,
+      "side": "after",
+      "report": {
+        "label": "after",
+        "generatedAt": "2026-09-19T17:02:40.046Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.5382184166666619,
+            "p50Us": 0.33100000000274576,
+            "p95Us": 0.7840000000030045,
+            "p99Us": 1.1750000000034788
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7983701666665629,
+            "p50Us": 0.6129999999870961,
+            "p95Us": 1.1750000000034788,
+            "p99Us": 2.3910000000029186
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.579067666666701,
+            "p50Us": 5.364999999997622,
+            "p95Us": 7.322999999999524,
+            "p99Us": 40.34599999999955
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.8687923333332925,
+            "p50Us": 6.470000000007303,
+            "p95Us": 9.965999999991482,
+            "p99Us": 41.88299999998435
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.546139999999987,
+            "p50Us": 6.609999999994898,
+            "p95Us": 7.816000000019585,
+            "p99Us": 29.355000000009568
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.583522333333692,
+            "p50Us": 5.9180000000083055,
+            "p95Us": 6.871999999987111,
+            "p99Us": 18.19400000002247
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.320245666666554,
+            "p50Us": 4.751999999996315,
+            "p95Us": 5.285000000014861,
+            "p99Us": 15.281000000015865
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.961801000000185,
+            "p50Us": 3.4760000000346736,
+            "p95Us": 3.9080000000240034,
+            "p99Us": 7.775999999978467
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.797498333333801,
+            "p50Us": 2.4620000000368236,
+            "p95Us": 2.7220000000056643,
+            "p99Us": 5.092999999988024
+          }
+        },
+        "footer": {
+          "bodyRows": {
+            "minimal": 2,
+            "balanced": 3,
+            "full": 4
+          },
+          "renders": {
+            "footerFull120": {
+              "samples": 3000,
+              "meanUs": 13.388066666667168,
+              "p50Us": 11.031000000002678,
+              "p95Us": 13.833999999974367,
+              "p99Us": 100.62399999998206
+            },
+            "footerBalanced120": {
+              "samples": 3000,
+              "meanUs": 11.55157533333348,
+              "p50Us": 9.9760000000515,
+              "p95Us": 12.367000000040207,
+              "p99Us": 47.39799999998695
+            },
+            "footerNarrow40": {
+              "samples": 3000,
+              "meanUs": 8.968421666667162,
+              "p50Us": 7.7559999999721185,
+              "p95Us": 9.393999999986136,
+              "p99Us": 40.758000000039374
+            },
+            "footerNoStatus120": {
+              "samples": 3000,
+              "meanUs": 7.709776666667179,
+              "p50Us": 6.720999999970445,
+              "p95Us": 8.34900000000971,
+              "p99Us": 30.200000000036198
+            }
+          },
+          "cachedRender": {
+            "frames": 1000000,
+            "identicalCacheHits": 1000000,
+            "statusChecks": 1005002,
+            "statusChanges": 1,
+            "meanUs": 0.0990622830000001
+          }
+        },
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004642740000000004
+        }
+      }
+    },
+    {
+      "pair": 5,
+      "side": "before",
+      "report": {
+        "label": "before",
+        "generatedAt": "2026-09-19T17:02:40.341Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.450626916666656,
+            "p50Us": 0.30200000000490945,
+            "p95Us": 0.7639999999966562,
+            "p99Us": 1.125000000001819
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7578439166666273,
+            "p50Us": 0.6130000000013069,
+            "p95Us": 1.0950000000065074,
+            "p99Us": 2.2809999999964248
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.543166000000166,
+            "p50Us": 5.042999999986364,
+            "p95Us": 10.097000000001799,
+            "p99Us": 41.85299999998904
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.480080666666026,
+            "p50Us": 6.047999999992726,
+            "p95Us": 10.829999999998563,
+            "p99Us": 51.87999999998283
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 6.87867766666669,
+            "p50Us": 6.137999999992871,
+            "p95Us": 6.781000000017912,
+            "p99Us": 23.46799999997984
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.050056333332723,
+            "p50Us": 5.375000000015007,
+            "p95Us": 6.016999999985728,
+            "p99Us": 20.895999999993364
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.255932000000275,
+            "p50Us": 4.661000000027116,
+            "p95Us": 5.213999999995167,
+            "p99Us": 13.340999999996939
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.90490200000054,
+            "p50Us": 3.4560000000283253,
+            "p95Us": 3.9889999999900283,
+            "p99Us": 8.790999999973792
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.753342000000569,
+            "p50Us": 2.4510000000077525,
+            "p95Us": 2.5919999999928223,
+            "p99Us": 5.052999999975327
+          }
+        },
+        "footer": null,
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004837281000000019
+        }
+      }
+    },
+    {
+      "pair": 6,
+      "side": "before",
+      "report": {
+        "label": "before",
+        "generatedAt": "2026-09-19T17:02:40.639Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.4866792499999914,
+            "p50Us": 0.3719999999987067,
+            "p95Us": 0.4920000000012692,
+            "p99Us": 1.125000000001819
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7573930000000022,
+            "p50Us": 0.6029999999981328,
+            "p95Us": 1.1350000000049931,
+            "p99Us": 2.1699999999924557
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.073860666666743,
+            "p50Us": 4.932999999994081,
+            "p95Us": 6.781000000003701,
+            "p99Us": 36.89099999999712
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 6.9531786666666315,
+            "p50Us": 6.027999999986378,
+            "p95Us": 7.877000000007683,
+            "p99Us": 39.76399999999103
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.165318999999674,
+            "p50Us": 6.0579999999959,
+            "p95Us": 9.573999999986427,
+            "p99Us": 29.627000000004955
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.3533586666666935,
+            "p50Us": 5.395000000021355,
+            "p95Us": 9.162000000003445,
+            "p99Us": 25.699000000003025
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.336423666666681,
+            "p50Us": 4.6820000000025175,
+            "p95Us": 5.154000000004544,
+            "p99Us": 20.704999999992424
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.941124000000954,
+            "p50Us": 3.4560000000283253,
+            "p95Us": 4.019000000027972,
+            "p99Us": 9.253000000001066
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.98086433333274,
+            "p50Us": 2.4610000000393484,
+            "p95Us": 3.1749999999988177,
+            "p99Us": 10.839999999973315
+          }
+        },
+        "footer": null,
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004990302999999983
+        }
+      }
+    },
+    {
+      "pair": 6,
+      "side": "after",
+      "report": {
+        "label": "after",
+        "generatedAt": "2026-09-19T17:02:41.274Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.5203596666667035,
+            "p50Us": 0.301999999997804,
+            "p95Us": 0.5329999999972301,
+            "p99Us": 1.1450000000010618
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.8617864166667294,
+            "p50Us": 0.6229999999902702,
+            "p95Us": 1.2559999999979254,
+            "p99Us": 2.5020000000068876
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.780196666666615,
+            "p50Us": 5.274000000000001,
+            "p95Us": 10.6089999999881,
+            "p99Us": 42.665999999996984
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.680156999999718,
+            "p50Us": 6.3600000000008095,
+            "p95Us": 10.628999999994448,
+            "p99Us": 43.69099999999548
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.409880666666812,
+            "p50Us": 6.470000000007303,
+            "p95Us": 7.554999999996426,
+            "p99Us": 32.77199999999425
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.581080333333122,
+            "p50Us": 5.786000000000513,
+            "p95Us": 7.012000000003127,
+            "p99Us": 21.518999999983635
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.415110000000411,
+            "p50Us": 4.701999999980444,
+            "p95Us": 7.284000000026936,
+            "p99Us": 15.642000000013923
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 4.021963666667681,
+            "p50Us": 3.436000000021977,
+            "p95Us": 4.450000000019827,
+            "p99Us": 12.57799999996223
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.81662166666637,
+            "p50Us": 2.40099999996346,
+            "p95Us": 2.9239999999504107,
+            "p99Us": 6.238999999993666
+          }
+        },
+        "footer": {
+          "bodyRows": {
+            "minimal": 2,
+            "balanced": 3,
+            "full": 4
+          },
+          "renders": {
+            "footerFull120": {
+              "samples": 3000,
+              "meanUs": 13.741120666666195,
+              "p50Us": 10.94999999997981,
+              "p95Us": 22.02199999999266,
+              "p99Us": 97.30899999999565
+            },
+            "footerBalanced120": {
+              "samples": 3000,
+              "meanUs": 12.834887333332771,
+              "p50Us": 10.046999999985928,
+              "p95Us": 20.042999999986932,
+              "p99Us": 60.801000000026306
+            },
+            "footerNarrow40": {
+              "samples": 3000,
+              "meanUs": 8.93537933333327,
+              "p50Us": 7.666000000028816,
+              "p95Us": 9.343000000001211,
+              "p99Us": 42.65699999996286
+            },
+            "footerNoStatus120": {
+              "samples": 3000,
+              "meanUs": 7.8766973333331265,
+              "p50Us": 6.64000000000442,
+              "p95Us": 13.260999999943124,
+              "p99Us": 40.91900000003079
+            }
+          },
+          "cachedRender": {
+            "frames": 1000000,
+            "identicalCacheHits": 1000000,
+            "statusChecks": 1005002,
+            "statusChanges": 1,
+            "meanUs": 0.10048688500000003
+          }
+        },
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004728403999999955
+        }
+      }
+    },
+    {
+      "pair": 7,
+      "side": "after",
+      "report": {
+        "label": "after",
+        "generatedAt": "2026-09-19T17:02:41.907Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.5514421666665948,
+            "p50Us": 0.43199999999643524,
+            "p95Us": 0.5719999999982406,
+            "p99Us": 1.1560000000017112
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.8229509166667159,
+            "p50Us": 0.6130000000013069,
+            "p95Us": 1.1449999999939564,
+            "p99Us": 2.2110000000026275
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.556217000000098,
+            "p50Us": 5.345000000005484,
+            "p95Us": 6.6409999999876845,
+            "p99Us": 34.96100000000979
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.788317666666853,
+            "p50Us": 6.44900000000348,
+            "p95Us": 8.388999999993985,
+            "p99Us": 77.41699999999696
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.525759999999994,
+            "p50Us": 6.560000000007449,
+            "p95Us": 7.886000000013382,
+            "p99Us": 29.656999999986056
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.778847666666803,
+            "p50Us": 5.856999999991785,
+            "p95Us": 7.162999999991371,
+            "p99Us": 26.683000000019774
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.364234333332952,
+            "p50Us": 4.700999999982969,
+            "p95Us": 5.314999999995962,
+            "p99Us": 21.489000000030956
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 3.972016999999394,
+            "p50Us": 3.486000000009426,
+            "p95Us": 4.128999999977623,
+            "p99Us": 10.206999999979871
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.9474779999998586,
+            "p50Us": 2.4809999999888532,
+            "p95Us": 3.4359999999651336,
+            "p99Us": 8.599000000003798
+          }
+        },
+        "footer": {
+          "bodyRows": {
+            "minimal": 2,
+            "balanced": 3,
+            "full": 4
+          },
+          "renders": {
+            "footerFull120": {
+              "samples": 3000,
+              "meanUs": 13.22178133333282,
+              "p50Us": 11.080999999990127,
+              "p95Us": 17.913000000021384,
+              "p99Us": 90.33599999997932
+            },
+            "footerBalanced120": {
+              "samples": 3000,
+              "meanUs": 11.924527333333032,
+              "p50Us": 10.02699999997958,
+              "p95Us": 19.79199999999537,
+              "p99Us": 60.930999999982305
+            },
+            "footerNarrow40": {
+              "samples": 3000,
+              "meanUs": 9.05528533333317,
+              "p50Us": 7.714999999961947,
+              "p95Us": 10.559000000000651,
+              "p99Us": 48.192000000028656
+            },
+            "footerNoStatus120": {
+              "samples": 3000,
+              "meanUs": 7.776942000000985,
+              "p50Us": 6.710999999995693,
+              "p95Us": 8.468999999990956,
+              "p99Us": 34.05800000007275
+            }
+          },
+          "cachedRender": {
+            "frames": 1000000,
+            "identicalCacheHits": 1000000,
+            "statusChecks": 1005002,
+            "statusChanges": 1,
+            "meanUs": 0.09842987400000004
+          }
+        },
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.005309693000000038
+        }
+      }
+    },
+    {
+      "pair": 7,
+      "side": "before",
+      "report": {
+        "label": "before",
+        "generatedAt": "2026-09-19T17:02:42.204Z",
+        "environment": {
+          "node": "v24.19.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "AMD Ryzen 7 9700X 8-Core Processor"
+        },
+        "methodology": "Synthetic same-tree microbenchmarks. Shared fixtures; the pre-change tree ignores the phase-2 snapshot fields. Timing includes performance.now overhead; the cached mean uses a bulk loop. NOT a live Pi/provider/terminal A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.5048419166666825,
+            "p50Us": 0.41099999999971715,
+            "p95Us": 0.5230000000011614,
+            "p99Us": 1.155000000004236
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 0.7741585833333805,
+            "p50Us": 0.5930000000091695,
+            "p95Us": 1.1549999999971305,
+            "p99Us": 2.2100000000051523
+          }
+        },
+        "renders": {
+          "baselineFull120": {
+            "samples": 3000,
+            "meanUs": 6.275294666666701,
+            "p50Us": 5.062999999992712,
+            "p95Us": 6.388999999998646,
+            "p99Us": 41.57199999998795
+          },
+          "saturatedFull120": {
+            "samples": 3000,
+            "meanUs": 7.123369666666721,
+            "p50Us": 6.018000000011625,
+            "p95Us": 9.0720000000033,
+            "p99Us": 42.22400000000448
+          },
+          "saturatedFull180": {
+            "samples": 3000,
+            "meanUs": 7.000317333333515,
+            "p50Us": 6.138999999990347,
+            "p95Us": 7.203000000004067,
+            "p99Us": 25.54800000001478
+          },
+          "saturatedMono120": {
+            "samples": 3000,
+            "meanUs": 6.044157999999488,
+            "p50Us": 5.375000000015007,
+            "p95Us": 6.0179999999832035,
+            "p99Us": 19.22899999999572
+          },
+          "concurrentBalanced120": {
+            "samples": 3000,
+            "meanUs": 5.2533600000000105,
+            "p50Us": 4.700999999982969,
+            "p95Us": 5.706000000003542,
+            "p99Us": 10.649000000000797
+          },
+          "concurrentBalanced40": {
+            "samples": 3000,
+            "meanUs": 4.087579333333271,
+            "p50Us": 3.4559999999999036,
+            "p95Us": 6.840999999951691,
+            "p99Us": 11.191999999994096
+          },
+          "emptyIdle120": {
+            "samples": 3000,
+            "meanUs": 2.791432333333193,
+            "p50Us": 2.46199999997998,
+            "p95Us": 2.6419999999802712,
+            "p99Us": 5.274999999983265
+          }
+        },
+        "footer": null,
+        "cachedRender": {
+          "frames": 1000000,
+          "identicalCacheHits": 1000000,
+          "meanUs": 0.004889446999999962
+        }
+      }
+    }
+  ]
+}

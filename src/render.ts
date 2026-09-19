@@ -4,7 +4,7 @@ import type { HudRole, HudStyler, HudThemeLike } from "./palette.ts";
 import type { HudConfig, HudLanguage } from "./config.ts";
 import type { HudSnapshot, ToolCategory, ToolOutcome } from "./state.ts";
 
-interface HudWords {
+export interface HudWords {
   context: string;
   ready: string;
   working: string;
@@ -14,14 +14,15 @@ interface HudWords {
   tasks: string;
   compact: string;
   cost: string;
+  usage: string;
   stopped: string;
   errors: string;
   other: string;
 }
 
-const LABELS: Record<HudLanguage, HudWords> = {
-  en: { context: "ctx(last)", ready: "ready", working: "working", settling: "settling", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", stopped: "interrupted", errors: "errors", other: "other" },
-  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", settling: "收尾中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", stopped: "已中断", errors: "错误", other: "其他" },
+export const LABELS: Record<HudLanguage, HudWords> = {
+  en: { context: "ctx(last)", ready: "ready", working: "working", settling: "settling", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", stopped: "interrupted", errors: "errors", other: "other" },
+  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", settling: "收尾中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", stopped: "已中断", errors: "错误", other: "其他" },
 };
 
 /** Fixed layout bounds: a row can never grow past these counts, whatever the state. */
@@ -53,17 +54,21 @@ export interface HudTheme extends HudThemeLike {
   fg(tone: string, text: string): string;
 }
 
-interface Field {
+/** One laid-out unit of a row. Exported so the footer surface reuses the same layout rules. */
+export interface HudField {
   priority: number;
   segments: HudSegment[];
   text: string;
   width: number;
 }
 
-const seg = (role: HudRole, text: string): HudSegment => ({ role, text });
+interface Field extends HudField {}
+
+export const hudSegment = (role: HudRole, text: string): HudSegment => ({ role, text });
+const seg = hudSegment;
 
 /** Build a field from optional segments; empty fields disappear instead of leaving gaps. */
-function field(priority: number, candidates: (HudSegment | null | false | "")[]): Field | null {
+export function field(priority: number, candidates: (HudSegment | null | false | "")[]): HudField | null {
   const segments: HudSegment[] = [];
   let text = "";
   for (const candidate of candidates) {
@@ -144,6 +149,15 @@ function toRow(segments: HudSegment[]): HudRow {
   return { text, segments };
 }
 
+/**
+ * Lay out already-built fields and wrap them into one row. Exported so every surface
+ * shares one priority/drop/clip implementation instead of reimplementing layout.
+ */
+export function assembleRow(candidates: (HudField | null)[], width: number, config: HudConfig): HudRow {
+  const separator = config.ascii ? " | " : " · ";
+  return toRow(layout(candidates, width, separator, config.ascii));
+}
+
 /** Below this width the context meter outranks the model name in the identity row. */
 const CONTEXT_FIRST_WIDTH = 45;
 const MODEL_PRIORITY = 100;
@@ -176,7 +190,7 @@ function gitField(snapshot: HudSnapshot, config: HudConfig): Field | null {
 }
 
 /** Context stays a single droppable field; only the context/alert segments change color. */
-function contextField(snapshot: HudSnapshot, config: HudConfig, width: number, label: string, priority: number): Field | null {
+export function contextField(snapshot: HudSnapshot, config: HudConfig, width: number, label: string, priority: number): HudField | null {
   if (snapshot.contextTokens === null || snapshot.contextWindow <= 0) {
     return field(priority, [seg("label", `${label} ?`)]);
   }
@@ -203,7 +217,7 @@ function contextField(snapshot: HudSnapshot, config: HudConfig, width: number, l
 }
 
 /** Activity is the phase marker plus its label; only waiting switches this field to warning. */
-function activityField(snapshot: HudSnapshot, config: HudConfig, width: number, words: HudWords): Field | null {
+export function activityField(snapshot: HudSnapshot, config: HudConfig, width: number, words: HudWords): HudField | null {
   const running = config.ascii ? ">" : "●";
   const check = config.ascii ? "ok" : "✓";
   if (snapshot.activeTools.length) {
@@ -227,7 +241,7 @@ const outcomeMark: Record<ToolOutcome, string> = { ok: "✓", error: "!", interr
  * The state ledger already merges every name beyond its cap into one `other` bucket,
  * so this field can never iterate an unbounded collection.
  */
-function toolCategoriesField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): Field | null {
+export function toolCategoriesField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
   // The state ledger mirrors every terminal outcome, so an empty ledger means no completions yet.
   if (!snapshot.toolCategories.length) return null;
   const marker = config.ascii ? "ok" : outcomeMark.ok;
@@ -251,12 +265,12 @@ function toolCategoriesField(snapshot: HudSnapshot, config: HudConfig, words: Hu
 }
 
 /** Aggregate failure count; the count itself is the only error-colored segment. */
-function errorsField(snapshot: HudSnapshot, words: HudWords): Field | null {
+export function errorsField(snapshot: HudSnapshot, words: HudWords): HudField | null {
   if (!snapshot.errors) return null;
   return field(94, [seg("label", `${words.errors} `), seg("error", String(snapshot.errors))]);
 }
 
-function agentsField(snapshot: HudSnapshot, words: HudWords): Field | null {
+export function agentsField(snapshot: HudSnapshot, words: HudWords): HudField | null {
   if (!snapshot.runningAgents && !snapshot.agentErrors) return null;
   return field(55, [
     seg("label", `${words.agents} `),
@@ -265,19 +279,19 @@ function agentsField(snapshot: HudSnapshot, words: HudWords): Field | null {
   ]);
 }
 
-function tasksField(snapshot: HudSnapshot, words: HudWords): Field | null {
+export function tasksField(snapshot: HudSnapshot, words: HudWords): HudField | null {
   if (!snapshot.taskSources) return null;
   return field(50, [seg("label", `${words.tasks} `), seg("body", `${snapshot.taskDone}/${snapshot.taskTotal}`)]);
 }
 
-function costField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): Field | null {
+export function costField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
   if (!config.showCost) return null;
   const value = snapshot.costReports ? `$${snapshot.cost.toFixed(3)}${snapshot.costReports < snapshot.usageReports ? "+?" : ""}` : "?";
   return field(60, [seg("label", `${words.cost} `), seg("body", value)]);
 }
 
 /** Bridge agents/tasks are emitted only for valid bridge data; no empty placeholder. */
-function bridgeFields(snapshot: HudSnapshot, config: HudConfig, width: number, words: HudWords, agents: Field | null, tasks: Field | null): (Field | null)[] {
+export function bridgeFields(snapshot: HudSnapshot, config: HudConfig, width: number, words: HudWords, agents: HudField | null, tasks: HudField | null): (HudField | null)[] {
   const summary: HudSegment[] = [];
   for (const item of [agents, tasks]) {
     if (!item) continue;
@@ -293,17 +307,29 @@ function bridgeFields(snapshot: HudSnapshot, config: HudConfig, width: number, w
 }
 
 /** Zero compactions or zero observed usage stay hidden instead of padding the row. */
-function compactionField(snapshot: HudSnapshot, words: HudWords): Field | null {
+export function compactionField(snapshot: HudSnapshot, words: HudWords): HudField | null {
   if (!snapshot.compactions) return null;
   return field(35, [seg("label", `${words.compact} `), seg("body", String(snapshot.compactions))]);
 }
 
-function tokensField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): Field | null {
+/**
+ * Observed usage since attachment/reset: input and both cache counters are separate
+ * fields, so a cached token is never counted as a fresh input token twice. The `obs*`
+ * marker states that this is not a full-session ledger; CH is the latest valid
+ * assistant's cacheRead / (input + cacheRead + cacheWrite), or `?` when unknown.
+ */
+export function tokensField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
   if (!snapshot.usageReports) return null;
   const arrow = { up: config.ascii ? "in" : "↑", down: config.ascii ? "out" : "↓" };
+  // One colored segment per counter keeps the field compact; the arrow and value share the
+  // reader-facing group, while the obs* label states the observation scope.
   return field(30, [
-    seg("label", arrow.up), seg("body", compactNumber(snapshot.input)),
-    seg("label", ` ${arrow.down}`), seg("body", compactNumber(snapshot.output)),
+    seg("label", `${words.usage} `),
+    snapshot.input ? seg("body", `${arrow.up}${compactNumber(snapshot.input)}`) : null,
+    snapshot.output ? seg("body", ` ${arrow.down}${compactNumber(snapshot.output)}`) : null,
+    snapshot.cacheRead ? seg("body", ` R${compactNumber(snapshot.cacheRead)}`) : null,
+    snapshot.cacheWrite ? seg("body", ` W${compactNumber(snapshot.cacheWrite)}`) : null,
+    seg("label", " CH"), seg("body", snapshot.cacheHit === null ? "?" : `${(snapshot.cacheHit * 100).toFixed(1)}%`),
   ]);
 }
 

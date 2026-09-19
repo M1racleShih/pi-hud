@@ -24,7 +24,7 @@ The committed baseline was captured at `2026-09-19T11:20:01.275Z` on `linux/x64`
 | Uncached full three-row render, p99 | 0.891 ms | ≤ 5 ms |
 | Cached render, bulk-loop mean | 0.0119 µs | ≤ 5 µs |
 
-The hook samples use 2,000 warmups and 12,000 observations. Assistant fixtures include provider/model identity and reported cache/cost usage. Full-layout rendering includes Chinese and emoji at 120 columns, with 3,000 uncached samples. Phase-2 scenarios add a category-saturated full layout (16 retained names plus `other`, three concurrent tools, an interruption) at 120/180 columns and a concurrent-activity balanced layout at 120/40 columns; they run against the same unchanged gates. The cached measure loops one million times and verifies object-identical cache hits. That tiny optimized bulk-loop average is **not an input-to-paint latency**, does not include terminal rendering, and must not be advertised as the TUI response time. Warm JIT, GC, OS scheduling and timing overhead affect all numbers; a single-host microbenchmark is not a deployment guarantee.
+The hook samples use 2,000 warmups and 12,000 observations. Assistant fixtures include provider/model identity and reported cache/cost usage. Full-layout rendering includes Chinese and emoji at 120 columns, with 3,000 uncached samples. Phase-2 scenarios add a category-saturated full layout (16 retained names plus `other`, three concurrent tools, an interruption) at 120/180 columns and a concurrent-activity balanced layout at 120/40 columns; they run against the same unchanged gates. Phase-3 scenarios render the optional footer surface (full/balanced/narrow/without statuses) through `HudFooterView` and add `cachedFooterRenderMeanUs ≤ 5 µs` for the footer's cached path, where the bounded status comparison runs on every host-invoked render. The cached measures loop one million times and verifies object-identical cache hits. That tiny optimized bulk-loop average is **not an input-to-paint latency**, does not include terminal rendering, and must not be advertised as the TUI response time. Warm JIT, GC, OS scheduling and timing overhead affect all numbers; a single-host microbenchmark is not a deployment guarantee.
 
 The synthetic 100,000-tool-event burst asserts **one pending publication timer and one publication**, bounded recent IDs (128), no retained completed tools, and zero extra publications across 60,000 ms of fake-clock idle time. A separate 50,000-event flood of unique tool names asserts that the retained per-name ledger stays at 16 entries, that the synthetic overflow record stays separate (so a real tool named `other` keeps its own counters). This is a deterministic scheduling/structure test, not a real minute of CPU/RSS sampling. A one-million-frame cache loop proves reuse for unchanged inputs; host invalidation or resizing necessarily changes that condition.
 
@@ -81,11 +81,46 @@ Paired per-run deltas (after − before within one pair) make the direction clea
 
 The worst uncached p99 in this phase (68 µs) leaves roughly 73× headroom against the unchanged 5 ms gate, and the strictest render path (one recompute per 250 ms coalesced publication) spends on the order of 0.004% of one core. **These are synthetic microbenchmarks, not a live Pi/provider/terminal A/B.** The real-host streaming, tool-dispatch and keyboard-latency acceptance procedure below is still required before any release claim.
 
+## Phase 3 optional footer surface: same-machine before/after
+
+The optional `surface: footer` slot, the cached identity data and the bounded extension-status comparison changed `extension.ts`, `state.ts`, `render.ts` and added `footer.ts`, so the phase was measured against the pre-change commit (`af3a5e4`) on the same host in one session. The gates were **not** changed; a cached-footer gate with the existing 5 µs budget was **added** for the new hot path. Raw per-run data is in [performance-phase3-ab.json](performance-phase3-ab.json).
+
+Method: `git worktree` of the pre-change commit as the before side, the same tree-agnostic probe file (`scripts/perf-ab.mjs`) copied into both worktrees, identical fixtures and sample counts as phase 2. The before tree has no `src/footer.ts`, so the probe imports it dynamically and reports the footer scenarios as **new scenarios without a baseline**; the runner records them as `before: null` instead of inventing a comparison. Eight pairs ran, alternating before-then-after and after-then-before, for 8 runs per side. The shared render fixture now also carries `cacheRead`/`cacheWrite`/`cacheHit`, which the pre-change renderer ignores, so both sides render the same information density. The after side was the phase-3 working tree (recorded as `workingTree: true`; the only later source change was inside `/hud on`'s epoch reset, which no measured scenario calls).
+
+| Measurement | Before (mean of 8) | After (mean of 8) | Delta |
+| --- | ---: | ---: | ---: |
+| Final assistant-message handler, p99 | 1.196 µs | 1.120 µs | −6.3% (paired −0.08 ± 0.18 µs) |
+| Tool start + end pair, p99 | 2.139 µs | 2.196 µs | +2.7% (paired +0.06 ± 0.18 µs) |
+| Uncached full render, baseline fixture, p50 | 4.850 µs | 5.118 µs | +5.5% |
+| Uncached full render, baseline fixture, mean | 6.163 µs | 6.292 µs | +2.1% (paired +0.13 ± 0.39 µs) |
+| Uncached full render, baseline fixture, p99 | 38.95 µs | 37.91 µs | −2.7% |
+| Uncached full render, category-saturated, p50 | 5.852 µs | 6.153 µs | +5.1% |
+| Uncached full render, category-saturated, mean | 7.064 µs | 7.539 µs | +6.7% (paired +0.47 ± 0.46 µs, 7/8 pairs) |
+| Uncached full render, category-saturated, p95 | 8.936 µs | 9.673 µs | +8.2% |
+| Uncached full render, category-saturated, p99 | 53.10 µs | 47.78 µs | −10.0% (paired −5.3 ± 22.9 µs) |
+| Uncached full render, category-saturated, 180 columns, mean | 7.054 µs | 7.181 µs | +1.8% |
+| Uncached full render, category-saturated, mono, mean | 5.947 µs | 6.324 µs | +6.3% |
+| Uncached balanced render, concurrent activity, mean | 5.135 µs | 5.174 µs | +0.8% |
+| Uncached balanced render, concurrent activity, p99 | 14.72 µs | 16.92 µs | +15.0% (paired +2.2 ± 6.5 µs) |
+| Uncached balanced render, concurrent activity, 40 columns, mean | 3.859 µs | 3.774 µs | −2.2% |
+| Uncached full render, empty idle row, mean | 2.719 µs | 2.662 µs | −2.1% |
+| Cached render, bulk-loop mean | 0.0049 µs | 0.0046 µs | −6.1% |
+| Footer full render, category-saturated, mean | n/a | 12.90 µs | new scenario |
+| Footer full render, category-saturated, p99 | n/a | 86.6 µs | new scenario |
+| Footer balanced render, category-saturated, mean | n/a | 11.52 µs | new scenario |
+| Footer balanced render, 40 columns, mean | n/a | 8.82 µs | new scenario |
+| Footer full render without statuses, mean | n/a | 7.38 µs | new scenario |
+| Footer cached render with 12 statuses, bulk-loop mean | n/a | 0.0954 µs | new gate ≤ 5 µs |
+
+The widget path with observed usage is the only comparable scenario that got measurably slower: the usage row now renders four separate counters plus `CH` instead of two merged numbers, which costs about **+0.47 µs mean** on the saturated fixture (7.1 → 7.5 µs) and +0.13 µs on the baseline fixture. That is a deliberate information increase of roughly 0.006% of one core at the strictest one-recompute-per-250 ms cadence, not a structural regression: every gate is unchanged, the worst after-side render p99 (47.8 µs) still leaves ~100× headroom against the 5 ms gate, and the cached path got slightly cheaper. The 12-status footer hot path (every host-invoked render re-checks the status map) measures 0.095 µs per cached frame against the new 5 µs gate, so it is ~52× inside budget.
+
+**These are synthetic microbenchmarks, not a live Pi/provider/terminal A/B.** The real-host streaming, tool-dispatch and keyboard-latency acceptance procedure below is still required before any release claim.
+
 ## Real host checks
 
 The pinned SDK/RPC/PTY checks below are the workflow's real-host gates. They were prepared for CI and, in addition, executed locally in the phase-1 environment; the executed results are recorded in [VERIFICATION.md](VERIFICATION.md).
 
-The pinned SDK type-contract check validates event names and accessed fields against the installed Pi 0.85.1 types. The RPC smoke launches the actual CLI, verifies `/hud` registration and strict JSON framing, and checks that no terminal widget request leaks into RPC. The PTY smoke launches the real TUI with a clean temporary home and no provider credentials, switches preset, resizes and toggles the HUD. It makes **no model request**.
+The pinned SDK type-contract check validates event names and accessed fields against the installed Pi 0.85.1 types, including the HUD's structural footer-data surface against Pi's real `ReadonlyFooterDataProvider`. The RPC smoke launches the actual CLI, verifies `/hud` registration and strict JSON framing, and checks that no terminal widget request leaks into RPC. The PTY smoke launches the real TUI with a clean temporary home and no provider credentials, switches surface, verifies native-footer restoration and an independent extension's `setStatus` update, and switches preset/palette and resizes. It makes **no model request**.
 
 These are prepared checks, not results from this sandbox. Even a passing PTY startup smoke is **not** a live model-stream performance A/B. Their first genuine runner results must be recorded separately rather than replacing this baseline with a claim they already ran.
 
@@ -103,4 +138,4 @@ Suggested acceptance policy: no reproducible extra stalls, no visible input lag 
 
 `/hud status` exposes observation scope, flush count, maximum observed flush duration, render requests, callback errors and bounded-record counts. It intentionally does not time every hot-path callback in production. Benchmarks instrument those callbacks externally. Status output can include the local config path; redact it before sharing.
 
-`/hud off` cancels pending publication/expiry work, disables the optional probe and removes only the named widget. The startup kill switch removes event dispatch overhead too. Session shutdown removes the bus listener and suppresses stale async results. A timeout or malformed config is an unavailable diagnostic, not a reason to stop the model or tool loop.
+`/hud off` cancels pending publication/expiry work, disables the optional probe and removes only the named widget. If the footer surface is active and the HUD still owns the slot, `off` also restores the built-in footer; if another extension replaced the HUD footer, `off` leaves that footer untouched. The startup kill switch removes event dispatch overhead too. Session shutdown removes the bus listener, the branch subscription and any footer/widget ownership, and suppresses stale async results. A timeout or malformed config is an unavailable diagnostic, not a reason to stop the model or tool loop.

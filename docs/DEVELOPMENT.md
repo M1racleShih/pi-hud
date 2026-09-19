@@ -1,0 +1,66 @@
+# Development, Git history and release workflow
+
+[README](../README.md) · [Contributing](../CONTRIBUTING.md) · [Verification](VERIFICATION.md)
+
+## Local workflow used for this delivery
+
+The repository was initialized with `main`, then developed on actual topic branches: `docs/research`, `feat/event-driven-hud`, `test/performance-and-release`, and a final documentation/release branch. Each logical stage is committed and merged with `--no-ff` to preserve the sequence. The v0.1.0 tag identifies the delivered source. No issue/PR numbers, reviewers, remote approvals or remote CI results are invented.
+
+The source ZIP is directly installable, while `pi-hud-history.bundle` in the delivery root preserves the real Git objects and branch/tag refs. Restore a development clone independently from the installable source directory:
+
+```sh
+git clone pi-hud-history.bundle pi-hud-dev
+cd pi-hud-dev
+git log --graph --oneline --all
+git remote remove origin
+```
+
+Set a remote belonging to your own repository before pushing:
+
+```sh
+git remote add origin git@github.com:YOUR-ACCOUNT/pi-hud.git
+git push -u origin main
+git push origin v0.1.0
+```
+
+Replace `YOUR-ACCOUNT`; no repository with that literal name is assumed to exist. Pushing the tag is optional and triggers a **draft-release** workflow. Pushing source alone does not publish to npm. GitHub repository creation, protected branches, required checks and reviewers remain owner-admin actions.
+
+## Local checks
+
+Use Node 22.19.0 or newer for the supported host profile. No npm dependencies are required for the local source suite.
+
+```sh
+npm ci --ignore-scripts --no-audit --no-fund
+npm run check
+npm test -- --experimental-test-coverage
+node bench/run.mjs --check --json=performance-result.json
+npm run package:check
+npm run demo
+```
+
+`check` enforces syntax, allowed imports, forbidden core-path APIs, manifest and local documentation links. `test` uses Node's test runner with explicit paths for shell-independent Windows execution. Git tests create and remove their own temporary repository. Performance budgets are explicit and machine-sensitive; see the methodology before comparing results. Packaging tests extract only the package's own tarball, perform an empty-cache offline production install and import the actual packed entry.
+
+## Pinned host checks (network-enabled environment)
+
+The SDK is isolated under ignored `.tmp/sdk`, not added to the shipped package's runtime dependencies:
+
+```sh
+npm install --prefix .tmp/sdk --ignore-scripts --no-audit --no-fund --save-exact @earendil-works/pi-coding-agent@0.85.1 typescript@5.9.3 @types/node@22.19.19
+node scripts/sdk-check.mjs
+node scripts/pi-rpc-smoke.mjs
+python3 scripts/pi-pty-smoke.py
+```
+
+The PTY script requires a Unix-like environment. SDK checks and examples use the actual pinned TypeScript API; implementation behavior remains covered by separate runtime tests. RPC and PTY smoke use disposable homes/workspaces with no provider credentials and make no model requests. A real streaming A/B is a separate acceptance step.
+
+Direct SDK packages are pinned; the network-installed host's transitive dependency tree is not vendored in this source delivery. Review dependency changes and record the resolved `.tmp/sdk/package-lock.json` for reproducible host investigations. The root lockfile intentionally has zero dependencies.
+
+## GitHub workflow
+
+`ci.yml` runs on pull requests, main pushes, manual dispatch and reusable release calls. It contains six OS/Node test combinations, an Ubuntu performance gate with uploaded JSON, and an Ubuntu pinned-SDK/RPC/PTY job. Actions use reviewed commit SHAs, pull-request jobs have only `contents: read`, checkouts do not persist credentials, and the workflow does not use `pull_request_target` or repository secrets to execute contributor code. Dependabot monitors GitHub Actions pins.
+
+Issue forms ask for sanitized environment/reproductions; the PR template requires performance and bilingual-documentation evidence. Repository administrators should require the relevant CI checks, review changes and protect `main`. Those settings are not claimed active merely because YAML is included.
+
+`release.yml` runs on version tags, reuses CI, checks that the tag matches `package.json`, creates source ZIP and npm tarball with SHA-256 sums, then opens a **draft** GitHub release. Only that final job has `contents: write`. It never automatically publishes a release or sends anything to npm. Draft contents still require human review and the real-terminal acceptance evidence described in [PERFORMANCE.md](PERFORMANCE.md).
+
+For subsequent releases: update both READMEs if behavior changed, add changelog notes, rerun verification, open/review/merge the PR, update package and lockfile versions together, tag the reviewed commit, inspect the draft artifacts, and publish only after the acceptance gate is satisfied.

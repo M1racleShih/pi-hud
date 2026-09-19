@@ -1,0 +1,24 @@
+
+en / minimal / 120 columns (synthetic fixture)
+[Example Model] | ctx(last) █████░░░░░ 45% 90k/200k | pi-hud | high
+
+en / balanced / 120 columns (synthetic fixture)
+[Example Model] | ctx(last) █████░░░░░ 45% 90k/200k | pi-hud | high
+● edit state.mjs | tools* ✓5 !0 | agents 1 | tasks 3/7 | est* $0.042
+
+en / full / 120 columns (synthetic fixture)
+[Example Model] | ctx(last) █████░░░░░ 45% 90k/200k | pi-hud | high
+● edit state.mjs | tools* ✓5 !0 | est* $0.042
+agents 1 | tasks 3/7 | Build Pi HUD | compactions* 0 | ↑87k ↓3.0k
+
+zh-CN / minimal / 120 columns (synthetic fixture)
+[Example Model] | 上下文(上次) █████░░░░░ 45% 90k/200k | pi-hud | high
+
+zh-CN / balanced / 120 columns (synthetic fixture)
+[Example Model] | 上下文(上次) █████░░░░░ 45% 90k/200k | pi-hud | high
+● edit state.mjs | 工具* ✓5 !0 | 代理 1 | 任务 3/7 | 估算* $0.042
+
+zh-CN / full / 120 columns (synthetic fixture)
+[Example Model] | 上下文(上次) █████░░░░░ 45% 90k/200k | pi-hud | high
+● edit state.mjs | 工具* ✓5 !0 | 估算* $0.042
+代理 1 | 任务 3/7 | Build Pi HUD | 压缩* 0 | ↑87k ↓3.0k

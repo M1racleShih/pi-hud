@@ -68,7 +68,7 @@ cd /home/shq/opensource/agents/pi-hud
 pi -e "$PWD/index.ts"
 ```
 
-对每个背景（深/浅）× 每个宽度（40/80/120/180）执行以下流程。宽度档之间退出 pi、调整窗口、`tput cols` 确认后再进入（也鼓励顺手观察运行中 resize，见 CP-C7）。
+对每个背景（深/浅）× 每个宽度（40/80/120/180）执行以下流程。宽度档之间退出 pi、调整窗口、`tput cols` 确认后再进入（也鼓励顺手观察运行中 resize，结果记入 CP-B1 的备注列）。
 
 ### 2.1 surface 对照流程
 

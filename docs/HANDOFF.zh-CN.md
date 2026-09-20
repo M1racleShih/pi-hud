@@ -1,6 +1,6 @@
 # pi-hud 开发交接
 
-更新：2026-09-20（B2b 后续：视觉验收准备 + 默认 footer 独立评估）。代码基线：B2b review 修复提交 5333c7d 已通过复审，本轮在其上新增验收材料与文档，未改生产代码默认值。
+更新：2026-09-20（视觉验收精简执行：核心项经观察者口述确认并转录收紧，记录见结果文件；仅文档变更，未改生产代码与默认值）。代码基线：B2b review 修复提交 5333c7d 已通过复审；后续各轮均未改生产代码默认值。
 仓库：<https://github.com/M1racleShih/pi-hud>，继续使用 `main`。
 
 ## 当前完成情况
@@ -12,7 +12,8 @@
 - 第三阶段 B2b（本轮）：**长历史性能实测与真实宿主验收已完成，并经一轮 review 修复四项证据缺陷后重建受影响证据**。1k/10k/100k 线性+分支夹具实测（固定 seed/比例/内容大小）；稳态增量、超限恢复（含恢复再失败）、重建/切换/取消实测；8 组同机交替 observed/session A/B（完整轮含 250ms 合并发布，断言每轮恰好一次发布）；真实 TUI 中 9 场景验收（10k resume、同 summary 双压缩、树导航/回根、模型切换、基线在途时快速切会话、双 footer 两种加载顺序、后置异步 message_end 替换扩展）全部与独立文件 oracle 对齐；20 对 × 2 配置（默认 observed+widget 与可选 session+footer）共 80 组真实 TUI 流式/工具/键盘 A/B，含流中输入与配对噪声包络。原始数据与结论见 [性能证据](PERFORMANCE.md)、[验证记录](VERIFICATION.md) 与 docs/ 下四份 JSON。
 - B2b 修复：`accumulateUsage` 每条记录分配元组数组（100k 重建约 24 MiB 垃圾）→ 提升为模块级常量；`/hud status` 诊断新增已发布 totals，便于真实宿主与独立 oracle 对齐。review 两轮共修复七项测量缺陷（A/B 从不触发 250ms 发布、fast-switch 未命中在途基线、流式探针标记/超时/完成语义、组数与负载不足、纯文本字节计数、回显证据可被无关输出满足、缺工具行静默通过），仅重建受影响证据，详见 VERIFICATION.md 的 review round 两节。
 - 默认仍为 widget + observed（[默认 footer 决策记录](DEFAULT-FOOTER-DECISION.zh-CN.md) 已完成独立评估，结论：当前不切换，满足条件后重评；未改任何默认/配置）。widget 主体为 1/2/3 行，footer 主体为 2/3/4 行，footer 另有最多 2 行扩展状态。
-- B2b 后续（本轮）：**真人视觉验收材料已备好**（[VISUAL-ACCEPTANCE.zh-CN.md](VISUAL-ACCEPTANCE.zh-CN.md)：命令、检查点 CP-A/CP-B、结果记录模板；新增 `scripts/visual-demo.mjs` 合成着色预览入口，复用 preview fixture 与生产渲染器/配色），等待真人执行；**默认 footer 决策记录已产出**（[DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)）。
+- B2b 后续：真人视觉验收材料与默认 footer 决策记录已交付（`scripts/visual-demo.mjs`、[VISUAL-ACCEPTANCE.zh-CN.md](VISUAL-ACCEPTANCE.zh-CN.md)、[DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)）。
+- 视觉验收（最新）：**观察者按精简清单执行并口头确认"没问题"，结果已如实转录并收紧**于 [VISUAL-ACCEPTANCE-RESULTS.zh-CN.md](VISUAL-ACCEPTANCE-RESULTS.zh-CN.md)（口述转录、非逐项手写；带推测性的 ✅ 已按观察者指示降级）。通过：深色合成预览 A1–A6/A9/A10、真实会话 B1–B5/B7–B9（日常宽度）。未覆盖（➖）：A7/A8 变体、浅色细节节与真实会话、B6 逐字段对照、40/120/180 档、上下文警戒/partial/waiting/长标题。手册 "CP-C7" 悬空引用已修复。**状态：核心项通过、覆盖度部分；非完整视觉验收，不得宣称完整通过**。
 - 最后一次 review 未发现可操作的回归问题。
 
 ## 用户明确的展示偏好（优先于旧规划）
@@ -29,13 +30,13 @@
 
 - B2b（本轮）已通过：npm run verify（244 项测试、仓库检查、性能门禁全不变）、npm run package:check、固定 SDK 检查（sdk-check、usage-oracle-check）、RPC/PTY 冒烟、长历史基准（docs/performance-b2b-ledger.json）、8 组交替 A/B（docs/performance-b2b-usage-ab.json）、真实宿主 9 场景（docs/host-acceptance-b2b.json）、20 组真实 TUI 流式/工具/键盘 A/B（docs/pi-stream-ab-b2b.json）。
 - B2b 关键实测结论：附挂 3.1/3.3ms（1k）→ 20.9/23.1ms（10k）→ 202/231ms（100k，含 SDK 自身 2.0–2.9ms 的 O(N) getEntries 同步复制）；分片最大 0.23–0.70ms（预算 2ms 不变）；稳态增量只随新增条数增长且 getEntries 保持 0 次；session 模式稳态边际成本约 +1.0µs 账本核对 + ~0.9µs 发布/轮，另 ~1.0µs/次 sess* 渲染；真实 TUI（两种配置各 20 对）所有时间指标均在同机噪声包络内；按原始终端字节计的确定性成本为每轮约 +0.9–1.0 KiB、每次流式回复 +1.0 KiB（footer）至 +2.6 KiB（widget），另一次约 320–460 字节的合并发布（完成后约 150ms）。
-- 仍未验（不得宣称）：真人深浅色终端视觉验收（材料已备好待执行）、跨平台矩阵、真实付费 provider 流式 A/B（明确不使用付费 provider）、流中 resize/压缩/中止重试等剩余实时场景。
+- 仍未验（不得宣称）：完整版真人视觉验收（精简核心项已通过，剩余宽度档/浅色真实会话/B6 逐字段对照/部分状态未覆盖，见结果文件）、跨平台矩阵、真实付费 provider 流式 A/B（明确不使用付费 provider）、流中 resize/压缩/中止重试等剩余实时场景。
 - 默认 footer 切换评估已完成：结论为“当前不切换，有条件重评”，见 [DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)；widget + observed 保持默认，本轮未改任何默认或用户配置。
 
 ## B2b 之后的待验清单（本轮更新）
 
 1. B2b 评审：**已完成**（5333c7d 经三轮复审通过，见 .tmp/review/b2b-review-round3.md；B2b 数据不重做）。
-2. 真人深浅色终端视觉验收：**材料已备好，等待真人执行**（[VISUAL-ACCEPTANCE.zh-CN.md](VISUAL-ACCEPTANCE.zh-CN.md)；合成预览/PTY 检查不能代填通过）。
+2. 真人深浅色终端视觉验收：**精简核心项已通过（口述转录，见 [VISUAL-ACCEPTANCE-RESULTS.zh-CN.md](VISUAL-ACCEPTANCE-RESULTS.zh-CN.md)）**；宽度逐档、浅色真实会话、B6 逐字段对照与部分状态仍未覆盖。补齐或由所有者明示接受当前覆盖度，均可满足决策记录的重评条件 1。
 3. 跨平台矩阵（CI 运行 Linux/macOS/Windows × Node 22.19.0/24）：未执行。
 4. 默认 footer 切换：**独立评估已完成**，结论“当前不切换；视觉验收、字段缺口取舍、跨平台、实时场景、所有者批准全部满足后重评”，见 [DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)。
 
@@ -72,15 +73,17 @@ Pi 内可用 `/hud surface footer`、`/hud surface widget`、`/hud off`、`/hud 
 宿主 SDK 位于被忽略的 .tmp/sdk，不随 Git 同步。需要宿主检查时按 [开发流程](DEVELOPMENT.md) 安装锁定 Pi 0.85.1 SDK，并执行 sdk-check、usage-oracle-check、pi-rpc-smoke、pi-pty-smoke。
 用户级 Pi 配置、provider 凭据、pi-goal 安装和会话状态也不由本仓库同步；不要将这些内容提交到 Git。
 
-## 下一阶段：真人执行视觉验收，之后按条件重评默认 footer
+## 下一阶段：字段缺口取舍与跨平台矩阵，之后按条件重评默认 footer
 
-B2b（验收轮）与三轮 review 已完成；本轮（B2b 后续）交付了验收材料与决策记录：
+B2b（验收轮）与三轮 review 已完成；后续材料已交付；视觉验收精简执行并转录收紧（见上）。下一步依次是：
 
-- `scripts/visual-demo.mjs`：合成着色预览（生产渲染器 + 生产配色，强制深/浅变体，40/80/120/180 列，覆盖 ready/working/waiting、上下文警戒、session 各状态与不可用降级、长标题、扩展状态折叠；`--ascii`/`--plain`/`--mode 256color` 可选）。`scripts/preview.mjs` 仅新增导出（fixtureState/sessionView/FOOTER_IDENTITY），`docs/preview.txt` 字节不变。
-- [VISUAL-ACCEPTANCE.zh-CN.md](VISUAL-ACCEPTANCE.zh-CN.md)：真人验收手册（第 1 部分合成着色预览 CP-A1..A10；第 2 部分真实会话 CP-B1..B9 含原生 footer 字段对照表；第 4 部分结果记录模板，明确禁止代填）。
-- [DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)：默认 footer 独立决策记录（SDK 字段来源与缺口、口径、所有权、B2b 成本、迁移影响、尚缺证据、有条件建议）。
+1. 字段缺口书面取舍（决策记录条件 2）：接受 "HUD footer 不显示 auto/sub/xp、上下文为 ctx(last) 快照" 并写入文档，或选择等待上游公开来源。
+2. 视觉验收覆盖度处置（条件 1 的另一半）：补齐完整手册，或所有者明示接受当前精简覆盖度。
+3. CI 跨平台矩阵（条件 3）：需所有者解除"不推送"约束以触发 GitHub Actions。
+4. 剩余实时协议场景（条件 4）：补齐或明确豁免。
+5. 全部满足后由所有者批准单独的默认切换变更（条件 5，两步走且不连带，见决策记录）。
 
-下一步依次是：用户执行视觉验收手册并记录结果 → 字段缺口取舍（auto/sub/xp/实时 ctx）→ CI 跨平台矩阵 → 剩余实时协议场景 → 满足后由所有者批准单独的默认切换变更。B1 契约约束仍然全部有效：
+B1 契约约束仍然全部有效：
 
 - Pi 原生统计包含所有 session entries 中 assistant、带 usage 的 toolResult、compaction、branch_summary；observed 不是同一口径，两种口径都要显式标注。
 - getEntries 的全量数组构建、getContextUsage 的 branch/估算访问不是 O(1)。禁止在 render 或逐 token 路径调用（当前由 scripts/check.mjs 边界强制）。100k 实测：SDK 自身 O(N) 复制约 2.1–2.4ms，是附挂最长停顿的主要成分，分片无法补救这一步（B1 契约已明示）。
@@ -93,9 +96,11 @@ B2b（验收轮）与三轮 review 已完成；本轮（B2b 后续）交付了�
 
 ```text
 先读 docs/HANDOFF.zh-CN.md，核对 git status、当前代码和相关规划。
-B2b 及三轮 review 已完成，不要重做；B2b 后续（视觉验收准备 + 默认 footer 决策记录）
-也已交付：scripts/visual-demo.mjs、docs/VISUAL-ACCEPTANCE.zh-CN.md、
-docs/DEFAULT-FOOTER-DECISION.zh-CN.md。保持 observed 与 widget 默认。
-下一步是用户真人执行视觉验收手册并填写结果；在结果出来之前不得宣称视觉验收
-通过，也不得切换默认。不新增额度功能，不发布不推送。
+B2b、三轮 review、B2b 后续材料均已交付，不要重做。视觉验收已精简执行：
+核心项经观察者口述确认并转录收紧于 docs/VISUAL-ACCEPTANCE-RESULTS.zh-CN.md
+（覆盖度部分，非完整通过，不得宣称完整视觉验收）。保持 observed 与 widget 默认。
+下一步：①字段缺口书面取舍（auto/sub/xp/实时 ctx，决策记录条件 2）；
+②视觉验收覆盖度处置（补齐或所有者明示接受）；③跨平台矩阵（需所有者
+解除不推送约束）；④剩余实时场景补齐或豁免；⑤所有者批准后重评默认。
+不新增额度功能；不发布不推送（除非所有者明确解除）。
 ```

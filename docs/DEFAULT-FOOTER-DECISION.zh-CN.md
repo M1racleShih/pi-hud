@@ -99,5 +99,5 @@
 - **条件 1（视觉验收）：闭合。** 观察者精简执行核心项并确认无问题（转录见 [VISUAL-ACCEPTANCE-RESULTS.zh-CN.md](VISUAL-ACCEPTANCE-RESULTS.zh-CN.md)）；所有者明示接受当前覆盖度，未覆盖项（宽度逐档、浅色真实会话、B6 逐字段对照、部分状态）按"未通过项被明确接受"处理。
 - **条件 2（字段缺口）：闭合。** 所有者书面接受：HUD footer 接管模式下不显示 `auto`/`sub`/`xp` 标记，上下文为 `ctx(last)` 快照而非实时估计。不伪造字段；未选择向上游提需求，如未来改变主意可另行提出。
 - **条件 3（跨平台矩阵）：闭合。** 所有者授权解除"不推送"约束后推送；首轮 Windows 两 job 因 CRLF 检出导致 preview 字节校验失败，`c0f0948` 以 `.gitattributes` 强制 LF 检出修复；运行 35541018928 全部 8 个 job 通过（ubuntu/macos/windows × Node 22.19.0/24、性能门禁、Pi 0.85.1 契约与 RPC 检查）。
-- **条件 4（剩余实时协议场景）：未闭合。**
-- **条件 5（所有者批准默认切换）：未闭合。** 默认保持 `surface: widget` + `usageScope: observed` 不变；满足 3、4 后仍需单独的批准变更（两步走且不连带）。
+- **条件 4（剩余实时协议场景）：已闭合（2026-09-20）。** `scripts/pi-live-scenarios.py` 在真实 TUI 中验证流中 resize（两种 surface）、流中 /compact、Esc 中止/重试与第二扩展并发 widget 共 5 个场景，全部与文件 oracle 对齐（`docs/live-protocol-scenarios.json`）；期间发现并修复的是测试基建问题（fixture 现在尊重宿主中止信号；连续 /hud status 的 PTY 陈旧帧解析陷阱），生产源码无需变更。
+- **条件 5（所有者批准默认切换）：未闭合。** 默认保持 `surface: widget` + `usageScope: observed` 不变；满足后仍需单独的批准变更（两步走且不连带）。

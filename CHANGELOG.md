@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — live-protocol scenarios close the default-footer condition 4
+
+The four remaining live-TUI protocol items are now executed and green against the real pinned Pi 0.85.1 TUI (`scripts/pi-live-scenarios.py`, evidence `docs/live-protocol-scenarios.json`): resize during an active measured stream (120→47→92 columns, four SIGWINCHes, both surfaces) with HUD rows provably within the current width; `/compact` submitted mid-stream (observed: the host interrupts the running stream, then runs the compaction — counted exactly once, ledger oracle-equal); Escape abort of a measured stream (terminator provably never reached) with ledger == file oracle after the abort and after a full retry; and an independent second extension widget coexisting through HUD on/off and surface switches. Two test-infrastructure defects were found and fixed — the deterministic fixture provider now honors the host abort signal (an aborted stream ends with the real `error`/`aborted` event instead of silently running to completion), and the scenario harness drains the kernel PTY buffer before parsing `/hud status` so back-to-back calls cannot match a stale totals frame. No production source file, default, gate or schema changed.
+
 Activity display now uses stable working/waiting/ready states on both surfaces. Individual tool names no longer rotate through the activity field; duplicate aggregate errors display removed, category failure counts retained.
 
 ## Unreleased — B2b review round: evidence defects fixed, affected records rebuilt

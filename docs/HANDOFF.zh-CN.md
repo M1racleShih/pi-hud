@@ -38,7 +38,7 @@
 1. B2b 评审：**已完成**（5333c7d 经三轮复审通过，见 .tmp/review/b2b-review-round3.md；B2b 数据不重做）。
 2. 真人深浅色终端视觉验收：**精简核心项已通过（口述转录，见 [VISUAL-ACCEPTANCE-RESULTS.zh-CN.md](VISUAL-ACCEPTANCE-RESULTS.zh-CN.md)）**；宽度逐档、浅色真实会话、B6 逐字段对照与部分状态仍未覆盖。补齐或由所有者明示接受当前覆盖度，均可满足决策记录的重评条件 1。
 3. 跨平台矩阵（CI 运行 Linux/macOS/Windows × Node 22.19.0/24）：**已执行通过**（运行 35541018928，8/8 job；Windows CRLF 问题由 `.gitattributes` 修复）。
-4. 默认 footer 切换：**独立评估已完成**，结论“当前不切换；视觉验收、字段缺口取舍、跨平台、实时场景、所有者批准全部满足后重评”，见 [DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)。
+4. 默认 footer 切换：重评条件 1–4 已全部闭合（视觉验收精简执行+所有者接受；字段缺口书面接受；跨平台矩阵 35541018928 全绿；实时场景 5/5 通过），仅剩条件 5（所有者批准单独的默认切换变更，两步走且不连带），见 [DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md) 追加节。
 
 ## 另一台电脑恢复
 
@@ -73,14 +73,14 @@ Pi 内可用 `/hud surface footer`、`/hud surface widget`、`/hud off`、`/hud 
 宿主 SDK 位于被忽略的 .tmp/sdk，不随 Git 同步。需要宿主检查时按 [开发流程](DEVELOPMENT.md) 安装锁定 Pi 0.85.1 SDK，并执行 sdk-check、usage-oracle-check、pi-rpc-smoke、pi-pty-smoke。
 用户级 Pi 配置、provider 凭据、pi-goal 安装和会话状态也不由本仓库同步；不要将这些内容提交到 Git。
 
-## 下一阶段：字段缺口取舍与跨平台矩阵，之后按条件重评默认 footer
+## 下一阶段：仅剩条件 5（所有者批准默认切换），或转向额度功能规划
 
 B2b（验收轮）与三轮 review 已完成；后续材料已交付；视觉验收精简执行并转录收紧（见上）。下一步依次是：
 
 1. 字段缺口书面取舍（决策记录条件 2）：**已闭合（2026-09-20）**——所有者书面接受缺口（footer 接管模式无 auto/sub/xp，ctx 为快照），见决策记录追加节。
 2. 视觉验收覆盖度处置（条件 1）：**已闭合（2026-09-20）**——所有者明示接受精简覆盖度（宽度逐档、浅色真实会话、B6 逐字段对照、部分状态以 ➖ 未覆盖形式被明确接受）。
 3. 跨平台矩阵（条件 3）：**已闭合（2026-09-20）**——Actions 运行 35541018928 全部 8 个 job 通过（ubuntu/macos/windows × Node 22.19.0/24、性能门禁、Pi 0.85.1 契约与 RPC）；首轮 Windows CRLF 失败已由 `.gitattributes`（`c0f0948`）修复。
-4. 剩余实时协议场景（条件 4）：未闭合（流中 resize、测量中实时压缩、abort/重试、第二并发扩展 widget；补齐或豁免）。
+4. 剩余实时协议场景（条件 4）：**已闭合（2026-09-20）**——`scripts/pi-live-scenarios.py` 五场景全部通过（流中 resize × 两 surface、流中 /compact、abort/重试、并发第二扩展 widget），证据 `docs/live-protocol-scenarios.json`；期间修复两项测试基建缺陷（fixture 尊重中止信号；连续 /hud status 的 PTY 陈旧帧解析），生产源码未变更，详见 VERIFICATION 的 live-protocol 节。
 5. 全部满足后由所有者批准单独的默认切换变更（条件 5，两步走且不连带，见决策记录）。
 
 B1 契约约束仍然全部有效：
@@ -99,7 +99,7 @@ B1 契约约束仍然全部有效：
 B2b、三轮 review、B2b 后续材料均已交付，不要重做。视觉验收已精简执行并转录收紧
 （docs/VISUAL-ACCEPTANCE-RESULTS.zh-CN.md），所有者已接受当前覆盖度（条件 1 闭合）
 并书面接受字段缺口（条件 2 闭合，见决策记录追加节）。保持 observed 与 widget 默认。
-跨平台矩阵已通过（条件 3 闭合，运行 35541018928）；剩余实时场景
-（条件 4）未闭合；条件 5 需所有者单独批准。不新增额度功能；推送仅限本决策
-授权，发布（release）仍需单独授权。
+条件 1–4 全部闭合（实时场景见 docs/live-protocol-scenarios.json），
+仅剩条件 5：所有者单独批准默认切换（两步走，先 surface: footer 保持
+observed）。不新增额度功能；发布（release）仍需单独授权。
 ```

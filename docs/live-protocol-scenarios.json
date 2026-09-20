@@ -1,0 +1,92 @@
+{
+  "generatedAt": "2026-09-21T06:54:42+0800",
+  "passed": true,
+  "provenance": {
+    "commit": "984e18599ec20617995078eeaece52a16523252e",
+    "dirtyFilesSha256": {
+      "ests/fixtures/fixture-provider.ts": "unreadable",
+      "scripts/pi-live-scenarios.py": "8087e026b74f8ad3745c3557d84208bf204387cba7cb820b916e839c5c28d748",
+      "tests/fixtures/event-logger.ts": "4a5f03f41ecba7d905be81188bb9092c9dd0907451d81b22eeb4fc07a0906255",
+      "tests/fixtures/other-widget.ts": "78c003eb7db5bb807518c0bfab4c608312c289b0218207994bef5796b88fa4b9"
+    },
+    "sdkLockSha256": "8a0902c7e9563f26eb73f346856a9f3cfc002c94a727ef4338209b96ed64fdda",
+    "node": "v24.18.0"
+  },
+  "durationSeconds": 62.4,
+  "environment": {
+    "node": "v24.18.0",
+    "pi": "0.85.1 (isolated .tmp/sdk)",
+    "provider": "deterministic in-process fixture (zero network/billing)"
+  },
+  "results": [
+    {
+      "scenario": "resize-mid-stream-widget",
+      "passed": true,
+      "note": "terminal resized 120->47->92 (4 SIGWINCH) during a measured LONGREPLY stream; stream completed, HUD rows within width, ledger == file oracle",
+      "workingDuringResize": true,
+      "midStreamAlive": true,
+      "midOverflowLines47": [],
+      "settledOverflowLines92": [],
+      "streamSeconds": 5.58,
+      "ledger": {
+        "input": 3596806,
+        "output": 47937,
+        "usageRecords": "99"
+      }
+    },
+    {
+      "scenario": "resize-mid-stream-footer",
+      "passed": true,
+      "note": "terminal resized 120->47->92 (4 SIGWINCH) during a measured LONGREPLY stream; stream completed, HUD rows within width, ledger == file oracle",
+      "workingDuringResize": true,
+      "midStreamAlive": true,
+      "midOverflowLines47": [],
+      "settledOverflowLines92": [],
+      "streamSeconds": 5.6,
+      "ledger": {
+        "input": 3596806,
+        "output": 47937,
+        "usageRecords": "99"
+      }
+    },
+    {
+      "scenario": "compact-mid-measurement",
+      "passed": true,
+      "note": "/compact submitted mid-stream (observed: the host interrupts the running stream and runs the compaction); compaction counted exactly once, ledger == file oracle",
+      "midStreamSubmissionAccepted": true,
+      "streamCompletedAfterSubmission": false,
+      "sessionCompactEventsInFile": 0,
+      "beforeInput": 6512281,
+      "afterInput": 6515299,
+      "rebuilds": "2",
+      "failureReason": "null"
+    },
+    {
+      "scenario": "abort-retry",
+      "passed": true,
+      "note": "Escape aborted a measured stream mid-flight (terminator never reached); ledger == file oracle after the abort and after the full retry",
+      "settledAfterAbort": true,
+      "terminatorSeenDuringAbort": false,
+      "abortedTotals": {
+        "input": 3596806,
+        "usageRecords": "99"
+      },
+      "retriedTotals": {
+        "input": 3597808,
+        "usageRecords": "100"
+      }
+    },
+    {
+      "scenario": "concurrent-widget",
+      "passed": true,
+      "note": "independent second extension widget coexists with the HUD widget; HUD on/off, surface switches and /other-widget off never disturb the other widget",
+      "coexistAtStartup": true,
+      "hudOffIsolatesOther": true,
+      "coexistAfterHudOn": true,
+      "coexistInFooterMode": true,
+      "coexistAfterSurfaceBack": true,
+      "otherOffKeepsHud": true,
+      "overflowLines": []
+    }
+  ]
+}

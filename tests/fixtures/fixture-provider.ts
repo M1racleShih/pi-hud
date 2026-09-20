@@ -37,6 +37,10 @@
  *   FIXTURE_STREAM_DELAY_MS  inter-delta delay for FIXTURE:STREAM (default 0)
  *   FIXTURE_CHUNKS           delta count for FIXTURE:STREAM (default 8)
  *   FIXTURE_LOG              append one JSON line per model call to this path
+ *
+ * Abort semantics: the options.signal from the host is honored mid-stream; an aborted
+ * stream stops without its terminator and ends with the "error"/"aborted" event a
+ * real provider emits, so abort/retry acceptance runs against realistic partials.
  */
 import { appendFileSync } from "node:fs";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
@@ -118,7 +122,7 @@ function fillerText(paragraphs) {
   return text;
 }
 
-function emitText(stream, output, text, chunks, delayMs) {
+function emitText(stream, output, text, chunks, delayMs, signal) {
   // Exact split: `chunks` evenly sized pieces (floor/ceil distribution), so the delta
   // count is deterministic and equals the requested chunk count.
   const parts = [];
@@ -133,7 +137,9 @@ function emitText(stream, output, text, chunks, delayMs) {
   return (async () => {
     let accumulated = "";
     for (const part of parts) {
+      if (signal?.aborted) return; // honor the host's abort signal mid-stream
       if (delayMs > 0) await sleep(delayMs);
+      if (signal?.aborted) return;
       accumulated += part;
       const block = output.content[contentIndex];
       block.text = accumulated;
@@ -149,20 +155,23 @@ function emitText(stream, output, text, chunks, delayMs) {
  * that never occur in the echoed command or the surrounding UI, so first-content and
  * completion detection are unambiguous at the terminal.
  */
-function emitMeasured(stream, output, prefix, body, terminator, chunks, delayMs) {
+function emitMeasured(stream, output, prefix, body, terminator, chunks, delayMs, signal) {
   output.content.push({ type: "text", text: "" });
   const contentIndex = output.content.length - 1;
   stream.push({ type: "text_start", contentIndex, partial: output });
   return (async () => {
     let accumulated = "";
     const emit = async (part) => {
+      if (signal?.aborted) return; // honor the host's abort signal mid-stream
       if (delayMs > 0) await sleep(delayMs);
+      if (signal?.aborted) return;
       accumulated += part;
       output.content[contentIndex].text = accumulated;
       stream.push({ type: "text_delta", contentIndex, delta: part, partial: output });
     };
     await emit(prefix);
     for (let index = 0; index < chunks; index++) {
+      if (signal?.aborted) return;
       const start = Math.floor((body.length * index) / chunks);
       const end = Math.floor((body.length * (index + 1)) / chunks);
       if (end > start) await emit(body.slice(start, end));
@@ -172,8 +181,9 @@ function emitMeasured(stream, output, prefix, body, terminator, chunks, delayMs)
   })();
 }
 
-function streamFixture(model, context) {
+function streamFixture(model, context, options) {
   const stream = createAssistantMessageEventStream();
+  const signal = options?.signal; // the host aborts in-flight requests through this
   const n = ++calls;
   const usage = usageFor(n);
   const isSummary = typeof context.systemPrompt === "string" && context.systemPrompt.startsWith(SUMMARIZATION_MARKER);
@@ -233,11 +243,22 @@ function streamFixture(model, context) {
         const terminator = "«END»";
         const body = Array.from({ length: 24 }, (_, index) => `${script.word}-body-token-${index}`).join(" ");
         await emitMeasured(stream, output, prefix, body, terminator, script.kind === "longreply"
-          ? longChunks : chunks, script.kind === "longreply" ? longDelayMs : delayMs);
-        output.stopReason = "stop";
+          ? longChunks : chunks, script.kind === "longreply" ? longDelayMs : delayMs, signal);
       } else {
         const body = script.kind === "filler" ? fillerText(script.count) : script.text;
-        await emitText(stream, output, body, script.kind === "stream" ? chunks : 1, script.kind === "stream" ? delayMs : 0);
+        await emitText(stream, output, body, script.kind === "stream" ? chunks : 1, script.kind === "stream" ? delayMs : 0, signal);
+      }
+      if (signal?.aborted) {
+        // An aborted stream stops without the terminator: the same partial-commit
+        // semantics a real network provider shows when the host aborts mid-flight.
+        output.stopReason = "aborted";
+        stream.push({ type: "error", reason: "aborted", error: output });
+        stream.end(output);
+        return;
+      }
+      if (script.kind === "tool") {
+        output.stopReason = "toolUse";
+      } else {
         output.stopReason = "stop";
       }
       stream.push({ type: "done", reason: output.stopReason, message: output });

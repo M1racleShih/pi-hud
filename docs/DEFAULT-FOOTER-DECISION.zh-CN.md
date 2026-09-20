@@ -93,3 +93,11 @@
 - [HANDOFF](HANDOFF.zh-CN.md) 的"默认仍为 widget + observed"在本记录后继续有效。
 - [VERIFICATION](VERIFICATION.md) 的待办清单继续把默认切换列为未执行事项；本记录是其"Default-footer evaluation"条目的展开。
 - 本记录不伴随任何代码、配置、schema 或生成预览的变更。
+
+## 追加：重评条件处置记录（2026-09-20，所有者决定）
+
+- **条件 1（视觉验收）：闭合。** 观察者精简执行核心项并确认无问题（转录见 [VISUAL-ACCEPTANCE-RESULTS.zh-CN.md](VISUAL-ACCEPTANCE-RESULTS.zh-CN.md)）；所有者明示接受当前覆盖度，未覆盖项（宽度逐档、浅色真实会话、B6 逐字段对照、部分状态）按"未通过项被明确接受"处理。
+- **条件 2（字段缺口）：闭合。** 所有者书面接受：HUD footer 接管模式下不显示 `auto`/`sub`/`xp` 标记，上下文为 `ctx(last)` 快照而非实时估计。不伪造字段；未选择向上游提需求，如未来改变主意可另行提出。
+- **条件 3（跨平台矩阵）：进行中。** 所有者授权解除"不推送"约束并推送触发 GitHub Actions 矩阵；是否通过以 Actions 运行记录为准。
+- **条件 4（剩余实时协议场景）：未闭合。**
+- **条件 5（所有者批准默认切换）：未闭合。** 默认保持 `surface: widget` + `usageScope: observed` 不变；满足 3、4 后仍需单独的批准变更（两步走且不连带）。

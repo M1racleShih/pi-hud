@@ -247,48 +247,65 @@ frame timestamps are preserved in the record; and every metric gets true per-pai
 plus a same-side adjacent-pair repeatability envelope. `--self-test` exercises the failure
 paths deterministically (missing prefix/terminator, timeout ratio, interval windows).
 
+All byte metrics below count **raw terminal bytes** (escape sequences included); the
+round-2 review showed the previous plain-text accounting undercounted styled output by
+an arbitrary factor. Every during-stream key (echo and control) is verified to have been
+written before the reply's completion terminator, and the completion timestamp comes from
+the frame scan, never from a trailing-frame heuristic.
+
 Default profile (observed + widget), paired over 20 pairs:
 
-| Metric | HUD off (p50) | HUD on (p50) | Paired delta | Noise envelope p90 | Verdict |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Idle keyboard echo p50 / p95 | 1.15 / 2.03 ms | 1.19 / 2.15 ms | −0.03 ± 0.20 ms | 0.42 / 1.93 ms | within noise |
-| First content, cold process | 33.0 ms | 31.4 ms | −1.4 ± 3.2 ms | 4.3 ms | within noise |
-| First content, warm | 18.2 ms | 17.6 ms | −0.4 ± 1.4 ms | 2.3 ms | within noise |
-| Render-frame interval p50 / p95 (warm) | 15.65 / 16.52 ms | 15.67 / 16.47 ms | +0.09 / −0.16 ± 0.4 ms | 0.54 / 0.70 ms | within noise |
-| Stream completion | 110.2 ms | 110.5 ms | +0.1 ± 11.6 ms | 17.7 ms | within noise |
-| Echo while streaming (p50) | 0.73 ms | 0.70 ms | −0.03 ± 0.19 ms | 0.41 ms | within noise (0 failures both sides) |
-| Redraw while streaming (p50) | 0.092 ms | 0.114 ms | +0.017 ± 0.032 ms | 0.060 ms | within noise |
-| Tool row visible / full turn | 19.6 ms | 19.3 ms | −0.05 ± 1.6 ms | 2.4 ms | within noise |
-| Terminal bytes per tool turn | 1851 B | 2086 B | **+235 B (20/20 pairs)** | 0 | real, deterministic |
-| Coalesced post-turn publication | none | 150 ms after completion | — | — | designed repaint |
+| Metric | HUD off (p50) | HUD on (p50) | Paired delta | Verdict |
+| --- | ---: | ---: | ---: | --- |
+| Idle keyboard echo p50 / p95 | 0.88 / 1.86 ms | 0.88 / 1.86 ms | +0.02 ± 0.21 / −0.38 ± 1.29 ms | within noise |
+| First content, cold process | 29.4 ms | 29.2 ms | +0.5 ± 4.4 ms | within noise |
+| First content, warm | 17.8 ms | 18.1 ms | +0.4 ± 1.0 ms | within noise |
+| Render-frame interval p50 / p95 (warm) | 15.62 / 16.49 ms | 15.63 / 16.50 ms | +0.02 / +0.04 ± 0.3–0.5 ms | within noise |
+| Stream completion | 96.9 ms | 97.6 ms | +1.2 ± 12.2 ms | within noise |
+| Echo while streaming (p50) | 0.86 ms | 0.81 ms | −0.02 ± 0.17 ms | within noise; 0 timeouts, 8/8 keys before completion |
+| Redraw while streaming (p50) | 0.028 ms | 0.026 ms | 0.00 ± 0.01 ms | within noise; 4/4 control keys before completion |
+| Long-stream duration | 1.536 s | 1.532 s | −0.002 ± 0.007 s | identical to the provider's 1.52 s script |
+| Tool row visible / full turn | 18.2 ms | 18.8 ms | +0.5 ± 1.2 ms | within noise |
+| Raw terminal bytes per tool turn | 2388 B | 3302 B | **+914 B (20/20 pairs)** | real, deterministic |
+| Raw bytes per streamed reply (window) | 7950 B | 10610 B | **+2692 ± 501 B (20/20)** | real (widget repaints during streaming) |
+| Coalesced publication window | none | 153 ms after completion, 318 B | — | designed repaint |
 
 Opt-in profile (session + footer), paired over 20 pairs:
 
-| Metric | HUD off (p50) | HUD on (p50) | Paired delta | Noise envelope p90 | Verdict |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Idle keyboard echo p50 / p95 | 1.22 / 2.66 ms | 1.06 / 2.03 ms | −0.11 ± 0.22 ms | 0.42 / 1.67 ms | within noise |
-| First content, cold process | 31.1 ms | 31.8 ms | −0.1 ± 3.3 ms | 4.8 ms | within noise |
-| First content, warm | 18.4 ms | 17.8 ms | −0.4 ± 1.1 ms | 2.7 ms | within noise |
-| Render-frame interval p50 / p95 (warm) | 15.66 / 16.68 ms | 15.65 / 16.61 ms | −0.07 / −0.06 ± 0.2–0.4 ms | 0.62 / 0.69 ms | within noise |
-| Stream completion | 111.7 ms | 111.0 ms | −0.7 ± 12.0 ms | 16.9 ms | within noise |
-| Echo while streaming (p50) | 0.71 ms | 0.59 ms | −0.05 ± 0.27 ms | 0.43 ms | within noise (0 failures both sides) |
-| Redraw while streaming (p50) | 0.102 ms | 0.107 ms | +0.010 ± 0.036 ms | 0.061 ms | within noise |
-| Tool row visible / full turn | 19.5 ms | 19.1 ms | −0.17 ± 2.4 ms | 3.3 ms | within noise |
-| Terminal bytes per tool turn | 1851 B | 2036 B | **+185 B (20/20 pairs)** | 0 | real, deterministic |
-| Coalesced post-turn publication | none | 150 ms after completion | — | — | designed repaint |
+| Metric | HUD off (p50) | HUD on (p50) | Paired delta | Verdict |
+| --- | ---: | ---: | ---: | --- |
+| Idle keyboard echo p50 / p95 | 1.00 / 1.91 ms | 0.78 / 1.68 ms | −0.17 ± 0.20 / −0.54 ± 1.06 ms | within noise |
+| First content, cold process | 29.7 ms | 30.2 ms | −0.4 ± 4.8 ms | within noise |
+| First content, warm | 17.5 ms | 17.5 ms | +0.02 ± 1.3 ms | within noise |
+| Render-frame interval p50 / p95 (warm) | 15.61 / 16.63 ms | 15.63 / 16.50 ms | +0.08 / −0.01 ± 0.4–0.6 ms | within noise |
+| Stream completion | 96.7 ms | 96.4 ms | +0.2 ± 8.3 ms | within noise |
+| Echo while streaming (p50) | 0.78 ms | 0.74 ms | −0.04 ± 0.12 ms | within noise; 0 timeouts, 8/8 keys before completion |
+| Redraw while streaming (p50) | 0.027 ms | 0.031 ms | +0.003 ± 0.011 ms | within noise; 4/4 control keys before completion |
+| Long-stream duration | 1.532 s | 1.532 s | 0.000 ± 0.011 s | identical to the provider's script |
+| Tool row visible / full turn | 18.4 ms | 18.2 ms | +0.1 ± 1.8 ms | within noise |
+| Raw terminal bytes per tool turn | 2388 B | 3333 B | **+945 B (20/20 pairs)** | real, deterministic |
+| Raw bytes per streamed reply (window) | 7950 B | 8906 B | **+956 ± 340 B (20/20)** | real |
+| Coalesced publication window | none | 156 ms after completion, 456 B | — | designed repaint |
 
 Notes on semantics: render-frame intervals are the pi-tui frame cadence while content
 streams — terminal frame gaps, not provider token gaps (the provider is deterministic);
-during-stream control-key numbers are next-frame (redraw) latency, printable echoes are
-char-verified; toolVisible and toolTurn coincide under this fixture because the instant
-follow-up reply lands in the same frame batch — the detection is isolated, the provider
-just does not separate them. Every timing metric is inside the measured same-machine
-repeatability envelope on both profiles; the HUD's only deterministic per-turn terminal
-cost is one coalesced footer publication (~185–235 B, ~150 ms after completion; the ledger
-verify itself adds ~+1 µs per the A/B above). Earlier drafts of this A/B had two metric
-bugs found in review: a "+450% inter-token p95 stall" that was actually the coalesced
-publication's quiet period being counted as a token gap, and keyboard timeouts being
-silently discarded. Both are fixed structurally (windowed intervals, failure counting).
+during-stream control-key numbers are next-frame (redraw) latency; echo keys are verified
+through a distinct marker alphabet (Greek letters absent from the ASCII replies and the
+TUI chrome) plus the contiguous accumulated-sequence check, so unrelated transcript or
+footer output cannot satisfy them; toolVisible and toolTurn coincide under this fixture
+because the instant follow-up reply lands in the same frame batch — the detection is
+isolated, the provider just does not separate them. Every timing metric is inside the
+measured same-machine repeatability envelope on both profiles. The HUD's deterministic
+terminal cost is real but larger than the earlier plain-text accounting suggested:
+**~+0.9–1.0 KiB of raw terminal bytes per tool turn** on both surfaces, **+1.0 KiB
+(footer) to +2.6 KiB (widget) per streamed reply**, plus one coalesced publication
+(~320–460 B) ~150 ms after completion. History of metric corrections: round 1 fixed a
+"+450% inter-token p95 stall" (the coalesced publication's quiet period counted as a
+token gap) and silently-discarded keyboard timeouts; round 2 fixed plain-text byte
+accounting, echo evidence that unrelated output could satisfy, DONE-without-tool-row
+passing silently, censored-keyboard percentiles, a trailing-frame completion heuristic
+that inflated the long-stream duration by up to 240 ms, and control keys that were typed
+after the stream had ended.
 
 ### What remains open
 

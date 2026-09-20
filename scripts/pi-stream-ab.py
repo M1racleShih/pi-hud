@@ -110,32 +110,52 @@ def percentiles(values):
     }
 
 
-def analyze_keyboard(samples, max_failure_ratio=MAX_KEYBOARD_FAILURE_RATIO):
-    """samples: latency in ms, or None for a timed-out key. Timeouts are counted;
-    too many (or no successes) is a measurement failure, never a quiet pass."""
+def analyze_keyboard(samples, required=True, timeout_ceiling_ms=KEY_TIMEOUT_S * 1_000):
+    """samples: latency in ms, or None for a timed-out key.
+
+    Required measurements (default) FAIL on any timeout: a percentile computed after
+    dropping censored keys would understate the tail (the review showed
+    [1, 2, None, 1.5] reporting p95=2 with a 2-second censoring ceiling), so the
+    all-key acceptance conclusion is withheld entirely instead.
+    Optional measurements report explicit censored statistics: responded-only
+    percentiles plus a censoring-aware upper bound, never an unlabelled all-key p95."""
     failures = sum(1 for sample in samples if sample is None)
     successes = [sample for sample in samples if sample is not None]
     if not successes:
-        raise MeasurementError("keyboard echo: every key timed out")
-    if failures > len(samples) * max_failure_ratio:
+        raise MeasurementError("keyboard: every key timed out")
+    if required and failures:
         raise MeasurementError(
-            f"keyboard echo: {failures}/{len(samples)} keys timed out (limit {max_failure_ratio:.0%})")
-    return {
+            f"keyboard: {failures}/{len(samples)} keys timed out; a required all-key latency cannot be reported from censored samples")
+    if not required and failures > len(samples) * MAX_KEYBOARD_FAILURE_RATIO:
+        raise MeasurementError(
+            f"keyboard: {failures}/{len(samples)} keys timed out (limit {MAX_KEYBOARD_FAILURE_RATIO:.0%})")
+    stats = {key: round(value, 3) for key, value in percentiles(successes).items()}
+    result = {
         "failures": failures,
+        "censored": failures > 0,
         "samples": [round(sample, 3) if sample is not None else None for sample in samples],
-        **{key: round(value, 3) for key, value in percentiles(successes).items()},
+        **stats,
     }
+    if failures:
+        result["censoringCeilingMs"] = timeout_ceiling_ms
+        result["respondedOnly"] = True
+        result["upperBoundWithCensored"] = {key: timeout_ceiling_ms for key in ("p50", "p95", "max")}
+        result["note"] = "percentiles cover responded keys only; the true all-key p50/p95 lies between these and the censoring ceiling"
+    return result
 
 
-def analyze_stream(frames, write_time, prefix, terminator, tail_quiet_s=0.5, max_collect_s=15.0):
-    """frames: [(timestamp_s, plain_text_delta)] accumulated AFTER the command write.
+def analyze_stream(frames, write_time, prefix, terminator):
+    """frames: [(timestamp_s, raw_byte_count, plain_text_delta)] accumulated AFTER the
+    command write. Byte metrics count RAW terminal bytes (escape sequences included);
+    the plain text exists only for marker detection.
 
     Returns first-content/completion timings, render-frame intervals strictly inside
-    the streaming window, byte counts, and the post-completion publication frame.
+    the streaming window, raw byte counts, and the post-completion publication window.
     Raises MeasurementError when the prefix or the terminator is never observed."""
     first_content_at = None
     completion_at = None
-    for timestamp, text in frames:
+    for frame in frames:
+        timestamp, _, text = frame
         if first_content_at is None and prefix in text:
             first_content_at = timestamp
         if completion_at is None and terminator in text:
@@ -147,10 +167,11 @@ def analyze_stream(frames, write_time, prefix, terminator, tail_quiet_s=0.5, max
         raise MeasurementError(f"stream: completion terminator never rendered: {terminator!r}")
     window = [frame for frame in frames if first_content_at <= frame[0] <= completion_at]
     intervals = [(window[i][0] - window[i - 1][0]) * 1_000 for i in range(1, len(window))]
-    # Post-completion frames: after a small epsilon (the final text_end tail renders
-    # within ~50ms) but inside the coalesced-publication window. The first such frame
-    # is the post-turn repaint (the HUD's ~250ms-budget coalesced publication on the
-    # on side; the native footer's own repaint on the off side).
+    # Publication window: the entire defined interval after a small epsilon (the final
+    # text_end tail renders within ~50ms) up to 1.5s past completion - every frame in
+    # it is counted, no read-chunk cap. On the HUD side the first frame is the
+    # ~250ms-budget coalesced publication; on the off side the native footer repaints
+    # with the frame cadence (usually nothing lands in the window at all).
     post = [frame for frame in frames if completion_at + 0.05 < frame[0] <= completion_at + 1.5]
     return {
         "firstContentMs": (first_content_at - write_time) * 1_000,
@@ -158,9 +179,10 @@ def analyze_stream(frames, write_time, prefix, terminator, tail_quiet_s=0.5, max
         "streamedSeconds": completion_at - first_content_at,
         "renderFrameIntervals": [round(value, 3) for value in intervals],
         "framesInWindow": len(window),
-        "bytesInWindow": sum(len(frame[1].encode("utf8", "replace")) for frame in window),
+        "rawBytesInWindow": sum(frame[1] for frame in window),
         "publicationDelayMs": ((post[0][0] - completion_at) * 1_000) if post else None,
-        "publicationBytes": (sum(len(frame[1].encode("utf8", "replace")) for frame in post[:3]) if post else 0),
+        "publicationWindowRawBytes": sum(frame[1] for frame in post),
+        "publicationWindowFrames": len(post),
     }
 
 
@@ -192,7 +214,7 @@ class Trial:
             os.chdir(home / "ws")
             os.execve(NODE, args, env)
         fcntl.ioctl(self.fd, termios.TIOCSWINSZ, struct.pack("HHHH", 50, 120, 0, 0))
-        self.frames = []          # (timestamp, plain-text delta) AFTER the last reset
+        self.frames = []          # (timestamp, raw byte count, plain-text delta)
         self.write_time = None
 
     def _pump_once(self, timeout=0.005):
@@ -207,14 +229,14 @@ class Trial:
             raise
         if not data:
             raise RuntimeError("TUI EOF during measurement")
-        self.frames.append((time.monotonic(), ANSI.sub("", data.decode("utf8", "replace"))))
+        self.frames.append((time.monotonic(), len(data), ANSI.sub("", data.decode("utf8", "replace"))))
         return True
 
     def wait_for(self, predicate, timeout, description):
         """Pump until predicate(joined plain text) holds; MeasurementError on timeout."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if predicate("".join(text for _, text in self.frames)):
+            if predicate("".join(text for _, _, text in self.frames)):
                 return
             self._pump_once(0.01)
         raise MeasurementError(f"timed out waiting for {description}")
@@ -255,21 +277,26 @@ class Trial:
                 pass
 
 
-def echo_keys(trial: Trial, keys, verify_chars=True):
-    """Type keys one at a time; each sample is write->frame containing the char
-    (verified echo) or None on timeout. Timeouts are kept as None - the analysis
-    decides whether the failure ratio is fatal."""
+IDLE_KEYS = "ζηθικξπταβγδ"
+STREAM_KEYS = "ζηθικξπτ"
+
+
+def echo_keys(trial: Trial, keys):
+    """Type one distinct marker key at a time; each sample is write->frame whose text
+    contains that key's character. The keys are distinct characters that never occur
+    in the TUI chrome or the fixture's ASCII replies, so a post-write occurrence can
+    only be the editor echoing that keystroke (the review showed plain letters match
+    unrelated transcript/footer output and pass without any editor change)."""
     samples = []
     for key in keys:
         trial.reset()
-        trial.send(key.encode() if isinstance(key, str) else key)
-        char = key if isinstance(key, str) and len(key) == 1 else None
+        trial.send(key.encode())
         deadline = time.monotonic() + KEY_TIMEOUT_S
         sample = None
         while time.monotonic() < deadline:
             if trial._pump_once(0.005):
-                text = "".join(text for _, text in trial.frames)
-                if not verify_chars or (char is not None and char in text):
+                text = "".join(text for _, _, text in trial.frames)
+                if key in text:
                     sample = (trial.frames[-1][0] - trial.write_time) * 1_000
                     break
         samples.append(sample)
@@ -287,58 +314,131 @@ def stream_turn(trial: Trial, word: str):
     trial.collect_quiet(0.5, 3.0)
     result = analyze_stream(trial.frames, trial.write_time, prefix, terminator)
     result["deltaCount"] = STREAM_CHUNKS + 2
-    result["rawFrameTimestamps"] = [round(timestamp - trial.write_time, 4) for timestamp, _ in trial.frames]
+    result["rawFrameTimestamps"] = [round(timestamp - trial.write_time, 4) for timestamp, _, _ in trial.frames]
     return result
 
 
 def long_stream_with_typing(trial: Trial, word: str):
+    """Long streamed reply with interleaved typing.
+
+    Timing invariants (fixed in review round 2): every typed key - echo AND control -
+    must be written while the reply is still streaming (the terminator not yet in the
+    accumulated output at write time; any violation fails the scenario), and
+    first-content/completion are taken from the FRAME SCAN (the frame whose text first
+    contains the marker), never from `frames[-1]` after a wait - a post-terminator
+    quiet-period frame used to inflate the completion timestamp by hundreds of ms."""
     prefix = f"«{word}-START»"
     terminator = "«END»"
     trial.reset()
     trial.send(f"FIXTURE:LONGREPLY:{word}\r".encode())
     trial.wait_for(lambda text: prefix in text, 15.0, f"{word} long-stream first content")
     typed = []
-    # Verified printable echoes while the body streams.
-    for char in "zhqimwax":
+    redraw = []
+    sent_before_completion = []
+    redraw_before_completion = []
+
+    def still_streaming():
+        return terminator not in "".join(text for _, _, text in trial.frames)
+
+    # Verified editor echoes while the body streams: distinct marker characters that
+    # cannot occur in the ASCII reply body or the TUI chrome (see echo_keys).
+    for char in STREAM_KEYS:
+        before = still_streaming()
         written = time.monotonic()
         os.write(trial.fd, char.encode())
         deadline = time.monotonic() + KEY_TIMEOUT_S
         sample = None
         while time.monotonic() < deadline:
             if trial._pump_once(0.005):
-                text = "".join(text for _, text in trial.frames)
-                if char in text.split(prefix)[-1][-400:]:
-                    sample = (time.monotonic() - written) * 1_000
+                text = "".join(text for _, _, text in trial.frames)
+                if char in text:
+                    sample = (trial.frames[-1][0] - written) * 1_000
                     break
         typed.append(sample)
-        time.sleep(0.08)
-    # Control keys during streaming: redraw-frame latency semantics (the next frame
-    # may be a stream frame; these are labeled redraw, not echo).
-    redraw = []
+        sent_before_completion.append(before)
+        time.sleep(0.06)
+    # Control keys (backspace, cursor-left) DURING the same stream: redraw-frame
+    # latency semantics - written immediately after the echo keys, with no long
+    # settle in between, so they still land before the reply completes.
     for key in (b"\x7f", b"\x7f", b"\x1b[D", b"\x1b[D"):
+        before = still_streaming()
         written = time.monotonic()
         os.write(trial.fd, key)
-        deadline = time.monotonic() + KEY_TIMEOUT_S
+        deadline = time.monotonic() + 0.5
         sample = None
         while time.monotonic() < deadline:
             if trial._pump_once(0.005):
-                sample = (time.monotonic() - written) * 1_000
+                sample = (trial.frames[-1][0] - written) * 1_000
                 break
         redraw.append(sample)
-        time.sleep(0.08)
+        redraw_before_completion.append(before)
+        time.sleep(0.04)
     trial.wait_for(lambda text: terminator in text, 20.0, f"{word} long-stream completion")
-    trial.collect_quiet(0.4, 2.0)
-    typed_analyzed = analyze_keyboard(typed)
-    redraw_analyzed = {
-        "failures": sum(1 for sample in redraw if sample is None),
-        "samples": [round(sample, 3) if sample is not None else None for sample in redraw],
-        **{key: round(value, 3) for key, value in percentiles([s for s in redraw if s is not None]).items()},
-    } if any(sample is not None for sample in redraw) else {"failures": len(redraw), "samples": redraw}
+    trial.collect_quiet(0.5, 2.0)
+    # Frame-scan timings (never frames[-1] heuristics).
+    first_content_at = None
+    completion_at = None
+    accumulated = ""
+    for timestamp, _, text in trial.frames:
+        accumulated += text
+        if first_content_at is None and prefix in accumulated:
+            first_content_at = timestamp
+        if completion_at is None and terminator in accumulated:
+            completion_at = timestamp
+    if first_content_at is None or completion_at is None:
+        raise MeasurementError("long-stream: marker frames missing after completion wait")
+    # Editor-state evidence: the editor line must have rendered the whole accumulated
+    # marker sequence contiguously (an unrelated transcript frame cannot produce it).
+    if STREAM_KEYS not in accumulated:
+        raise MeasurementError(
+            "long-stream typing: the accumulated editor marker sequence never rendered; "
+            "echo evidence is inconclusive")
+    typed_analyzed = analyze_keyboard(typed, required=True)
+    redraw_analyzed = analyze_keyboard(redraw, required=False)
+    if not all(sent_before_completion):
+        raise MeasurementError(
+            f"long-stream typing: {sent_before_completion.count(False)} echo key(s) were typed "
+            "at/after the reply completed; the during-stream window was not exercised for them")
+    if not all(redraw_before_completion):
+        raise MeasurementError(
+            f"long-stream typing: {redraw_before_completion.count(False)} control key(s) were "
+            "typed at/after the reply completed; they would not measure during-stream redraw")
     return {
         "deltaCount": LONG_CHUNKS + 2,
-        "streamedSeconds": None,
+        "streamedSeconds": completion_at - first_content_at,
+        "keysTypedBeforeCompletion": sum(sent_before_completion),
+        "controlKeysTypedBeforeCompletion": sum(redraw_before_completion),
         "typingDuringStreamEcho": typed_analyzed,
         "typingDuringStreamRedraw": redraw_analyzed,
+    }
+
+
+def analyze_tool(frames, write_time, tool_marker="read marker.txt", done_marker="FIXTURE:DONE"):
+    """Pure analysis of one tool turn's frames. The tool row is MANDATORY: a turn
+    whose follow-up reply arrives without the tool row raises (the review showed
+    DONE-only output silently returning toolVisibleMs=None). Byte counts are RAW
+    terminal bytes (escapes included)."""
+    tool_visible_at = None
+    done_at = None
+    for timestamp, _, text in frames:
+        if tool_visible_at is None and tool_marker in text:
+            tool_visible_at = timestamp
+        if done_at is None and done_marker in text:
+            done_at = timestamp
+            break
+    if done_at is None:
+        raise MeasurementError("tool turn: the follow-up reply never rendered")
+    if tool_visible_at is None:
+        raise MeasurementError(
+            "tool turn: the follow-up reply rendered without the tool row; "
+            "dispatch visibility cannot be measured")
+    post = [frame for frame in frames if done_at + 0.05 < frame[0] <= done_at + 1.5]
+    return {
+        "toolVisibleMs": (tool_visible_at - write_time) * 1_000,
+        "toolTurnMs": (done_at - write_time) * 1_000,
+        "rawBytes": sum(frame[1] for frame in frames),
+        "publicationDelayMs": ((post[0][0] - done_at) * 1_000) if post else None,
+        "publicationWindowRawBytes": sum(frame[1] for frame in post),
     }
 
 
@@ -348,25 +448,19 @@ def tool_turn(trial: Trial):
     # The transcript renders the running/completed tool row as "read marker.txt"
     # (space-separated); the echoed command is colon-separated
     # ("FIXTURE:TOOL:read:marker.txt"), so the space form is unambiguous.
-    tool_visible_at = None
     deadline = time.monotonic() + 20.0
     while time.monotonic() < deadline:
-        if trial._pump_once(0.01):
-            text = "".join(text for _, text in trial.frames)
-            if tool_visible_at is None and "read marker.txt" in text:
-                tool_visible_at = trial.frames[-1][0]
-            if "FIXTURE:DONE" in text:
-                done_at = trial.frames[-1][0]
-                trial.collect_quiet(0.5, 2.0)
-                post = [frame for frame in trial.frames if frame[0] > done_at + 0.25]
-                return {
-                    "toolVisibleMs": (tool_visible_at - trial.write_time) * 1_000 if tool_visible_at else None,
-                    "toolTurnMs": (done_at - trial.write_time) * 1_000,
-                    "bytes": sum(len(text.encode("utf8", "replace")) for _, text in trial.frames),
-                    "publicationDelayMs": ((post[0][0] - done_at) * 1_000) if post else None,
-                }
-    if tool_visible_at is None:
-        raise MeasurementError("tool turn: the read tool row never rendered")
+        if not trial._pump_once(0.01):
+            continue
+        text = "".join(text for _, _, text in trial.frames)
+        if "FIXTURE:DONE" in text:
+            # Bounded grace for the tool row to land in the same/next frame(s).
+            grace = time.monotonic() + 0.5
+            while time.monotonic() < grace and "read marker.txt" not in text:
+                trial._pump_once(0.01)
+                text = "".join(text for _, _, text in trial.frames)
+            trial.collect_quiet(0.5, 2.0)
+            return analyze_tool(trial.frames, trial.write_time)
     raise MeasurementError("tool turn: the follow-up reply never rendered")
 
 
@@ -379,7 +473,7 @@ def run_trial(base: pathlib.Path, hud: bool, profile_name: str, index: int) -> d
         trial.send(b"\x1b")
         time.sleep(0.4)
         trial.collect_quiet(0.5, 1.5)
-        idle = analyze_keyboard(echo_keys(trial, "zhqimwaxpler"))
+        idle = analyze_keyboard(echo_keys(trial, IDLE_KEYS), required=True)
         trial.send(b"\x03")
         time.sleep(0.2)
         trial.collect_quiet(0.3, 1.0)
@@ -468,29 +562,53 @@ def provenance():
 
 
 METRICS = [
-    ("idleKeyboard.p50Ms", lambda t: t["idleKeyboard"].get("p50")),
-    ("idleKeyboard.p95Ms", lambda t: t["idleKeyboard"].get("p95")),
-    ("coldStream.firstContentMs", lambda t: t["coldStream"]["firstContentMs"]),
-    ("warmStream.firstContentMs", lambda t: t["warmStream"]["firstContentMs"]),
-    ("warmStream.renderFrameInterval.p50Ms", lambda t: percentiles(t["warmStream"]["renderFrameIntervals"])["p50"] if t["warmStream"]["renderFrameIntervals"] else None),
-    ("warmStream.renderFrameInterval.p95Ms", lambda t: percentiles(t["warmStream"]["renderFrameIntervals"])["p95"] if t["warmStream"]["renderFrameIntervals"] else None),
-    ("warmStream.completionMs", lambda t: t["warmStream"]["completionMs"]),
-    ("longStreamTyping.echo.p50Ms", lambda t: t["longStreamTyping"]["typingDuringStreamEcho"].get("p50")),
-    ("longStreamTyping.echo.p95Ms", lambda t: t["longStreamTyping"]["typingDuringStreamEcho"].get("p95")),
-    ("longStreamTyping.echo.failures", lambda t: t["longStreamTyping"]["typingDuringStreamEcho"]["failures"]),
-    ("longStreamTyping.redraw.p50Ms", lambda t: t["longStreamTyping"]["typingDuringStreamRedraw"].get("p50")),
-    ("toolTurn.toolVisibleMs", lambda t: t["toolTurn"]["toolVisibleMs"]),
-    ("toolTurn.toolTurnMs", lambda t: t["toolTurn"]["toolTurnMs"]),
-    ("toolTurn.bytes", lambda t: t["toolTurn"]["bytes"]),
-    ("warmStream.publicationDelayMs", lambda t: t["warmStream"].get("publicationDelayMs")),
+    ("idleKeyboard.p50Ms", lambda t: t["idleKeyboard"].get("p50"), True),
+    ("idleKeyboard.p95Ms", lambda t: t["idleKeyboard"].get("p95"), True),
+    ("coldStream.firstContentMs", lambda t: t["coldStream"]["firstContentMs"], True),
+    ("warmStream.firstContentMs", lambda t: t["warmStream"]["firstContentMs"], True),
+    ("warmStream.renderFrameInterval.p50Ms", lambda t: percentiles(t["warmStream"]["renderFrameIntervals"])["p50"] if t["warmStream"]["renderFrameIntervals"] else None, True),
+    ("warmStream.renderFrameInterval.p95Ms", lambda t: percentiles(t["warmStream"]["renderFrameIntervals"])["p95"] if t["warmStream"]["renderFrameIntervals"] else None, True),
+    ("warmStream.completionMs", lambda t: t["warmStream"]["completionMs"], True),
+    ("longStreamTyping.echo.p50Ms", lambda t: t["longStreamTyping"]["typingDuringStreamEcho"].get("p50"), True),
+    ("longStreamTyping.echo.p95Ms", lambda t: t["longStreamTyping"]["typingDuringStreamEcho"].get("p95"), True),
+    ("longStreamTyping.echo.failures", lambda t: t["longStreamTyping"]["typingDuringStreamEcho"]["failures"], True),
+    ("longStreamTyping.keysTypedBeforeCompletion", lambda t: t["longStreamTyping"]["keysTypedBeforeCompletion"], True),
+    ("longStreamTyping.controlKeysTypedBeforeCompletion", lambda t: t["longStreamTyping"]["controlKeysTypedBeforeCompletion"], True),
+    ("longStreamTyping.redraw.p50Ms", lambda t: t["longStreamTyping"]["typingDuringStreamRedraw"].get("p50"), True),
+    ("longStreamTyping.streamedSeconds", lambda t: t["longStreamTyping"]["streamedSeconds"], True),
+    ("toolTurn.toolVisibleMs", lambda t: t["toolTurn"]["toolVisibleMs"], True),
+    ("toolTurn.toolTurnMs", lambda t: t["toolTurn"]["toolTurnMs"], True),
+    ("toolTurn.rawBytes", lambda t: t["toolTurn"]["rawBytes"], True),
+    ("warmStream.rawBytesInWindow", lambda t: t["warmStream"]["rawBytesInWindow"], True),
+    # The coalesced publication exists only on the HUD side (and the native footer
+    # rarely lands a frame in the defined window), so None is a legitimate value.
+    ("warmStream.publicationDelayMs", lambda t: t["warmStream"].get("publicationDelayMs"), False),
+    ("warmStream.publicationWindowRawBytes", lambda t: t["warmStream"].get("publicationWindowRawBytes"), False),
 ]
 
 
+def require_mandatory(trials):
+    """Every mandatory metric must yield a number for every trial; a None silently
+    filtered out by aggregation would hide a broken measurement (review R3)."""
+    missing = []
+    for trial in trials:
+        for label, reader, mandatory in METRICS:
+            if not mandatory:
+                continue
+            if not isinstance(reader(trial), (int, float)):
+                missing.append({"trial": f"{trial['profile']}-{trial['index']}-{'hud' if trial['hud'] else 'off'}", "metric": label})
+    if missing:
+        raise SystemExit(f"mandatory metrics missing numeric values: {missing[:5]}")
+
+
 def self_test():
-    """Deterministic checks of the analysis functions' failure paths (no PTY)."""
+    """Deterministic checks of the analysis functions' failure paths (no PTY),
+    including the round-2 review's negative cases: raw-byte accounting, DONE without
+    the tool row, censored keyboard percentiles and echo evidence that must not pass
+    on unrelated transcript output."""
     now = time.monotonic()
     # 1. Missing terminator fails.
-    frames = [(now + 0.001, "«zq7-START» some body"), (now + 0.002, "more body")]
+    frames = [(now + 0.001, 3, "«zq7-START» some body"), (now + 0.002, 4, "more body")]
     try:
         analyze_stream(frames, now, "«zq7-START»", "«END»")
         raise AssertionError("missing terminator must fail")
@@ -498,32 +616,66 @@ def self_test():
         pass
     # 2. Missing prefix fails.
     try:
-        analyze_stream([(now, "no marker at all «END»")], now, "«zq7-START»", "«END»")
+        analyze_stream([(now, 4, "no marker at all «END»")], now, "«zq7-START»", "«END»")
         raise AssertionError("missing prefix must fail")
     except MeasurementError:
         pass
     # 3. Prefix in the echoed command never counts: the command contains the word
     #    but not the guillemet-delimited prefix, and pre-write frames are excluded.
-    frames = [(now - 0.5, "FIXTURE:REPLY:zq7 echoed"), (now + 0.05, "«zq7-START»b0"), (now + 0.07, "b1"), (now + 0.09, "«END»")]
+    frames = [(now - 0.5, 20, "FIXTURE:REPLY:zq7 echoed"), (now + 0.05, 3, "«zq7-START»b0"), (now + 0.07, 2, "b1"), (now + 0.09, 5, "«END»")]
     result = analyze_stream(frames, now, "«zq7-START»", "«END»")
     assert abs(result["firstContentMs"] - 50) < 1, result
     assert result["framesInWindow"] == 3, result
     assert len(result["renderFrameIntervals"]) == 2
-    # 4. Keyboard failure ratio is fatal; a single timeout is not.
+    # 4. Raw bytes: a styled payload counts its escape bytes, not its plain chars
+    #    (the review's 901-raw-byte / 1-plain-byte synthetic).
+    styled_raw = len(b"\x1b[31m" * 100 + b"X" + b"\x1b[0m" * 100)
+    frames = [(now - 0.01, styled_raw, "«zq7-START»"), (now + 0.05, styled_raw, "«END»")]
+    result = analyze_stream(frames, now, "«zq7-START»", "«END»")
+    assert result["rawBytesInWindow"] == 2 * styled_raw, result
+    # 5. Publication window counts every frame in the defined interval (no [:3] cap).
+    frames = [(now, 3, "«zq7-START»"), (now + 0.04, 5, "«END»")] + [(now + 0.1 + i * 0.1, 10, f"p{i}") for i in range(6)]
+    result = analyze_stream(frames, now, "«zq7-START»", "«END»")
+    assert result["publicationWindowFrames"] == 6 and result["publicationWindowRawBytes"] == 60, result
+    # 6. Required keyboard measurements fail on ANY timeout (censored samples must
+    #    not produce an all-key percentile); optional ones report censored bounds.
     try:
-        analyze_keyboard([1.0] * 3 + [None] * 2)
-        raise AssertionError("40% timeouts must fail")
+        analyze_keyboard([1.0, 2.0, None, 1.5], required=True)
+        raise AssertionError("required keyboard with a timeout must fail")
     except MeasurementError:
         pass
-    analyzed = analyze_keyboard([1.0, 2.0, None, 1.5])
-    assert analyzed["failures"] == 1 and analyzed["n"] == 3
-    # 5. Empty keyboard sample fails.
+    censored = analyze_keyboard([1.0, 2.0, None, 1.5], required=False)
+    assert censored["censored"] and censored["respondedOnly"] and censored["failures"] == 1
+    assert censored["upperBoundWithCensored"]["p95"] == KEY_TIMEOUT_S * 1_000
+    assert "note" in censored
     try:
         analyze_keyboard([None, None])
         raise AssertionError("all-timeout keyboard must fail")
     except MeasurementError:
         pass
-    print("PASS: stream/keyboard analysis failure paths behave deterministically")
+    # 7. DONE without the tool row FAILS (the review's silent toolVisibleMs=None).
+    try:
+        analyze_tool([(now + 0.02, 5, "FIXTURE:DONE")], now)
+        raise AssertionError("DONE without the tool row must fail")
+    except MeasurementError as error:
+        assert "tool row" in str(error)
+    result = analyze_tool([(now + 0.01, 5, "read marker.txt"), (now + 0.02, 5, "FIXTURE:DONE")], now)
+    assert abs(result["toolVisibleMs"] - 10) < 1 and abs(result["toolTurnMs"] - 20) < 1
+    assert result["rawBytes"] == 10
+    # 8. Marker-key echo evidence: a character appearing only in unrelated output
+    #    (typed BEFORE the write, or in stream body) is not a post-write echo. The
+    #    helper semantics are exercised through the same frames discipline used by
+    #    echo_keys: only post-write frames count, and the marker alphabet cannot
+    #    occur in ASCII chrome or reply bodies.
+    marker = "ζ"
+    pre = [(now - 0.1, 5, f"unrelated transcript already contains {marker}")]
+    post_unrelated = [(now + 0.01, 5, "lg4-body-token-7 footer noise")]
+    text = "".join(text for _, _, text in pre + post_unrelated)
+    assert marker not in "".join(text for _, _, text in post_unrelated), \
+        "marker must not appear in unrelated post-write output"
+    post_echo = [(now + 0.02, 5, "editor line: ζ")]
+    assert marker in "".join(text for _, _, text in post_echo)
+    print("PASS: stream/keyboard/tool analysis failure paths behave deterministically")
     return 0
 
 
@@ -569,7 +721,8 @@ def main() -> int:
     summary = {}
     for profile_name in profile_names:
         profile_trials = [trial for trial in trials if trial["profile"] == profile_name]
-        summary[profile_name] = {label: paired_summary(profile_trials, reader) for label, reader in METRICS}
+        require_mandatory(profile_trials)
+        summary[profile_name] = {label: paired_summary(profile_trials, reader) for label, reader, _ in METRICS}
     record = {
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "pairs": args.pairs, "profiles": profile_names, "trials": len(trials),

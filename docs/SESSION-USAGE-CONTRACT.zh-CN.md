@@ -172,7 +172,7 @@ B2 不扩展这两个字段为历史重建或实时估计：保留当前 observe
 - **内存**：释放后保留 0.01–2.1MiB（含 V8 碎片影响）；峰值读数需要零工作对照窗口（同探针同时长无账本工作在压缩后堆上同样增长 54.9MiB）与沉淀 GC，单次 GC 前后差会把加载阶段垃圾归因到附挂阶段。
 - **A/B**（review 轮重建）：8 组交替 observed/session：账本核对 +1.03µs、含 250ms 合并发布的完整轮 +1.94µs、sess* 渲染 +1.02µs、hook 与缓存路径不变；探针断言每轮恰好一次发布，结构证据在关机前采集；门禁未放宽且全部通过。
 - **真实宿主**：9 场景全部通过与独立文件 oracle 精确对齐（10k 分支 resume、真实 read 工具轮次、同 summary 双压缩（SDK find(summary) 命中旧 entry 的边界真实发生）、树导航+回根+重追加、模型切换、快速切会话、双 footer 两种 -e 顺序（HUD 延迟配置挂载总是落在所有 session_start 之后，启动时拥有槽位；启动后手动接管→HUD 抑制不清除；/hud surface footer 重夺）、后置异步 message_end 替换扩展（账本按最终记录计数）。
-- **真实 TUI 流式/工具/键盘 A/B**（review 轮重建）：20 对 × 2 配置（默认 observed+widget 与可选 session+footer）共 80 组；首内容/完成标记为原子首尾增量（42/152 个增量整），缺完成或 >25% 键盘超时即判失败；流中输入（8 键回显 + 退格 + 方向键）单独测；所有时间指标均在同机配对噪声包络内；HUD 每轮真实终端成本为一次约 185–235 字节 footer 发布（完成后约 150ms），maxFlushMs 保持个位数毫秒。
+- **真实 TUI 流式/工具/键盘 A/B**（review 轮重建）：20 对 × 2 配置（默认 observed+widget 与可选 session+footer）共 80 组；首内容/完成标记为原子首尾增量（42/152 个增量整），缺完成或 >25% 键盘超时即判失败；流中输入（8 键回显 + 退格 + 方向键）单独测；所有时间指标均在同机配对噪声包络内；按原始终端字节计，HUD 每轮约 +0.9–1.0 KiB、每次流式回复 +1.0 KiB（footer）至 +2.6 KiB（widget），另一次约 320–460 字节合并发布（完成后约 150ms），maxFlushMs 保持个位数毫秒。
 - **修复**：accumulateUsage 每记录元组数组（100k 约 24MiB 垃圾）→ TOKEN_FIELDS 模块常量；/hud status 诊断新增 totals（有界标量，便于真实宿主对 oracle 核对）。
 - **发现的上游事实**（非 HUD 缺陷）：Pi 0.85.1 原生 footer 对无 usage 的 assistant 消息会 addUsageToTotals(undefined) 崩溃，真实 provider 会话总是携带 usage，故仅影响含缺失 usage 的合成会话文件；验收夹具对这类记录注入确定性 usage。B2b 期间未放宽任何门槛，未切默认 footer。
 

@@ -159,8 +159,8 @@ B2 不扩展这两个字段为历史重建或实时估计：保留当前 observe
 - 增量：`turn_end`/`agent_settled` 触发核对，`message_end` 仅标记 updating；从当前 leaf 沿 `parentId` 回走到已提交游标，临时标量聚合、找到锚点才提交；重复事件不重计；缺 entry、链断裂、到 root 未遇锚点、循环或超过 2048 条时整批丢弃、标记 partial 并安排恰好一次恢复重建，不形成空闲重试循环；恢复成功后清除失败记录。
 - 生命周期：session_start（含 resume/fork/reload/new）、off、退出 session 口径都递增 generation 并丢弃任务/游标/快照；session_tree/session_compact 合并为一次重建；切 surface/主题/宽度不重建；`/hud reset` 保留账本并触发一次核对。
 - 数值：四项 token 独立累计；非负有限数才计入，否则该字段计为未知（`+?`）；assistant 缺 usage 标记数据不完整；无 usage 的 toolResult 仅口径外；无 usage 的摘要保留 token 小计、费用计不完整；cost=0 为有效零；费用全未知显示 `?`；饱和显示 `limited*`。
-- 展示：`sess*`（中文 `全会话*`）标签在最前，随后 `↻`（更新中，ASCII `~`）、`+?`（不完整）、`?`（装载中）；右侧截断先删计数器；**费用字段独立携带同样的 sess* 范围与状态标记**（balanced widget 与窄屏 footer 不显示 token 字段时仍自描述，费用自身的不完整显示在数值后、其余不完整显示在标记上，不重复）；宿主缺少只读接口时显式降级为 observed 标签；诊断公开 status/updating/重建原因与次数/host 调用次数/字段缺失数/耗时等有界标量。
-- 验证：241 项测试（新增 43 项覆盖正确性矩阵及评审修复）、独立 oracle、`scripts/usage-oracle-check.mjs`（真实 SessionManager + SDK 自带 usage-totals 作为 oracle，含 resetLeaf 回根与超限追加恢复场景）、固定 SDK 类型检查、`npm run verify`、`npm run package:check` 全部通过。详见 [VERIFICATION.md](VERIFICATION.md)。
+- 展示：`sess*`（中文 `全会话*`）标签在最前，随后 `↻`（更新中，ASCII `~`）、`+?`（不完整）、`?`（装载中）、`limited*`（饱和）等紧凑标记**始终位于数值之前**，右缘截断先删数值，被裁剪的饱和值不会丢失提示；费用字段独立携带同样的 sess* 范围与状态标记（balanced widget 与窄屏 footer 不显示 token 字段时仍自描述，费用自身的不完整显示在数值后、其余不完整显示在标记上，不重复）；宿主缺少只读接口时显式降级为 observed 标签；诊断公开 status/updating/重建原因与次数/host 调用次数/字段缺失数/耗时等有界标量。二次追赶失败留下的覆盖缺口在下一次成功锚定核对提交该段记录时确认补齐并清除（真实字段缺失/饱和仍保持 partial）；补齐发布即使无待处理标记也会通知 UI。
+- 验证：244 项测试（新增 46 项覆盖正确性矩阵及两轮评审修复）、独立 oracle、`scripts/usage-oracle-check.mjs`（真实 SessionManager + SDK 自带 usage-totals 作为 oracle，含 resetLeaf 回根与超限追加恢复场景）、固定 SDK 类型检查、`npm run verify`、`npm run package:check` 全部通过。详见 [VERIFICATION.md](VERIFICATION.md)。
 - 仍未做（不得宣称）：1k/10k/100k 长历史测量、稳态增量成本测量、同机交替 A/B、真实宿主（resume/压缩/树导航/双 footer 扩展）验收、流式验收、默认 footer 切换评估。
 
 ## B2b 待验清单（下一轮）

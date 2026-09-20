@@ -52,6 +52,11 @@ const sessionFixture = (view = sessionView()) => {
   snapshot.sessionUsage = view;
   return snapshot;
 };
+const sessionFixtureWith = (view, overrides = {}) => {
+  const snapshot = fixture(overrides);
+  snapshot.sessionUsage = view;
+  return snapshot;
+};
 
 /** Synthetic identity cache for the footer surface; a real session fills this from lifecycle events. */
 const FOOTER_IDENTITY = Object.freeze({ cwd: "~/opensource/pi-hud", provider: "demo", title: "Compare HUDs", branch: "main", branchDirty: true });
@@ -174,11 +179,11 @@ export function renderPreview() {
   push("");
   push(
     "usageScope: session (phase 3 B2a) — full-session ledger totals replace the obs* counters;",
-    "the sess* label leads, then compact markers: ↻ updating, +? incomplete, ? while loading,",
-    "limited* after a saturated sum. The cost field carries the same scope and markers on its",
-    "own (the balanced widget and narrow footers drop the token field). ctx(last), CH and tool",
-    "categories keep their observed scope. An unavailable host surface degrades to the",
-    "observed-labelled fields.",
+    "the sess* label leads, then compact markers before every number: ↻ updating, +? incomplete,",
+    "? while loading, limited* for a saturated (capped) sum — a clipped value never loses its",
+    "hint. The cost field carries the same scope and markers on its own (the balanced widget",
+    "and narrow footers drop the token field). ctx(last), CH and tool categories keep their",
+    "observed scope. An unavailable host surface degrades to the observed-labelled fields.",
     "",
   );
   {
@@ -202,13 +207,15 @@ export function renderPreview() {
     push(rows(sessionFixture(sessionView({ limited: true })), "full", "en", 120, config).at(-1));
     push("");
     push("session updating and incomplete shown through the cost field alone (balanced widget:");
-    push("no token field, so the cost field carries the sess* scope, ↻ and +? marks itself)");
+    push("no token field, so the cost field carries the sess* scope, ↻/+? and limited* itself)");
     push(rows(sessionFixture(sessionView({ updating: true })), "balanced", "en", 120, config).at(-1));
     push(rows(sessionFixture(sessionView({ fieldsIncomplete: true, missingInput: 2 })), "balanced", "en", 120, config).at(-1));
+    push(rows(sessionFixture(sessionView({ limited: true })), "balanced", "en", 120, config).at(-1));
     push("");
-    push("session scope and markers survive right-edge truncation (en / full / 30 and 38 columns)");
-    for (const width of [30, 38]) push(`${width} columns: ${rows(sessionFixture(sessionView({ fieldsIncomplete: true, updating: true })), "full", "en", width, config).at(-1)}`);
-    push("Counters clip first; the sess* scope and the ↻/+? markers stay readable.");
+    push("session scope and markers survive right-edge truncation (en / full / 30 and 38 columns,");
+    push("no bridge data; saturated, updating and incomplete at once)");
+    for (const width of [30, 38]) push(`${width} columns: ${rows(sessionFixtureWith(sessionView({ fieldsIncomplete: true, updating: true, limited: true }), { bridge: false, active: false }), "full", "en", width, config).at(-1)}`);
+    push("Counters clip first; the sess* scope and the ↻/+?/limited* markers stay readable.");
     push("");
     push("session ASCII mode (en / full / 120 columns)");
     push(...rows(sessionFixture(), "full", "en", 120, { ...config, ascii: true }));

@@ -726,6 +726,14 @@ export class SessionUsageLedger {
       this.published.examined += temp.examined;
       this.examinedTotal += temp.examined;
       this.cursor = leaf;
+      // The anchored walk covered exactly the segment a previous catch-up or verify
+      // failure could not reach, so the coverage gap is confirmed healed here - not on
+      // a timer. Genuine field incompleteness and saturation are re-evaluated in
+      // commitIdle and keep their partial mark; only the coverage failure is cleared.
+      this.coverageGap = false;
+      this.failureReason = null;
+      this.commitIdle(true);
+      return;
     }
     this.commitIdle();
   }
@@ -749,8 +757,11 @@ export class SessionUsageLedger {
     target.limited = target.limited || delta.limited;
   }
 
-  private commitIdle(): void {
-    const had = this.updating || this.pendingSinceCommit > 0;
+  private commitIdle(healed = false): void {
+    // `healed` marks the case where a previously failed coverage segment was just
+    // committed: the publication must go out even when nothing was pending, so a
+    // long-stuck partial snapshot visibly returns to ready.
+    const had = this.updating || this.pendingSinceCommit > 0 || healed;
     this.updating = false;
     this.pendingSinceCommit = 0;
     this.publishedStatus = fieldsIncomplete(this.published!) || this.published!.limited || this.coverageGap ? "partial" : "ready";

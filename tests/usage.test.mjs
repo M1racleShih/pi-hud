@@ -630,6 +630,91 @@ test("a malformed parentId fails the walk instead of following garbage", () => {
   assert.equal(view.status, "ready");
 });
 
+test("a second catch-up failure heals through the next successful verify, not a timer", () => {
+  const manager = new FakeSessionManager();
+  manager.appendMessage(assistantEntry(1));
+  manager.appendMessage(assistantEntry(1));
+  let publishes = 0;
+  const f = ledgerFixture({ manager, chunkEntries: 1, onPublish: () => publishes++ });
+  f.ledger.restart(manager, "test");
+  f.clock.step(); // capture + first slice
+  // First failure: e3 is temporarily un-indexable when the baseline finishes.
+  const id3 = manager.appendMessage(assistantEntry(1));
+  const record3 = manager.byId.get(id3);
+  manager.dropIndex(id3);
+  f.clock.step(); // last slice -> catch-up fails -> one recovery scheduled
+  // The recovery's own catch-up fails on e4: no further self-perpetuation.
+  manager.byId.set(id3, record3);
+  const id4 = manager.appendMessage(assistantEntry(1));
+  const record4 = manager.byId.get(id4);
+  manager.dropIndex(id4);
+  drain(f);
+  const stuck = f.ledger.view();
+  const stuckDiag = f.ledger.inspect();
+  assert.equal(stuck.input, 3, "totals stay valid up to the committed cursor");
+  assert.equal(stuck.status, "partial");
+  assert.equal(stuckDiag.coverageGap, true);
+  assert.match(stuckDiag.failureReason ?? "", /catchup:missing-entry/);
+  assert.equal(f.clock.pending, 0, "the second failure does not self-perpetuate");
+  // The index heals and the next event boundary verifies: the anchored walk commits the
+  // exact segment the failures could not reach, so the coverage failure clears.
+  manager.byId.set(id4, record4);
+  const publishesBeforeHeal = publishes;
+  f.ledger.onMessageEnd();
+  f.ledger.requestVerify();
+  drain(f);
+  const healed = f.ledger.view();
+  const healedDiag = f.ledger.inspect();
+  assert.equal(healed.input, 4, "the healed delta is committed");
+  assert.equal(healed.status, "ready", "the confirmed gap clears the coverage partial");
+  assert.equal(healedDiag.coverageGap, false);
+  assert.equal(healedDiag.failureReason, null);
+  assert.ok(publishes > publishesBeforeHeal, "the healed publication notifies the UI");
+  assert.equal(f.clock.pending, 0, "no idle retry loop remains");
+  // Genuine record incompleteness still keeps the partial mark with no failure reason.
+  manager.appendCompaction("no-usage", undefined);
+  f.ledger.onMessageEnd();
+  f.ledger.requestVerify();
+  drain(f);
+  const afterSummary = f.ledger.view();
+  assert.equal(afterSummary.status, "partial", "a usage-less summary keeps the data incomplete");
+  assert.equal(f.ledger.inspect().coverageGap, false, "field incompleteness is not a coverage gap");
+  assert.equal(f.ledger.inspect().failureReason, null);
+});
+
+test("a healed gap publishes even when nothing was marked pending", () => {
+  const manager = new FakeSessionManager();
+  manager.appendMessage(assistantEntry(1));
+  let publishes = 0;
+  const f = ledgerFixture({ manager, onPublish: () => publishes++ });
+  f.ledger.restart(manager, "test");
+  drain(f);
+  // A verify failure (broken chain) creates the gap; the recovery rebuild cannot run
+  // because the ledger is drained, so healing must come from a later event boundary.
+  const id = manager.appendMessage(assistantEntry(2));
+  manager.dropIndex(id);
+  f.ledger.requestVerify();
+  f.clock.step();
+  assert.equal(f.ledger.view().status, "partial");
+  drain(f); // the scheduled recovery folds the record and clears the failure
+  assert.equal(f.ledger.view().status, "ready");
+  // Now create a second gap and heal it with a bare requestVerify (no message_end, no
+  // updating flag): the healed publication must still go out.
+  const id2 = manager.appendMessage(assistantEntry(3));
+  manager.dropIndex(id2);
+  f.ledger.requestVerify();
+  f.clock.step();
+  assert.equal(f.ledger.view().status, "partial");
+  manager.byId.set(id2, manager.order.at(-1));
+  const before = publishes;
+  f.ledger.requestVerify();
+  drain(f);
+  assert.equal(f.ledger.view().input, 6, "the healed segment is committed");
+  assert.equal(f.ledger.view().status, "ready");
+  assert.ok(publishes > before, "a bare heal (nothing pending) still notifies the UI");
+  assert.equal(f.clock.pending, 0);
+});
+
 test("catch-up failure keeps valid totals, records the gap and recovers via one rebuild", () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(1));
@@ -742,7 +827,7 @@ test("the session cost field carries scope and status marks even without the tok
   assert.match(rowsFor(sessionView({ updating: true }), { ascii: true }), /sess\* ~ \$0\.420/, "ASCII updating mark");
   assert.match(rowsFor(sessionView({ fieldsIncomplete: true, missingInput: 2 })), /sess\* \+\? \$0\.420/, "non-cost incompleteness shows as a mark");
   assert.match(rowsFor(sessionView({ fieldsIncomplete: true, costMissing: true })), /sess\* \$0\.420\+\?/, "cost incompleteness stays on the value without a duplicate mark");
-  assert.match(rowsFor(sessionView({ limited: true })), /sess\* \$0\.420 limited\*/, "saturation shows in the cost field");
+  assert.match(rowsFor(sessionView({ limited: true })), /sess\* limited\* \$0\.420/, "saturation precedes the cost value");
   assert.match(rowsFor(sessionView({ status: "loading", costKnown: false })), /sess\* \?/, "loading shows unknown");
   // The footer usage row keeps the same self-describing cost field when narrow width
   // drops the token field.
@@ -759,20 +844,44 @@ test("an unavailable or inactive ledger renders the observed fields unchanged", 
   assert.ok(!rows.join("\n").includes("sess*"));
 });
 
+test("the saturation marker precedes every saturated number and survives clipping", () => {
+  const saturated = sessionView({
+    input: Number.MAX_SAFE_INTEGER, output: Number.MAX_SAFE_INTEGER,
+    cacheRead: Number.MAX_SAFE_INTEGER, cacheWrite: 0,
+    cost: Number.MAX_SAFE_INTEGER, limited: true,
+  });
+  // Full widget with showCost off at 40 columns is the reported scenario: the counters
+  // clip, and the capped-total hint must stay in front of whatever remains visible.
+  const full = normalizeConfig({ usageScope: "session", preset: "full", color: false, showCost: false });
+  const row = formatHud(snapshotWith(saturated), full, 40).at(-1).text;
+  assert.match(row, /sess\* limited\* ↑90/, "the marker precedes the clipped counters");
+  assert.match(row, /…$/, "the row is genuinely clipped, not wide enough to fit everything");
+  for (const width of [30, 52]) {
+    const clipped = formatHud(snapshotWith(saturated), full, width).at(-1).text;
+    assert.match(clipped, /sess\* limited\*/, `${width} columns keep the marker with any visible value`);
+  }
+  const zh = formatHud(snapshotWith(saturated), normalizeConfig({ usageScope: "session", preset: "full", color: false, showCost: false, language: "zh-CN" }), 40).at(-1).text;
+  assert.match(zh, /全会话\* limited\* ↑90/);
+  const ascii = formatHud(snapshotWith(saturated), normalizeConfig({ usageScope: "session", preset: "full", color: false, showCost: false, ascii: true }), 40).at(-1).text;
+  assert.match(ascii, /sess\* limited\* in90/);
+  // The footer usage row and the standalone cost field (balanced widget shows no token
+  // field): whenever the saturated value is displayed, the marker is displayed first.
+  const footerRow = formatFooter(snapshotWith(saturated), normalizeConfig({ usageScope: "session", preset: "balanced", color: false }), 56, EMPTY_IDENTITY)[1].text;
+  assert.match(footerRow, /sess\* limited\* \$90/);
+  const balancedRow = formatHud(snapshotWith(saturated), normalizeConfig({ usageScope: "session", preset: "balanced", color: false }), 46)[1].text;
+  assert.match(balancedRow, /sess\* limited\* \$90/);
+});
+
 test("narrow widths keep the scope label and the incompleteness marker ahead of the counters", () => {
   const config = normalizeConfig({ usageScope: "session", preset: "full", color: false });
   const snapshot = snapshotWith(sessionView({ fieldsIncomplete: true, updating: true }));
+  // Unconditional: at these widths the field is present (verified layout), so a
+  // regression that loses the scope or the marker must fail instead of skipping.
   for (const width of [34, 40, 52]) {
-    const rows = formatHud(snapshot, config, width).map((row) => row.text);
-    const row = rows.at(-1);
-    if (row.includes("sess*")) {
-      const cut = row.indexOf(" CH");
-      const head = cut === -1 ? row : row.slice(0, cut);
-      assert.match(head, /sess\*/, `${width} columns keep the scope label`);
-      assert.match(head, /\+\?/, `${width} columns keep the partial marker`);
-    }
+    const row = formatHud(snapshot, config, width).at(-1).text;
+    assert.match(row, /^sess\* ↻ \+\? /, `${width} columns keep the scope label and both markers first`);
   }
-  // The marker must be adjacent to the label so right-edge truncation removes counters first.
+  // The markers must be adjacent to the label so right-edge truncation removes counters first.
   const field = sessionTokensField(snapshotWith(sessionView({ fieldsIncomplete: true, updating: true })), config, LABELS.en);
   const texts = field.segments.map((segment) => segment.text);
   assert.equal(texts[0].trim(), "sess*");
@@ -781,13 +890,14 @@ test("narrow widths keep the scope label and the incompleteness marker ahead of 
 
 test("footer usage row carries the session field and status markers at narrow widths", () => {
   const config = normalizeConfig({ usageScope: "session", preset: "balanced", color: false });
-  const snapshot = snapshotWith(sessionView({ fieldsIncomplete: true }));
+  const snapshot = snapshotWith(sessionView({ fieldsIncomplete: true, updating: true }));
   const rows = formatFooter(snapshot, config, 120, EMPTY_IDENTITY).map((row) => row.text);
   assert.match(rows[1], /sess\*/);
   assert.match(rows[1], /\+\?/);
+  // Unconditional: at 46 columns the token field folds, and the cost field must still
+  // carry the session scope plus both status markers (verified layout, no skip path).
   const narrow = formatFooter(snapshot, config, 46, EMPTY_IDENTITY).map((row) => row.text);
-  const usageRow = narrow[1] ?? "";
-  if (usageRow.includes("sess")) assert.match(usageRow, /sess\*/);
+  assert.match(narrow[1], /sess\* ↻ \+\? \$0\.420/, "the folded-row cost field stays self-describing");
 });
 
 test("empty ready session hides the token counters instead of showing zero totals", () => {

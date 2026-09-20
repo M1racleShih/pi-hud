@@ -168,11 +168,11 @@ status text number 0 · status text number 1 · status text number 2
 status text number 3 · status text number 4 · status text number 5 · +14
 
 usageScope: session (phase 3 B2a) — full-session ledger totals replace the obs* counters;
-the sess* label leads, then compact markers: ↻ updating, +? incomplete, ? while loading,
-limited* after a saturated sum. The cost field carries the same scope and markers on its
-own (the balanced widget and narrow footers drop the token field). ctx(last), CH and tool
-categories keep their observed scope. An unavailable host surface degrades to the
-observed-labelled fields.
+the sess* label leads, then compact markers before every number: ↻ updating, +? incomplete,
+? while loading, limited* for a saturated (capped) sum — a clipped value never loses its
+hint. The cost field carries the same scope and markers on its own (the balanced widget
+and narrow footers drop the token field). ctx(last), CH and tool categories keep their
+observed scope. An unavailable host surface degrades to the observed-labelled fields.
 
 session ready (en / full / 120 columns)
 [Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
@@ -198,17 +198,19 @@ session loading (zh-CN / full / 120 columns): totals unknown, ctx(last) still ob
 session unknown cost (records never reported cost) and saturated sums (full preset;
 row 2 carries the cost field, row 3 the token field)
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · sess* ?
-agents 1 · tasks 3/7 · Build Pi HUD · sess* ↑61k ↓15k R312k W9.4k CH86.2% limited*
+agents 1 · tasks 3/7 · Build Pi HUD · sess* limited* ↑61k ↓15k R312k W9.4k CH86.2%
 
 session updating and incomplete shown through the cost field alone (balanced widget:
-no token field, so the cost field carries the sess* scope, ↻ and +? marks itself)
+no token field, so the cost field carries the sess* scope, ↻/+? and limited* itself)
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · sess* ↻ $0.384 · agents 1 · tasks 3/7
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · sess* +? $0.384 · agents 1 · tasks 3/7
+● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · sess* limited* $0.384 · agents 1 · tasks 3/7
 
-session scope and markers survive right-edge truncation (en / full / 30 and 38 columns)
-30 columns: agents 1 · tasks 3/7
-38 columns: agents 1 · tasks 3/7 · Build Pi HUD
-Counters clip first; the sess* scope and the ↻/+? markers stay readable.
+session scope and markers survive right-edge truncation (en / full / 30 and 38 columns,
+no bridge data; saturated, updating and incomplete at once)
+30 columns: sess* ↻ +? limited* ↑61k ↓15k…
+38 columns: sess* ↻ +? limited* ↑61k ↓15k R312k W…
+Counters clip first; the sess* scope and the ↻/+?/limited* markers stay readable.
 
 session ASCII mode (en / full / 120 columns)
 [Example Model] | high | pi-hud | git:main* | ctx(last) #####..... 45% 90k/200k

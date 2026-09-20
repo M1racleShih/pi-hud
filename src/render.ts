@@ -292,13 +292,14 @@ export function sessionCostField(view: SessionUsageView, config: HudConfig, word
   const marks: string[] = [];
   if (view.updating) marks.push(config.ascii ? "~" : "↻");
   // `+?` on the value already reports an unknown cost part; the mark covers every other
-  // incompleteness (missing token fields, coverage gap) so exactly one hint appears
-  // for each distinct problem.
+  // incompleteness (missing token fields) so exactly one hint appears for each distinct
+  // problem. The saturation hint always precedes the value it qualifies.
   if (view.fieldsIncomplete && !view.costMissing) marks.push("+?");
-  if (marks.length) segments.push(seg(view.fieldsIncomplete && !view.costMissing ? "warning" : "label", `${marks.join(" ")} `));
+  if (view.limited) marks.push("limited*");
+  const markWarns = (view.fieldsIncomplete && !view.costMissing) || view.limited;
+  if (marks.length) segments.push(seg(markWarns ? "warning" : "label", `${marks.join(" ")} `));
   const value = view.costKnown ? `$${view.cost.toFixed(3)}${view.costMissing ? "+?" : ""}` : "?";
   segments.push(seg("body", value));
-  if (view.limited) segments.push(seg("warning", " limited*"));
   return field(60, segments);
 }
 
@@ -348,10 +349,11 @@ export function tokensField(snapshot: HudSnapshot, config: HudConfig, words: Hud
 
 /**
  * Full-session ledger totals (`usageScope: "session"`). The scope label leads and the
- * compact status markers (`↻`/ASCII `~` updating, `+?` incomplete, `?` while loading) sit
- * directly behind it, so right-edge truncation removes counters before it can remove the
- * scope or the incompleteness hint. CH keeps its observed meaning: it never describes the
- * session totals. `limited*` marks a saturated (capped) sum instead of pretending precision.
+ * compact status markers (`↻`/ASCII `~` updating, `+?` incomplete, `?` while loading,
+ * `limited*` saturated) sit directly behind it, so right-edge truncation removes the
+ * numbers before it can remove the scope, the incompleteness hint or the saturation
+ * hint — a clipped value must never lose the signal that it is a capped total, not an
+ * exact one. CH keeps its observed meaning: it never describes the session totals.
  */
 export function sessionTokensField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
   const usage = snapshot.sessionUsage!;
@@ -361,7 +363,9 @@ export function sessionTokensField(snapshot: HudSnapshot, config: HudConfig, wor
   const marks: string[] = [];
   if (usage.updating) marks.push(config.ascii ? "~" : "↻");
   if (usage.fieldsIncomplete) marks.push("+?");
-  if (marks.length) segments.push(seg(usage.fieldsIncomplete ? "warning" : "label", `${marks.join(" ")} `));
+  // The saturation hint always precedes every number it qualifies.
+  if (usage.limited) marks.push("limited*");
+  if (marks.length) segments.push(seg(usage.fieldsIncomplete || usage.limited ? "warning" : "label", `${marks.join(" ")} `));
   if (usage.status === "loading") {
     segments.push(seg("body", "?"));
   } else {
@@ -371,7 +375,6 @@ export function sessionTokensField(snapshot: HudSnapshot, config: HudConfig, wor
     if (usage.cacheWrite) segments.push(seg("body", ` W${compactNumber(usage.cacheWrite)}`));
   }
   segments.push(seg("label", " CH"), seg("body", snapshot.cacheHit === null ? "?" : `${(snapshot.cacheHit * 100).toFixed(1)}%`));
-  if (usage.limited) segments.push(seg("warning", " limited*"));
   return field(30, segments);
 }
 

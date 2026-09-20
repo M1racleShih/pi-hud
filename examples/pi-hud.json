@@ -6,6 +6,7 @@
   "placement": "belowEditor",
   "language": "en",
   "palette": "pastel",
+  "usageScope": "observed",
   "refreshMs": 250,
   "color": true,
   "ascii": false,

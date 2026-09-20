@@ -27,7 +27,11 @@ const surfaceFileSource = existsSync(join("src", SURFACE_FILE)) ? readFileSync(j
 const surfaceSection = surfaceFileSource.includes(SURFACE_START) && surfaceFileSource.includes(SURFACE_END)
   ? surfaceFileSource.split(SURFACE_START)[1].split(SURFACE_END)[0]
   : "";
-const countSurfaceCalls = (source) => (source.match(/\bsetFooter\s*\(/g) ?? []).length;
+// Call sites may use plain or optional-chained invocation (`x.foo(` / `x.foo?.(`), so every
+// matcher below accepts an optional `?.` before the argument list. Method-form names
+// additionally require a receiver dot, because an interface member like `setFooter?(...)`
+// must not count as an optional-chained call.
+const countSurfaceCalls = (source) => (source.match(/\.\s*setFooter\s*(?:\?\.\s*)?\(/g) ?? []).length;
 assert.ok(surfaceSection.includes("setFooter"), `${SURFACE_FILE} must own the setFooter boundary`);
 assert.equal(
   countSurfaceCalls(surfaceFileSource), countSurfaceCalls(surfaceSection),
@@ -35,12 +39,34 @@ assert.equal(
 );
 assert.ok(surfaceSection.includes("typeof ui.setFooter !== \"function\""), "the surface boundary must keep its capability guard");
 assert.ok(surfaceSection.includes("installFooter") && surfaceSection.includes("releaseFooter"), "install and release must both live in the boundary");
-const forbiddenBase = /\b(?:execSync|execFileSync|spawnSync|readFileSync|writeFileSync|setInterval|fetch)\s*\(|\.(?:getBranch|getEntries|getContextUsage|registerTool|sendMessage|sendUserMessage|appendEntry|setEditorComponent|onTerminalInput)\s*\(|\bconsole\s*\./;
-const forbiddenSurface = /\bsetFooter\s*\(/;
+// Same pattern for host history reads: only the optional session-usage ledger module may
+// call the read-only entry APIs, only inside its marked boundary. The render-path history
+// APIs (getBranch/getContextUsage) stay forbidden everywhere, boundary included.
+const HISTORY_FILE = "usage.ts";
+const HISTORY_START = "/* history-boundary:start */";
+const HISTORY_END = "/* history-boundary:end */";
+const historyFileSource = existsSync(join("src", HISTORY_FILE)) ? readFileSync(join("src", HISTORY_FILE), "utf8") : "";
+const historySection = historyFileSource.includes(HISTORY_START) && historyFileSource.includes(HISTORY_END)
+  ? historyFileSource.split(HISTORY_START)[1].split(HISTORY_END)[0]
+  : "";
+const countHistoryCalls = (source) => (source.match(/\.\s*(?:getEntries|getEntry|getLeafId|getSessionId)\s*(?:\?\.\s*)?\(/g) ?? []).length;
+assert.ok(historySection.length > 0, `${HISTORY_FILE} must contain the history boundary section`);
+assert.equal(
+  countHistoryCalls(historyFileSource), countHistoryCalls(historySection),
+  "read-only entry APIs may only be called inside the marked history boundary section",
+);
+assert.ok(
+  ["getEntries", "getEntry", "getLeafId"].every((method) => historySection.includes(method)),
+  "the history boundary must wrap the read-only entry reads",
+);
+const forbiddenBase = /\b(?:execSync|execFileSync|spawnSync|readFileSync|writeFileSync|setInterval|fetch)\s*(?:\?\.\s*)?\(|\.\s*(?:getBranch|getContextUsage|registerTool|sendMessage|sendUserMessage|appendEntry|setEditorComponent|onTerminalInput)\s*(?:\?\.\s*)?\(|\bconsole\s*\./;
+const forbiddenSurface = /\.\s*setFooter\s*(?:\?\.\s*)?\(/;
+const forbiddenHistory = /\.\s*(?:getEntries|getEntry|getLeafId|getSessionId)\s*(?:\?\.\s*)?\(/;
 for (const file of readdirSync("src").filter((file) => file.endsWith(".ts"))) {
   const source = readFileSync(join("src", file), "utf8");
   assert.ok(!forbiddenBase.test(source), `Forbidden hot-path API or direct output in ${file}`);
   if (file !== SURFACE_FILE) assert.ok(!forbiddenSurface.test(source), `setFooter is only allowed in the ${SURFACE_FILE} surface boundary`);
+  if (file !== HISTORY_FILE) assert.ok(!forbiddenHistory.test(source), `read-only entry APIs are only allowed in the ${HISTORY_FILE} history boundary`);
   for (const match of source.matchAll(/from\s+["'](node:[^"']+)["']/g)) {
     assert.ok(allowedBuiltins[file]?.has(match[1]), `Unexpected builtin import ${match[1]} in ${file}`);
   }

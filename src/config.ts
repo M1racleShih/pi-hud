@@ -16,6 +16,12 @@ export type HudPalette = "pastel" | "theme" | "mono";
  * `footer` replaces the native footer through `ui.setFooter` and does not mount the widget.
  */
 export type HudSurface = "widget" | "footer";
+/**
+ * `observed` (default) keeps the low-cost counters since this attachment/reset.
+ * `session` additionally builds the optional full-session ledger from the current
+ * SessionManager's entries (see src/usage.ts); the display then labels totals `sess*`.
+ */
+export type HudUsageScope = "observed" | "session";
 
 export interface GitConfig {
   enabled: boolean;
@@ -31,6 +37,8 @@ export interface HudConfig {
   placement: HudPlacement;
   language: HudLanguage;
   palette: HudPalette;
+  /** Which usage numbers the usage fields show; scopes never change acquisition defaults. */
+  usageScope: HudUsageScope;
   refreshMs: number;
   color: boolean;
   ascii: boolean;
@@ -52,6 +60,7 @@ export const DEFAULT_CONFIG: Readonly<HudConfig> = Object.freeze({
   placement: "belowEditor",
   language: "en",
   palette: "pastel",
+  usageScope: "observed",
   refreshMs: 250,
   color: true,
   ascii: false,
@@ -82,6 +91,7 @@ export function normalizeConfig(input: unknown = {}): Readonly<HudConfig> {
     ["placement", ["aboveEditor", "belowEditor"]],
     ["language", ["en", "zh-CN"]],
     ["palette", ["pastel", "theme", "mono"]],
+    ["usageScope", ["observed", "session"]],
   ] as const) {
     if (!(values as readonly string[]).includes(result[key] as string)) throw new Error(`Invalid ${key}`);
   }

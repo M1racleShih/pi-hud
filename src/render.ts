@@ -14,13 +14,15 @@ export interface HudWords {
   compact: string;
   cost: string;
   usage: string;
+  /** Label for the optional full-session ledger totals (`usageScope: "session"`). */
+  session: string;
   stopped: string;
   other: string;
 }
 
 export const LABELS: Record<HudLanguage, HudWords> = {
-  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", stopped: "interrupted", other: "other" },
-  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", stopped: "已中断", other: "其他" },
+  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", session: "sess*", stopped: "interrupted", other: "other" },
+  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", session: "全会话*", stopped: "已中断", other: "其他" },
 };
 
 /** Fixed layout bounds: a row can never grow past these counts, whatever the state. */
@@ -271,6 +273,13 @@ export function tasksField(snapshot: HudSnapshot, words: HudWords): HudField | n
 
 export function costField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
   if (!config.showCost) return null;
+  if (config.usageScope === "session" && snapshot.sessionUsage) {
+    const usage = snapshot.sessionUsage;
+    // Recorded session cost: every record unknown renders `?`, a known subtotal with
+    // unknown parts renders `<known>+?`, an explicit reported zero stays a valid zero.
+    const value = usage.costKnown ? `$${usage.cost.toFixed(3)}${usage.costMissing ? "+?" : ""}` : "?";
+    return field(60, [seg("label", `${words.cost} `), seg("body", value)]);
+  }
   const value = snapshot.costReports ? `$${snapshot.cost.toFixed(3)}${snapshot.costReports < snapshot.usageReports ? "+?" : ""}` : "?";
   return field(60, [seg("label", `${words.cost} `), seg("body", value)]);
 }
@@ -304,6 +313,7 @@ export function compactionField(snapshot: HudSnapshot, words: HudWords): HudFiel
  * assistant's cacheRead / (input + cacheRead + cacheWrite), or `?` when unknown.
  */
 export function tokensField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
+  if (config.usageScope === "session" && snapshot.sessionUsage) return sessionTokensField(snapshot, config, words);
   if (!snapshot.usageReports) return null;
   const arrow = { up: config.ascii ? "in" : "↑", down: config.ascii ? "out" : "↓" };
   // One colored segment per counter keeps the field compact; the arrow and value share the
@@ -316,6 +326,35 @@ export function tokensField(snapshot: HudSnapshot, config: HudConfig, words: Hud
     snapshot.cacheWrite ? seg("body", ` W${compactNumber(snapshot.cacheWrite)}`) : null,
     seg("label", " CH"), seg("body", snapshot.cacheHit === null ? "?" : `${(snapshot.cacheHit * 100).toFixed(1)}%`),
   ]);
+}
+
+/**
+ * Full-session ledger totals (`usageScope: "session"`). The scope label leads and the
+ * compact status markers (`↻`/ASCII `~` updating, `+?` incomplete, `?` while loading) sit
+ * directly behind it, so right-edge truncation removes counters before it can remove the
+ * scope or the incompleteness hint. CH keeps its observed meaning: it never describes the
+ * session totals. `limited*` marks a saturated (capped) sum instead of pretending precision.
+ */
+export function sessionTokensField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
+  const usage = snapshot.sessionUsage!;
+  if (usage.status !== "loading" && !usage.usageRecords && !usage.limited) return null;
+  const arrow = { up: config.ascii ? "in" : "↑", down: config.ascii ? "out" : "↓" };
+  const segments: HudSegment[] = [seg("label", `${words.session} `)];
+  const marks: string[] = [];
+  if (usage.updating) marks.push(config.ascii ? "~" : "↻");
+  if (usage.fieldsIncomplete) marks.push("+?");
+  if (marks.length) segments.push(seg(usage.fieldsIncomplete ? "warning" : "label", `${marks.join(" ")} `));
+  if (usage.status === "loading") {
+    segments.push(seg("body", "?"));
+  } else {
+    if (usage.input) segments.push(seg("body", `${arrow.up}${compactNumber(usage.input)}`));
+    if (usage.output) segments.push(seg("body", ` ${arrow.down}${compactNumber(usage.output)}`));
+    if (usage.cacheRead) segments.push(seg("body", ` R${compactNumber(usage.cacheRead)}`));
+    if (usage.cacheWrite) segments.push(seg("body", ` W${compactNumber(usage.cacheWrite)}`));
+  }
+  segments.push(seg("label", " CH"), seg("body", snapshot.cacheHit === null ? "?" : `${(snapshot.cacheHit * 100).toFixed(1)}%`));
+  if (usage.limited) segments.push(seg("warning", " limited*"));
+  return field(30, segments);
 }
 
 /** Pure, bounded renderer. Input is already sanitized by the state boundary. */

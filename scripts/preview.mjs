@@ -38,10 +38,25 @@ const fixture = (overrides = {}) => {
 const rows = (snapshot, preset, language, width, extra = {}) =>
   formatHud(snapshot, normalizeConfig({ preset, language, color: false, ...extra }), width).map((row) => row.text);
 
+/** Session-ledger views for the `usageScope: "session"` previews (phase 3 B2a). */
+const sessionView = (overrides = {}) => ({
+  status: "ready", updating: false,
+  input: 61_200, output: 14_800, cacheRead: 312_000, cacheWrite: 9_400,
+  cost: 0.384, costKnown: true, costMissing: false, usageRecords: 46, examined: 210,
+  missingInput: 0, missingOutput: 0, missingCacheRead: 0, missingCacheWrite: 0,
+  assistantMissingUsage: 0, summaryMissingUsage: 0, limited: false, fieldsIncomplete: false,
+  ...overrides,
+});
+const sessionFixture = (view = sessionView()) => {
+  const snapshot = fixture();
+  snapshot.sessionUsage = view;
+  return snapshot;
+};
+
 /** Synthetic identity cache for the footer surface; a real session fills this from lifecycle events. */
 const FOOTER_IDENTITY = Object.freeze({ cwd: "~/opensource/pi-hud", provider: "demo", title: "Compare HUDs", branch: "main", branchDirty: true });
-const footerRows = (snapshot, preset, language, width, statuses) => {
-  const config = normalizeConfig({ preset, language, color: false });
+const footerRows = (snapshot, preset, language, width, statuses, extra = {}) => {
+  const config = normalizeConfig({ preset, language, color: false, ...extra });
   const result = formatFooter(snapshot, config, width, FOOTER_IDENTITY).map((row) => row.text);
   result.push(...formatStatusRows(statuses, config, width).map((row) => row.text));
   return result;
@@ -155,6 +170,44 @@ export function renderPreview() {
     const many = new Map();
     for (let index = 0; index < 20; index++) many.set(`ext-${index}`, `status text number ${index}`);
     push(...footerRows(balanced, "balanced", "en", 80, many));
+  }
+  push("");
+  push(
+    "usageScope: session (phase 3 B2a) — full-session ledger totals replace the obs* counters;",
+    "the sess* label leads, then compact markers: ↻ updating, +? incomplete, ? while loading,",
+    "limited* after a saturated sum. ctx(last), CH and tool categories keep their observed scope.",
+    "An unavailable host surface degrades to the observed-labelled fields.",
+    "",
+  );
+  {
+    const config = { usageScope: "session" };
+    push("session ready (en / full / 120 columns)");
+    push(...rows(sessionFixture(), "full", "en", 120, config));
+    push("");
+    push("session updating during a rebuild (old snapshot kept and marked)");
+    push(...rows(sessionFixture(sessionView({ updating: true })), "full", "en", 120, config));
+    push("");
+    push("session partial: two summaries lack usage, so cost keeps its known subtotal +?;");
+    push("missing token fields would mark the same +? next to the label");
+    push(...rows(sessionFixture(sessionView({ fieldsIncomplete: true, costMissing: true, summaryMissingUsage: 2 })), "full", "en", 120, config));
+    push("");
+    push("session loading (zh-CN / full / 120 columns): totals unknown, ctx(last) still observed");
+    push(...rows(sessionFixture(sessionView({ status: "loading", input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, costKnown: false, usageRecords: 0, examined: 0 })), "full", "zh-CN", 120, config));
+    push("");
+    push("session unknown cost (records never reported cost) and saturated sums (full preset)");
+    push(rows(sessionFixture(sessionView({ cost: 0, costKnown: false })), "full", "en", 120, config).at(-1));
+    push(rows(sessionFixture(sessionView({ limited: true })), "full", "en", 120, config).at(-1));
+    push("");
+    push("session scope and markers survive right-edge truncation (en / full / 30 and 38 columns)");
+    for (const width of [30, 38]) push(`${width} columns: ${rows(sessionFixture(sessionView({ fieldsIncomplete: true, updating: true })), "full", "en", width, config).at(-1)}`);
+    push("Counters clip first; the sess* scope and the ↻/+? markers stay readable.");
+    push("");
+    push("session ASCII mode (en / full / 120 columns)");
+    push(...rows(sessionFixture(), "full", "en", 120, { ...config, ascii: true }));
+    push("");
+    push("footer usage row in session mode (en / balanced / 120 then 46 columns)");
+    push(footerRows(sessionFixture(), "balanced", "en", 120, undefined, { usageScope: "session" })[1]);
+    push(footerRows(sessionFixture(sessionView({ fieldsIncomplete: true, costMissing: true })), "balanced", "en", 46, undefined, { usageScope: "session" })[1]);
   }
   return lines.join("\n") + "\n";
 }

@@ -12,9 +12,11 @@ mkdirSync(root, { recursive: true });
 writeFileSync(join(root, "package.json"), '{"private":true,"type":"module"}\n');
 const subscriptions = OBSERVED_EVENTS.map((name) => `pi.on(${JSON.stringify(name)}, (_event, ctx) => { terminalContext(ctx); });`).join("\n");
 writeFileSync(join(root, "contract.ts"), `
-import type { ExtensionAPI, ExtensionContext, ReadonlyFooterDataProvider, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ReadonlyFooterDataProvider, SessionEntry, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
 import { HUD_ROLES, THEME_ROLES } from "../../src/palette.ts";
 import type { FooterDataLike, HudFooterComponent, HudIdentity } from "../../src/footer.ts";
+import type { SessionEntryLike, SessionManagerLike } from "../../src/usage.ts";
+import { SessionUsageLedger } from "../../src/usage.ts";
 declare const pi: ExtensionAPI;
 // Every HUD role token must stay assignable to Pi's ThemeColor union.
 const themeTokens: ThemeColor[] = HUD_ROLES.map((role) => THEME_ROLES[role]);
@@ -77,6 +79,28 @@ pi.on("tool_execution_start", (event) => { const id: string = event.toolCallId; 
 pi.on("tool_execution_end", (event) => { const id: string = event.toolCallId; const error: boolean = event.isError; void id; void error; });
 pi.on("model_select", (event) => { const id: string = event.model.id; const provider: string = event.model.provider; void id; void provider; });
 pi.on("thinking_level_select", (event) => { const level: string = event.level; void level; });
+// Phase 3 B2a: the session usage ledger reads the read-only entry surface at lifecycle
+// boundaries. The structural HUD types must accept the real pinned SDK surfaces.
+pi.on("turn_end", (event) => { const index: number = event.turnIndex; void index; void event.message; void event.toolResults; });
+type SdkReadonlySessionManager = ExtensionContext["sessionManager"];
+type SdkUsage = NonNullable<Extract<SessionEntry, { type: "compaction" }>["usage"]>;
+declare const readonlyManager: SdkReadonlySessionManager;
+const usageManager: SessionManagerLike = readonlyManager;
+const ledger: SessionUsageLedger = new SessionUsageLedger({});
+ledger.restart(usageManager, "contract");
+ledger.onStructural("tree");
+ledger.onStructural("compact");
+ledger.onMessageEnd();
+ledger.requestVerify();
+ledger.deactivate();
+declare const sessionEntry: SessionEntry;
+declare const usage: SdkUsage;
+const structuralEntry: SessionEntryLike = sessionEntry;
+const entryType: unknown = structuralEntry.type;
+const entryParent: unknown = structuralEntry.parentId;
+const entryUsage = structuralEntry.usage;
+const tokenFields: number[] = [usage.input, usage.output, usage.cacheRead, usage.cacheWrite, usage.cost.total];
+void entryType; void entryParent; void entryUsage; void tokenFields;
 const unsubscribe: () => void = pi.events.on("pi-hud:update", (_data: unknown) => {});
 pi.events.emit("pi-hud:update", { version: 1 });
 pi.registerCommand("hud-contract", { description: "contract only", handler: async (_args, ctx) => { terminalContext(ctx); } });

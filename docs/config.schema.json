@@ -49,6 +49,14 @@
       ],
       "default": "pastel"
     },
+    "usageScope": {
+      "enum": [
+        "observed",
+        "session"
+      ],
+      "default": "observed",
+      "description": "observed keeps counters since attach/reset; session additionally builds the optional full-session ledger (reads full history once per baseline; status-marked in the HUD)"
+    },
     "refreshMs": {
       "type": "integer",
       "minimum": 250,

@@ -116,6 +116,26 @@ The widget path with observed usage is the only comparable scenario that got mea
 
 **These are synthetic microbenchmarks, not a live Pi/provider/terminal A/B.** The real-host streaming, tool-dispatch and keyboard-latency acceptance procedure below is still required before any release claim.
 
+## Phase 3 B2a session usage ledger: no performance claim yet
+
+The optional `usageScope: "session"` ledger adds history work that the existing gates do not
+cover: the gates measure hooks and render paths, which the ledger never touches. What is
+already structurally asserted by tests: render performs zero history reads; steady turns
+call `getEntries()` zero times (increments walk `getEntry`/`getLeafId` only, capped at 2048
+records); idle sessions schedule no ledger task; and each baseline keeps exactly one shallow
+entries array for its duration. The 512-entry / ~2 ms slice budget and the 2048-record walk
+cap are the B1 contract's candidate parameters, **not measured results**.
+
+What has **not** been measured (B2b, see the [contract](SESSION-USAGE-CONTRACT.zh-CN.md) and
+[VERIFICATION.md](VERIFICATION.md)): 1k/10k/100k-entry linear and branched histories
+(`getEntries` copy, aggregation CPU, max slice, heap/RSS before and after release, rebuild
+and session-switch cost), the longest uninterruptible event-loop pause via an external
+latency probe, steady-state cost by added-record count (1/32/2048), the over-cap recovery
+path, cancellation while switching sessions quickly, and an interleaved same-machine A/B.
+No end-to-end initialization budget has been approved: until B2b publishes the three-tier
+measurements and the max pause, "imperceptible" must not be claimed for `session` mode, and
+the gate numbers above must not be presented as covering the ledger's background work.
+
 ## Real host checks
 
 The pinned SDK/RPC/PTY checks below are the workflow's real-host gates. They were prepared for CI and, in addition, executed locally in the phase-1 environment; the executed results are recorded in [VERIFICATION.md](VERIFICATION.md).
@@ -136,6 +156,6 @@ Suggested acceptance policy: no reproducible extra stalls, no visible input lag 
 
 ## Diagnostics and failure containment
 
-`/hud status` exposes observation scope, flush count, maximum observed flush duration, render requests, callback errors and bounded-record counts. It intentionally does not time every hot-path callback in production. Benchmarks instrument those callbacks externally. Status output can include the local config path; redact it before sharing.
+`/hud status` exposes observation scope, usage scope and session-ledger diagnostics (status, rebuild reasons/counts, host call counts, missing-field counts, timings), flush count, maximum observed flush duration, render requests, callback errors and bounded-record counts. It intentionally does not time every hot-path callback in production. Benchmarks instrument those callbacks externally. Status output can include the local config path; redact it before sharing.
 
 `/hud off` cancels pending publication/expiry work, disables the optional probe and removes only the named widget. If the footer surface is active and the HUD still owns the slot, `off` also restores the built-in footer; if another extension replaced the HUD footer, `off` leaves that footer untouched. The startup kill switch removes event dispatch overhead too. Session shutdown removes the bus listener, the branch subscription and any footer/widget ownership, and suppresses stale async results. A timeout or malformed config is an unavailable diagnostic, not a reason to stop the model or tool loop.

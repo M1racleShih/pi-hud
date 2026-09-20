@@ -1,5 +1,6 @@
 import { baseName, safeText } from "./text.ts";
 import type { GitStatus } from "./git.ts";
+import type { SessionUsageView } from "./usage.ts";
 
 export const LIMITS = Object.freeze({ tools: 64, recentIds: 128, agents: 16, tasks: 8, toolCategories: 16 });
 /** Display name of the synthetic bucket that merges tool names beyond the retention cap. */
@@ -101,6 +102,12 @@ export interface HudSnapshot {
   taskSources: number;
   toolCategories: ToolCategory[];
   git: GitStatus | null;
+  /**
+   * Published full-session ledger view. Attached by the controller in `usageScope:
+   * "session"`; `null` keeps the observed rendering (including the explicit degradation
+   * when the ledger is inactive or the host API is unavailable).
+   */
+  sessionUsage: SessionUsageView | null;
 }
 
 /** Only bounded scalar summaries are retained. Incoming payloads are never retained. */
@@ -401,6 +408,7 @@ export class HudState {
       taskTotal, taskDone, taskLabel, taskSources: this.tasks.size,
       toolCategories,
       git: this.git,
+      sessionUsage: null,
     };
   }
 }

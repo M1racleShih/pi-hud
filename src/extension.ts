@@ -10,13 +10,15 @@ import { HudFooterView, installFooter as mountFooterSurface, releaseFooter as un
 import type { FooterDataLike, HudFooterComponent } from "./footer.ts";
 import { GitProbe } from "./git.ts";
 import type { GitProbeLike, GitStatus } from "./git.ts";
+import { SessionUsageLedger } from "./usage.ts";
+import type { SessionManagerLike } from "./usage.ts";
 import { displayPath, safeText } from "./text.ts";
 
 export const WIDGET_KEY = "pi-hud";
 export const BRIDGE_EVENT = "pi-hud:update";
 export const OBSERVED_EVENTS: readonly string[] = Object.freeze([
   "session_start", "session_shutdown", "session_info_changed", "agent_start", "agent_end", "agent_settled",
-  "message_end", "tool_execution_start", "tool_execution_end", "session_compact",
+  "turn_end", "message_end", "tool_execution_start", "tool_execution_end", "session_compact",
   "session_tree", "model_select", "thinking_level_select", "ui_prompt_start", "ui_prompt_end",
 ]);
 const sameGit = (a: GitConfig, b: GitConfig) => a.enabled === b.enabled && a.ttlMs === b.ttlMs && a.timeoutMs === b.timeoutMs;
@@ -47,8 +49,15 @@ export interface PiContext {
   thinkingLevel?: string;
   ui: PiUi;
   isIdle(): boolean;
-  /** Present on Pi 0.85.1 event contexts; the HUD only reads the name at lifecycle boundaries. */
-  sessionManager?: { getSessionName?(): string | undefined };
+  /** Read at lifecycle boundaries only (never in render); the session ledger additionally
+   *  uses the read-only entry surface inside its own marked boundary in src/usage.ts. */
+  sessionManager?: {
+    getSessionName?(): string | undefined;
+    getSessionId?(): string;
+    getEntries?(): unknown[];
+    getEntry?(id: string): unknown;
+    getLeafId?(): string | null;
+  };
   /** Some hosts expose the name directly; also read only at lifecycle boundaries. */
   getSessionName?(): string | undefined;
 }
@@ -104,6 +113,7 @@ export class HudController {
   declare footerInstallations: number;
   declare footerReleases: number;
   declare git: GitProbeLike | null;
+  declare ledger: SessionUsageLedger | null;
   declare unsubscribe: (() => void) | null;
   declare configTimer: TimerHandle | null;
   declare expiryTimer: TimerHandle | null;
@@ -143,6 +153,7 @@ export class HudController {
     this.footerInstallations = 0;
     this.footerReleases = 0;
     this.git = null;
+    this.ledger = null;
     this.unsubscribe = null;
     this.configTimer = null;
     this.expiryTimer = null;
@@ -171,12 +182,20 @@ export class HudController {
       switch (name) {
         case "agent_start": this.state!.phase = "working"; this.git?.cancel(); break;
         case "agent_end": this.state!.phase = "settling"; break;
-        case "agent_settled": this.state!.settle(); this.wantGit = true; break;
-        case "message_end": changed = this.state!.messageEnd(event?.message, this.now()); break;
+        case "agent_settled": this.state!.settle(); this.wantGit = true; this.ledger?.requestVerify(); break;
+        case "turn_end": this.ledger?.requestVerify(); changed = false; break;
+        case "message_end":
+          // Observed counters keep their meaning; the session ledger only marks pending
+          // work here and reads the final committed entry at the next reliable boundary.
+          // A pending mark repaints too, so the updating marker shows even when the
+          // observed counters (for example on a toolResult message) did not change.
+          changed = this.ledger?.onMessageEnd() === true;
+          changed = this.state!.messageEnd(event?.message, this.now()) || changed;
+          break;
         case "tool_execution_start": changed = this.state!.startTool(event); break;
         case "tool_execution_end": changed = this.state!.endTool(event); break;
-        case "session_compact": this.state!.compact(); break;
-        case "session_tree": this.resetEpoch(); break;
+        case "session_compact": this.state!.compact(); this.ledger?.onStructural("compact"); break;
+        case "session_tree": this.resetEpoch(); this.ledger?.onStructural("tree"); break;
         case "session_info_changed": this.identity.title = safeText(event?.name, MAX_TITLE); break;
         case "model_select":
           this.state!.setModel(event?.model ?? ctx.model);
@@ -216,6 +235,13 @@ export class HudController {
       intervalMs: this.config.refreshMs, now: this.monotonic,
       setTimer: this.setTimer, clearTimer: this.clearTimer,
     });
+    // The optional full-session ledger shares the injected timers so tests stay
+    // deterministic; it never runs history work inside this lifecycle callback.
+    this.ledger = new SessionUsageLedger({
+      setTimer: this.setTimer, clearTimer: this.clearTimer, monotonic: this.monotonic,
+      onPublish: () => this.request(),
+    });
+    if (this.config.usageScope === "session") this.ledger.restart(this.readUsageManager(ctx), "session-start");
     if (this.pi.events?.on) {
       this.unsubscribe = this.pi.events.on(BRIDGE_EVENT, (payload) => {
         if (!this.enabled) return;
@@ -247,6 +273,12 @@ export class HudController {
       if (typeof ctx.sessionManager?.getSessionName === "function") return ctx.sessionManager.getSessionName();
       return undefined;
     } catch { this.callbackErrors++; return undefined; }
+  }
+
+  /** Structural cast for the ledger; property access stays guarded inside its boundary. */
+  readUsageManager(ctx?: PiContext): SessionManagerLike | null {
+    const manager = ctx?.sessionManager;
+    return manager && typeof manager === "object" ? manager : null;
   }
 
   request() {
@@ -398,10 +430,20 @@ export class HudController {
       this.wantGit = true;
     }
     if (!this.config.enabled) {
+      this.ledger?.deactivate();
       this.scheduler?.cancel(); this.clearExpiry(); this.releaseFooter(); this.detachWidget();
       return;
     }
     if (!previous.enabled) this.resetEpoch();
+    // Scope transitions rebuild the session ledger from scratch: an observed gap is never
+    // continued incrementally, and leaving `session` stops all acquisition immediately.
+    if (this.config.usageScope === "session") {
+      if (previous.usageScope !== "session" || !previous.enabled) {
+        this.ledger?.restart(this.readUsageManager(this.ctx ?? undefined), previous.enabled ? "scope" : "enable");
+      }
+    } else if (previous.usageScope === "session") {
+      this.ledger?.deactivate();
+    }
     // `placement` is a widget-only option: changing it must not disturb an installed footer.
     if (previous.placement !== this.config.placement && this.config.surface === "widget") this.detachWidget();
     this.attachSurface(claim);
@@ -449,6 +491,8 @@ export class HudController {
       this.attachSurface();
       this.syncBranchDirty();
       const snapshot = this.state!.snapshot();
+      // The published ledger view is attached here, never re-read during render.
+      if (this.config.usageScope === "session") snapshot.sessionUsage = this.ledger?.view() ?? null;
       this.view?.publish(snapshot, this.config);
       this.footer?.publish(snapshot, this.config, this.identity);
       this.scheduleExpiry();
@@ -506,6 +550,7 @@ export class HudController {
       version: "0.1.0", targetPi: "0.85.1", enabled: this.enabled,
       mode: this.ctx?.mode ?? "inactive", preset: this.config.preset,
       surface: this.config.surface, surfaceEffective: this.effectiveSurface(),
+      usageScope: this.config.usageScope,
       placement: this.config.placement, surfaceFallback: this.surfaceFallback,
       palette: this.config.palette, color: this.config.color, ascii: this.config.ascii,
       configurationPath: this.configurationPath, configurationError: this.configurationError,
@@ -533,10 +578,16 @@ export class HudController {
         cacheRead: this.state?.cacheRead ?? 0, cacheWrite: this.state?.cacheWrite ?? 0,
         cacheHitRate: this.state?.cacheHit ?? null, cost: this.state?.cost ?? 0,
       },
+      sessionUsage: this.ledger?.inspect() ?? null,
       coverage: {
-        counters: "observed since attach/reset; NOT a full-session ledger (the native footer aggregates every session entry)",
-        context: "last observed assistant snapshot, labelled ctx(last); not the host's live context estimate",
-        cacheHit: "most recent valid assistant: cacheRead / (input + cacheRead + cacheWrite); ? when unknown",
+        counters: this.config.usageScope === "session"
+          ? "session ledger totals over every SessionManager entry (all branches, pre-compaction, summaries); observed counters stay since attach/reset"
+          : "observed since attach/reset; NOT a full-session ledger (the native footer aggregates every session entry)",
+        context: "last observed assistant snapshot, labelled ctx(last); not the host's live context estimate; identical scope in observed and session modes",
+        cacheHit: "most recent valid assistant: cacheRead / (input + cacheRead + cacheWrite); ? when unknown; stays observed-scope even in session mode",
+        sessionLedger: this.config.usageScope === "session"
+          ? (this.ledger?.view() ? "full-session ledger active; status/rebuild/host-call diagnostics above" : "requested but unavailable; explicitly degraded to observed-labelled data")
+          : "inactive; usageScope: session opts in",
         title: "read at session start and on session_info_changed; never in render",
         branch: "footerData.getGitBranch() at install and on onBranchChange; no extra Git process",
         extensionStatuses: "footerData.getExtensionStatuses(); shown only by the footer surface, bounded to 8 entries / 64 chars / 2 rows",
@@ -553,7 +604,13 @@ export class HudController {
       const [command = "", value] = input;
       if (command === "status") { this.notify(JSON.stringify(this.inspect(), null, 2)); return; }
       if (command === "reload") { await this.reloadConfig(true); return; }
-      if (command === "reset") { this.resetEpoch(); this.request(); this.notify("pi-hud observation counters reset"); return; }
+      if (command === "reset") {
+        this.resetEpoch();
+        // The session ledger keeps its definition (not since-reset); a cheap reconciliation
+        // is requested so committed records stay verified after the observation reset.
+        this.ledger?.requestVerify();
+        this.request(); this.notify("pi-hud observation counters reset"); return;
+      }
       if (command === "refresh") { this.wantGit = true; this.request(); return; }
       let next: HudConfig | undefined;
       let claim = false;
@@ -564,6 +621,8 @@ export class HudController {
         next = { ...this.config, surface: value as HudConfig["surface"] };
         // An explicit surface request is the documented way to re-claim a replaced slot.
         claim = true;
+      } else if (command === "scope" && ["observed", "session"].includes(value as string)) {
+        next = { ...this.config, usageScope: value as HudConfig["usageScope"] };
       } else if (command === "preset" && ["minimal", "balanced", "full"].includes(value as string)) {
         next = { ...this.config, preset: value as HudConfig["preset"] };
       } else if (command === "lang" && ["en", "zh-CN"].includes(value as string)) {
@@ -576,7 +635,7 @@ export class HudController {
         next = { ...this.config, placement: value as HudConfig["placement"] };
       }
       if (!next) {
-        this.notify("/hud on|off|toggle · surface widget|footer · preset minimal|balanced|full · palette pastel|theme|mono · lang en|zh-CN · git on|off · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
+        this.notify("/hud on|off|toggle · surface widget|footer · scope observed|session · preset minimal|balanced|full · palette pastel|theme|mono · lang en|zh-CN · git on|off · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
         return;
       }
       // A pending startup load must not overwrite an explicit command.
@@ -584,6 +643,10 @@ export class HudController {
       this.configTimer = null;
       if (next.enabled && command !== "off") this.identity.title = safeText(this.readSessionName(ctx), MAX_TITLE);
       this.applyConfig(next, claim);
+      if (command === "scope") {
+        this.notify(`pi-hud scope ${value} (in-memory; session mode reads full history after this point)`);
+        return;
+      }
       if (command === "surface") {
         this.notify(this.surfaceFallback
           ? `pi-hud surface ${value}: ${this.surfaceFallback}`
@@ -605,6 +668,8 @@ export class HudController {
     this.scheduler = null;
     this.git?.dispose();
     this.git = null;
+    this.ledger?.dispose();
+    this.ledger = null;
     try { this.unsubscribe?.(); } catch { this.callbackErrors++; }
     this.unsubscribe = null;
     // Release our own surfaces in order: footer ownership first, then the widget.

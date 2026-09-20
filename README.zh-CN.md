@@ -2,9 +2,9 @@
 
 [English](README.md) | 简体中文
 
-为 [Pi](https://github.com/earendil-works/pi) 实现的被动、事件驱动 HUD，借鉴 [claude-hud](https://github.com/jarrodwatts/claude-hud) 的信息组织方式，而不是照搬它的 transcript 解析架构。显示模型、上下文快照、有界工具分类活动、已观察到的 token/费用，以及显式接入的子代理和任务进度。默认仍是编辑器旁的命名 widget；可显式启用 **footer 接管模式**，用它替换 Pi 原生 footer，避免同一份信息重复显示。
+为 [Pi](https://github.com/earendil-works/pi) 实现的被动、事件驱动 HUD，借鉴 [claude-hud](https://github.com/jarrodwatts/claude-hud) 的信息组织方式，而不是照搬它的 transcript 解析架构。显示模型、上下文快照、有界工具分类活动、已观察到的 token/费用、可选的**全会话用量账本**，以及显式接入的子代理和任务进度。默认仍是编辑器旁的命名 widget；可显式启用 **footer 接管模式**，用它替换 Pi 原生 footer，避免同一份信息重复显示。
 
-**零运行时依赖；不监听逐 token 事件；不扫描 transcript；不注入提示词；不发起网络请求。额外 Git 探测默认关闭。**
+**零运行时依赖；不监听逐 token 事件；不注入提示词；不发起网络请求。额外 Git 探测默认关闭。** 历史读取仅存在于显式开启的 `usageScope: "session"` 背后，并限制在一个可审计模块内。
 
 ## 预览
 
@@ -31,9 +31,21 @@ footer 主体固定为 **minimal 2 行、balanced 3 行、full 4 行**。其他�
 
 footer 还会显示 widget 没有的身份信息：工作目录（家目录缩写为 `~`）、模型、provider、thinking、会话标题，以及宿主缓存的 Git 分支。分支复用 Pi 的 `footerData.getGitBranch()`/`onBranchChange()`，不会为显示分支额外启动 Git 进程；额外的 dirty 标记仍由独立的 `git.enabled` 探测提供。
 
-footer **不是**原生 footer 的逐字节等价替换。本轮不读取会话历史，因此计数口径仍是“本次挂载/重置以来观察到”，上下文仍是明确标注的 `ctx(last)` 快照；不模仿原生 footer 的全会话合计、实时上下文估计、自动压缩/订阅标记和 provider 数量。`/hud status` 会打印这些覆盖差异。
+footer **不是**原生 footer 的逐字节等价替换。默认不读会话历史，计数口径仍是“本次挂载/重置以来观察到”，上下文仍是明确标注的 `ctx(last)` 快照；设为 `usageScope: "session"` 后用量字段切换为下节的全会话账本；两种模式下都不模仿原生 footer 的实时上下文估计、自动压缩/订阅标记和 provider 数量。`/hud status` 会打印这些覆盖差异。
 
 `minimal` 的活动摘要在第二行与上下文、用量共用空间：如果 40 列终端放不下，优先级更高的上下文留到最后，活动字段整体折叠；`balanced`（默认）与 `full` 为活动单列一行，因此 40 列下上下文百分比、稳定的阶段状态都能保留。
+
+## 用量口径：observed（默认）与 session
+
+`usageScope` 决定用量字段显示哪组数字。默认 `observed` 保持本次挂载/重置以来的低开销计数，完全不访问历史。设为 `session` 时额外建立可选的全会话账本，覆盖当前 SessionManager 的全部 entries（含其他分支、压缩前消息、已出错/中止的响应和摘要记录），与原生 footer 的四类记录规则一致：assistant、带 usage 的 toolResult、compaction、branch_summary。
+
+```text
+ctx(last) ██░░░░░░░░ 45% 90k/200k · 全会话* ↻ ↑61k ↓15k R312k W9.4k CH86.2% · 估算* $0.384
+```
+
+`全会话*` 标签在最前，紧随紧凑标记：`↻` 表示有已追加记录等待下一个可靠提交边界，`+?` 表示存在不完整数据，`?` 表示首次基线仍在装载，饱和截断后显示 `limited*`。费用保留已记录小计：有未知部分显示 `+?`，全部未知显示 `?`，显式报告的零仍视为有效零。两种模式下 `ctx(last)`、`CH` 和工具分类都保持观察口径：全会话合计从不冒充实时上下文估计、累计命中率或本次挂载的活动账本。
+
+账本事件驱动且可取消：一次基线重建分片读取历史（每片 512 条或约 2 毫秒），稳定轮次只沿已提交父链回走新增记录（不再重读全量数组），树导航和压缩各触发一次重建，会话切换或 `/hud off` 立即取消全部任务。宿主缺少只读 entry 接口时显式降级为带 observed 标签的数据，`/hud status` 记录请求范围与实际范围。`usageScope` 与 `surface` 独立：切换 widget/footer 不重置会话账本。完整契约（含缺失数据语义）见 [全会话统计契约](docs/SESSION-USAGE-CONTRACT.zh-CN.md)。
 
 所有权规则：HUD 仍拥有槽位时，`/hud off` 恢复原生 footer；如果其他扩展后来覆盖了 HUD footer，HUD 既不会在 `off`/dispose 时清除对方的 footer，也不会在普通刷新时抢回，只有显式的 `/hud surface footer` 才会重新接管。宿主不提供 `ui.setFooter` 时回退到 widget，并在 `/hud status` 中记录原因。
 
@@ -70,6 +82,7 @@ pi -e /absolute/path/to/pi-hud/index.ts
 | `/hud on`、`/hud off`、`/hud toggle` | 开关 HUD；重新开启时重新计算观察范围。 |
 | `/hud preset minimal\|balanced\|full` | 切换固定布局：widget 一、二、三行；footer 主体二、三、四行。 |
 | `/hud surface widget\|footer` | 切换显示位置；`footer` 替换原生 footer 且不挂载 widget，显式执行该命令可重新接管被其他扩展占用的槽位。 |
+| `/hud scope observed\|session` | 切换用量口径；`observed`（默认）保持挂载以来的计数，`session` 建立全会话账本，每次切换都重建基线。 |
 | `/hud palette pastel\|theme\|mono` | 切换字段配色：HUD 柔和色板（默认）、跟随宿主主题、或不着色。 |
 | `/hud lang en`、`/hud lang zh-CN` | 切换 HUD 标签语言；命令帮助仍为英文。 |
 | `/hud placement aboveEditor\|belowEditor` | 只移动 pi-hud 自己的 widget。 |
@@ -88,6 +101,7 @@ pi -e /absolute/path/to/pi-hud/index.ts
   "surface": "widget",
   "language": "zh-CN",
   "palette": "pastel",
+  "usageScope": "observed",
   "refreshMs": 250,
   "git": { "enabled": false }
 }
@@ -121,6 +135,8 @@ pi -e /absolute/path/to/pi-hud/index.ts
 
 **`obs*` 把 input、output、cacheRead、cacheWrite 分开呈现。** 缓存 token 不会被重复计入新的 input：显示的是 `↑输入`、`↓输出`、`R缓存读`、`W缓存写` 四个独立字段，而不是一个已经合并的数字。`CH` 取最近一次有效 assistant 响应的缓存命中率 `cacheRead / (input + cacheRead + cacheWrite)`；分母为零或 provider 未报告缓存字段时显示 `?`。重置、切换模型和压缩会清除不再适用的命中率，出错或中止的响应也不会覆盖上一次有效值。`obs*`、`last`、`est*` 含义一致：都是本次挂载范围内的有界观察，不是原生 footer 的全会话账本。
 
+**`全会话*`（显式 `usageScope: "session"`）是当前 SessionManager 全部 entries 的账本。** assistant 消息、带 usage 的 toolResult、compaction 和 branch_summary 分别贡献四项 token 和记录中的 `cost.total`；出错/中止响应只要报告了 usage 就计入，重试不会重复计入同一记录。缺失或非法数值会把数据标为不完整（`+?`）而不是被静默丢弃；不带 usage 的 toolResult 只是口径外，不当作未知收费；无 usage 的摘要保留已知 token 小计并把费用标为不完整；饱和求和显示 `limited*`。`/hud reset` 只清观察计数，保留这本账。完整的范围、生命周期与缺失数据语义见 [契约](docs/SESSION-USAGE-CONTRACT.zh-CN.md)。
+
 **“估算*”来自 Pi 的 `usage.cost.total`，不是实际账单或套餐额度。** 缺失数据显示 `?`，部分已知显示 `+?`。历史调用、压缩模型调用、没有进入主助手事件流的子代理费用不会被悄悄算入。不会读取服务商凭据，也不会请求套餐额度接口。
 
 **代理和任务需要显式桥接。** 原生 `subagent` 工具会作为有界分类显示，但单凭工具名无法知道其内部每个子代理的状态。[桥接协议](docs/BRIDGE.md) 允许 subagent 或 `/goal` 扩展发布小型生命周期记录。本版没有宣称自动适配所有第三方插件。
@@ -140,7 +156,7 @@ pi-hud 的路径是：
   → 小型快照 → 缓存的 widget / footer 行 → 只有行变了才 requestRender
 ```
 
-不监听 `message_update`、`tool_execution_update`；不调用 `getBranch()`、`getEntries()`、`getContextUsage()`；不做同步文件/进程操作；不轮询空闲状态；不接管输入或编辑器。`ctx.ui.setFooter` 只在专门的 footer 模块（`src/footer.ts`）里调用，带能力检测和 `tui` 模式判断，其他源文件一旦调用会被 `scripts/check.mjs` 直接判失败。不注册 LLM 工具、不改消息、不写会话。每行由有界的语义片段组成（字段 ≤ 12、片段 ≤ 40）；最终 ANSI 行会被缓存，宿主随模型流重绘时，只要宽度、已发布状态、状态变化和主题失效均未变化就复用同一数组。RPC、JSON、print 模式不创建 HUD 定时器、不读 HUD 配置、不挂 UI。
+不监听 `message_update`、`tool_execution_update`；不调用 `getBranch()`、`getContextUsage()`；不做同步文件/进程操作；不轮询空闲状态；不接管输入或编辑器。`getEntries()`、`getEntry()`、`getLeafId()` 只允许可选的全会话账本模块（`src/usage.ts`）在其标记的历史边界内调用，且只能来自生命周期事件调度的可取消后台任务，绝不在 render 或逐 token 路径；其他源文件一旦调用会被 `scripts/check.mjs` 直接判失败。`ctx.ui.setFooter` 只在专门的 footer 模块（`src/footer.ts`）里调用，带能力检测和 `tui` 模式判断，同一检查也强制该边界。不注册 LLM 工具、不改消息、不写会话。每行由有界的语义片段组成（字段 ≤ 12、片段 ≤ 40）；最终 ANSI 行会被缓存，宿主随模型流重绘时，只要宽度、已发布状态、状态变化和主题失效均未变化就复用同一数组。RPC、JSON、print 模式不创建 HUD 定时器、不读 HUD 配置、不挂 UI。
 
 启动配置读取异步延后；桥接活动最多使用一个过期定时器；可选 Git 具备超时、输出上限、单飞、冷却、取消与过期结果隔离。异步 Git 仍可能争用 CPU 或磁盘，不能把“异步”等同于“没有成本”。
 

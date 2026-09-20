@@ -4,9 +4,9 @@ Planned provider quota and API balance support: [implementation plan (Chinese)](
 
 English | [简体中文](README.zh-CN.md)
 
-A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, and opt-in agent/task progress. The default surface is a named widget next to Pi's built-in footer; an **opt-in footer surface** can replace that footer instead so the same information is not shown twice.
+A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, an **opt-in full-session usage ledger**, and opt-in agent/task progress. The default surface is a named widget next to Pi's built-in footer; an **opt-in footer surface** can replace that footer instead so the same information is not shown twice.
 
-**No runtime dependencies. No token-stream listeners. No transcript scans. No prompt injection. No network requests. Git probing is off by default.**
+**No runtime dependencies. No token-stream listeners. No prompt injection. No network requests. Git probing is off by default.** History reads exist only behind the opt-in `usageScope: "session"` and are confined to one audited module.
 
 ## Preview
 
@@ -33,9 +33,21 @@ The footer body uses **2 rows for `minimal`, 3 for `balanced` and 4 for `full`**
 
 The footer adds identity data that the widget does not show: the working directory (home is abbreviated to `~`), the model, the provider, the thinking level, the session title, and the host's Git branch. The branch comes from Pi's own `footerData.getGitBranch()`/`onBranchChange()` cache, so no extra Git process is started for it; the optional dirty marker still requires the separate `git.enabled` probe.
 
-The footer is **not** a byte-for-byte replacement of the built-in footer. This round does not read session history, so its counters remain "observed since this attachment/reset" and its context value stays the labelled `ctx(last)` snapshot. The host's full-session totals, live context estimate, auto-compaction/subscription flags and provider count are intentionally not imitated. `/hud status` prints the exact data-coverage differences.
+The footer is **not** a byte-for-byte replacement of the built-in footer. By default it does not read session history, so its counters remain "observed since this attachment/reset" and its context value stays the labelled `ctx(last)` snapshot. With `usageScope: "session"` the usage fields switch to the full-session ledger described above; the host's live context estimate, auto-compaction/subscription flags and provider count are intentionally not imitated in either mode. `/hud status` prints the exact data-coverage differences.
 
 In `minimal`, the activity summary shares the second row with the context meter and usage. If a 40-column terminal cannot fit both, the higher-priority context meter wins and the activity fields fold; `balanced` (the default) and `full` give activity its own row, so the context percentage, the stable phase all survive at 40 columns.
+
+## Usage scope: observed (default) or session
+
+`usageScope` selects which numbers the usage fields show. The default `observed` keeps the low-cost counters since this attachment/reset — no history access at all. `session` additionally builds an optional full-session ledger over the current SessionManager's entries (all branches, pre-compaction messages, error/aborted responses and summary records), matching the built-in footer's four record categories: assistant, tool results that carry usage, compaction and branch summaries.
+
+```text
+ctx(last) ██░░░░░░░░ 45% 90k/200k · sess* ↻ ↑61k ↓15k R312k W9.4k CH86.2% · est* $0.384
+```
+
+The `sess*` label leads the field, followed by compact markers: `↻` while appended records wait for the next reliable commit boundary, `+?` when any record reported incomplete data, `?` while the first baseline is still loading, and `limited*` after a saturated sum. Cost keeps its recorded subtotal with `+?` for unknown parts and `?` when nothing is known; an explicit reported zero stays a valid zero. `ctx(last)`, `CH` and the tool categories keep their observed scope in both modes — the session totals never claim to be a live context estimate, a cumulative cache-hit rate or a per-session activity ledger.
+
+The ledger is event-driven and cancelable: one baseline rebuild slices the history (512 entries or ~2 ms per slice), normal turns reconcile only the new records by walking the committed parent chain (never re-reading the whole array), tree navigation and compaction rebuild once, and a session switch or `/hud off` cancels everything immediately. A host without the read-only entry surface degrades explicitly to the observed-labelled fields; `/hud status` records the requested and actual scope. `usageScope` is independent of `surface`: switching widget/footer never resets the session account. The full contract, including the missing-data semantics, is in the [session usage contract](docs/SESSION-USAGE-CONTRACT.zh-CN.md) (Chinese).
 
 Ownership rules: `/hud off` restores the built-in footer while the HUD still owns the slot; if another extension replaced the HUD footer, the HUD neither clears that footer on `off`/dispose nor takes the slot back during a refresh — only an explicit `/hud surface footer` re-claims it. A host without `ui.setFooter` falls back to the widget and records the reason for `/hud status`.
 
@@ -72,6 +84,7 @@ To remove a registered local package, use Pi's package management (`pi remove /a
 | `/hud on`, `/hud off`, `/hud toggle` | Enable or disable the HUD. Enabling starts fresh observation counters. |
 | `/hud preset minimal\|balanced\|full` | Select a fixed one-, two-, or three-row widget layout, or a two-, three-, or four-row footer body. |
 | `/hud surface widget\|footer` | Select the surface. `footer` replaces the built-in footer and mounts no widget; an explicit command re-claims a slot taken by another extension. |
+| `/hud scope observed\|session` | Select the usage scope. `observed` (default) keeps since-attach counters; `session` builds the full-session ledger and re-baselines on every switch. |
 | `/hud palette pastel\|theme\|mono` | Select the field colors: the HUD's pastel palette (default), host theme tokens, or no color. |
 | `/hud lang en` or `/hud lang zh-CN` | Switch display labels. Command help remains English. |
 | `/hud placement aboveEditor\|belowEditor` | Move only the named HUD widget. |
@@ -90,6 +103,7 @@ Use one alternative, not a literal `|`, in commands. Changes are in-memory and a
   "surface": "widget",
   "language": "en",
   "palette": "pastel",
+  "usageScope": "observed",
   "refreshMs": 250,
   "git": { "enabled": false }
 }
@@ -123,6 +137,8 @@ Styling is semantic and per field, not per row. Plain text is laid out and trunc
 
 **`obs*` reports input, output and both cache counters separately.** Cached tokens are never added to fresh input again, so `↑in`, `↓out`, `RcacheRead` and `WcacheWrite` are the four reported fields instead of one merged number. `CH` is the cache-hit rate of the most recent assistant response with valid usage: `cacheRead / (input + cacheRead + cacheWrite)`, shown as `?` when that denominator is zero or the provider reported no cache data. Reset, a model switch and compaction clear a rate that no longer applies; aborted or errored responses never replace the last valid one. `obs*`, `last` and `est*` all mean the same thing: a bounded observation from this attachment, not the built-in footer's full-session ledger.
 
+**`sess*` (opt-in `usageScope: "session"`) is the full-session ledger** over every entry the current SessionManager holds. Assistant messages, tool results that report usage, compaction and branch summaries each contribute their four token fields and their recorded `cost.total`; error/aborted responses count when they reported usage, and a retry never double counts the same record. Records with missing or invalid numbers mark the data incomplete (`+?`) instead of being silently dropped; a usage-less tool result is simply out of scope, never an unknown charge; a summary without usage keeps the known token subtotals and marks the cost incomplete; saturated sums show `limited*`. `/hud reset` clears the observed counters but keeps this account. See [the contract](docs/SESSION-USAGE-CONTRACT.zh-CN.md) for the exact scope, lifecycle and missing-data semantics.
+
 **`est*` is a model-pricing estimate**, using Pi's reported `usage.cost.total`, not a bill or subscription allowance. Missing reports display `?`; partly known costs have `+?`. Historical, compaction-model, and unreported child-agent usage are not silently included. No provider credentials or subscription endpoints are read.
 
 **Agents/tasks appear only through an explicit extension bridge.** A native `subagent` tool can appear as a bounded tool category, but that alone does not reveal its internal children. [Bridge protocol and examples](docs/BRIDGE.md) let a subagent or `/goal` extension publish small lifecycle records. There is no universal, preinstalled adapter for every third-party extension.
@@ -139,7 +155,7 @@ native lifecycle/tool/final-message events
                                    -> requestRender only when lines change
 ```
 
-There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getEntries()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. `ctx.ui.setFooter` is called only from the dedicated footer surface module (`src/footer.ts`), behind a capability check and a `tui`-mode guard; `scripts/check.mjs` fails the build if any other file calls it. A row is a bounded list of semantic segments (at most 12 fields and 40 segments); the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, a status change or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
+There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. `getEntries()`/`getEntry()`/`getLeafId()` may be called only by the optional session usage ledger (`src/usage.ts`) inside its marked history boundary, and only in cancelable background tasks scheduled from lifecycle events — never in render or per-token paths; `scripts/check.mjs` fails the build if any other file calls them. `ctx.ui.setFooter` is called only from the dedicated footer surface module (`src/footer.ts`), behind a capability check and a `tui`-mode guard; the same check enforces that boundary. A row is a bounded list of semantic segments (at most 12 fields and 40 segments); the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, a status change or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
 
 A startup file read is deferred and asynchronous. A bridge record may schedule one bounded expiration timer. The optional Git subprocess has a timeout, output cap, single-flight gate, cooldown, cancellation, and stale-result protection; “asynchronous” does **not** mean it is free of CPU/I/O contention.
 

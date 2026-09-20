@@ -18,7 +18,7 @@ The [entry point](https://github.com/jarrodwatts/claude-hud/blob/939eb66485832de
 
 That design can be appropriate across short-lived status-line invocations, but a continuously changing transcript defeats the unchanged-file cache and makes input work proportional to history on misses. **This is a complexity observation, not a claim that Claude HUD is observably slow in practice.**
 
-**Pi decision:** observe finalized native events once, keep bounded in-memory summaries, never open transcripts and never walk `sessionManager.getBranch()` in render or event callbacks. Counters explicitly start at HUD attachment/reset; history is not secretly reconstructed. Resume/tree changes start a new observation epoch.
+**Pi decision:** observe finalized native events once, keep bounded in-memory summaries, never open transcripts and never walk `sessionManager.getBranch()` in render or event callbacks. Counters explicitly start at HUD attachment/reset; history is not secretly reconstructed. Resume/tree changes start a new observation epoch. **Later update (phase 3 B2a):** an explicit `usageScope: "session"` opt-in adds the full-session usage ledger ([usage.ts](../src/usage.ts), contract in [SESSION-USAGE-CONTRACT.zh-CN.md](SESSION-USAGE-CONTRACT.zh-CN.md)): it aggregates the manager's read-only entries in sliced, cancelable background tasks — never in render — reconciles steady turns against the committed parent chain, and marks missing data instead of guessing it. This is an audited exception to the "no history reads" default, not a change to that default.
 
 ## 3. VCS acquisition is optional work with a real cost
 
@@ -43,7 +43,7 @@ The [custom-footer example](https://github.com/earendil-works/pi/blob/v0.85.1/pa
 ## 6. Data semantics, not feature-shaped guesses
 
 - **Context:** `input + cacheRead + cacheWrite + output` from the last completed successful assistant response, divided by that model's context window. It is labelled **ctx(last)**, not exact live context. New user/tool text is not counted until a later response reports usage. Compaction/model change/reset invalidates it. Unknown remains unknown.
-- **Cost:** sum of observed assistant `usage.cost.total`, explicitly estimated and since attachment. Not an invoice, account balance, subscription quota, cross-session ledger or complete session bill. Compaction/subagent costs are not silently added.
+- **Cost:** sum of observed assistant `usage.cost.total`, explicitly estimated and since attachment. Not an invoice, account balance, subscription quota, cross-session ledger or complete session bill. Compaction/subagent costs are not silently added. **Session mode (phase 3 B2a)** sums recorded `cost.total` across the four native record categories with explicit unknown (`?`) and partial (`+?`) states; it still never re-prices history with current model prices and never queries a balance endpoint.
 - **Tools:** native start/end IDs and error flags; no transcript, output-text parsing or shell-command display.
 - **Agents/tasks:** a versioned opt-in event-bus bridge. An arbitrary third-party `subagent` tool is visible as a tool, but its children are not invented. Adapters emit actual lifecycle/progress facts. Bounded expiry prevents abandoned running badges living forever.
 - **Subscription quota:** not implemented. Claude-specific credential access or provider endpoints are not a portable Pi API.

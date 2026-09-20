@@ -2,6 +2,10 @@
 
 状态：P0（分字段配色与语义片段渲染）、P2（活动表现）与 **P1 阶段 A（可选 footer 接管与基础数据适配）** 已实现并完成可执行验证，2026-09-20。P1 阶段 A 交付的是**显式启用**的 `surface: footer`：默认仍是 widget，尚未宣称与原生 footer 完全等价替换；原生 footer 的全会话合计、实时上下文估计、自动压缩/订阅标记与 provider 数量仍不在覆盖范围内。本文是优化设计，不代表默认行为已经切换。依据：用户对比截图、当前 pi-hud 源码、本地 Pi 0.85.1 SDK 的实际实现。
 
+## 第三阶段 B1 后续核对（2026-09-20）
+
+统计契约见 [全会话统计契约](SESSION-USAGE-CONTRACT.zh-CN.md)：B2a（实现轮）已于 2026-09-20 交付可选的 `usageScope: session` 账本，B2b（长历史性能测量与真实宿主验收）待执行。固定 SDK 核对补充：正常追加可通过公开 getLeafId/getEntry 追踪，message_end 发生在最终替换及追加之前；provider 数量已有 getAvailableProviderCount 缓存 getter，不能与缺少完整公开来源的 auto/sub 标记混为一谈。下文“当前 input 合并缓存”是阶段 A 之前的背景描述，现有代码已拆分四项。
+
 ## 实施状态（2026-09-20）
 
 ### 本轮已实现（P0）

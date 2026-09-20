@@ -16,7 +16,7 @@ Claude HUD 借助 Claude Code 的原生 statusline：宿主传入 stdin JSON，�
 
 **Git 展示背后不止一次 Git 命令。** 原实现可涉及 ref、status、numstat、上下游差异和 remote，并带有超时处理。这里没有证据说明 Claude HUD 在用户机器上必然很慢；我们据此判断的只是复杂度和额外工作的来源。对于你要求的“核心循环不能有可感知影响”，默认不重复执行这些工作更稳妥。
 
-**Pi 的示例也不等于生产性能最佳实践。** 官方 custom-footer 示例在 render 中遍历 session branch 统计 token。它能说明 API 用法，但会把历史长度引入渲染成本。本项目不扫描 branch，不解析 transcript，也不覆盖 footer 来获得 Git 信息。
+**Pi 的示例也不等于生产性能最佳实践。** 官方 custom-footer 示例在 render 中遍历 session branch 统计 token。它能说明 API 用法，但会把历史长度引入渲染成本。本项目不扫描 branch，不解析 transcript，也不覆盖 footer 来获得 Git 信息。**后续更新（第三阶段 B2a）**：显式 `usageScope: "session"` 新增了可选的全会话用量账本（[usage.ts](../src/usage.ts)，契约见 [SESSION-USAGE-CONTRACT.zh-CN.md](SESSION-USAGE-CONTRACT.zh-CN.md)）：在可取消的后台任务里分片聚合 manager 的只读 entries，绝不在 render 中读历史；稳定轮次只沿已提交父链核对新增记录；缺失数据显式标记而非猜测。这是对“默认不读历史”的受审计例外，默认行为不变。
 
 ## pi-hud 的实现边界
 
@@ -32,7 +32,7 @@ Pi 的 `hasUI` 在 RPC 模式也可能为真，所以严格检查 `mode === "tui
 
 上下文条显示“上次已完成响应的 token 快照”，由 input、cacheRead、cacheWrite、output 相加，并使用对应模型的上下文窗口作为分母。新增用户内容和工具结果尚未被下一次响应统计时，这不是精确实时上下文。压缩、模型切换后显示未知，不显示虚假的 0%。
 
-费用只是 HUD 启用后所观察到的 assistant `usage.cost.total` 估算累加，不是账户账单或订阅额度，不包含旧历史、其他子代理或压缩请求的完整费用。为了不扫描历史，续接会话后不会凭空恢复全会话累计值。这是明确的性能取舍，而不是漏实现后仍宣称“全会话准确”。
+费用只是 HUD 启用后所观察到的 assistant `usage.cost.total` 估算累加，不是账户账单或订阅额度，不包含旧历史、其他子代理或压缩请求的完整费用。为了不扫描历史，续接会话后不会凭空恢复全会话累计值。这是明确的性能取舍，而不是漏实现后仍宣称“全会话准确”。**后续更新（B2a）**：显式 session 口径下，费用改为四类原生记录中已上报 `cost.total` 的累计，未知显示 `?`、部分已知显示 `+?`，仍不按当前模型价格重算历史，也不查询余额接口。
 
 工具运行状态直接取自 Pi 原生事件。子代理和待办则通过版本化 event-bus 协议接入：扩展真正知道进度时才上报。对于任意第三方 subagent 插件，不解析自然语言猜测子任务完成情况，也不宣称自动兼容。
 

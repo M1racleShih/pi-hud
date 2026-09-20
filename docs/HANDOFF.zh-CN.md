@@ -30,14 +30,14 @@
 
 - B2b（本轮）已通过：npm run verify（244 项测试、仓库检查、性能门禁全不变）、npm run package:check、固定 SDK 检查（sdk-check、usage-oracle-check）、RPC/PTY 冒烟、长历史基准（docs/performance-b2b-ledger.json）、8 组交替 A/B（docs/performance-b2b-usage-ab.json）、真实宿主 9 场景（docs/host-acceptance-b2b.json）、20 组真实 TUI 流式/工具/键盘 A/B（docs/pi-stream-ab-b2b.json）。
 - B2b 关键实测结论：附挂 3.1/3.3ms（1k）→ 20.9/23.1ms（10k）→ 202/231ms（100k，含 SDK 自身 2.0–2.9ms 的 O(N) getEntries 同步复制）；分片最大 0.23–0.70ms（预算 2ms 不变）；稳态增量只随新增条数增长且 getEntries 保持 0 次；session 模式稳态边际成本约 +1.0µs 账本核对 + ~0.9µs 发布/轮，另 ~1.0µs/次 sess* 渲染；真实 TUI（两种配置各 20 对）所有时间指标均在同机噪声包络内；按原始终端字节计的确定性成本为每轮约 +0.9–1.0 KiB、每次流式回复 +1.0 KiB（footer）至 +2.6 KiB（widget），另一次约 320–460 字节的合并发布（完成后约 150ms）。
-- 仍未验（不得宣称）：完整版真人视觉验收（精简核心项已通过，剩余宽度档/浅色真实会话/B6 逐字段对照/部分状态未覆盖，见结果文件）、跨平台矩阵、真实付费 provider 流式 A/B（明确不使用付费 provider）、流中 resize/压缩/中止重试等剩余实时场景。
+- 仍未验（不得宣称）：完整版真人视觉验收（精简核心项已通过，剩余项被所有者明示接受，见结果文件）、真实付费 provider 流式 A/B（明确不使用付费 provider）、流中 resize/压缩/中止重试等剩余实时场景。跨平台矩阵已通过（35541018928）。
 - 默认 footer 切换评估已完成：结论为“当前不切换，有条件重评”，见 [DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)；widget + observed 保持默认，本轮未改任何默认或用户配置。
 
 ## B2b 之后的待验清单（本轮更新）
 
 1. B2b 评审：**已完成**（5333c7d 经三轮复审通过，见 .tmp/review/b2b-review-round3.md；B2b 数据不重做）。
 2. 真人深浅色终端视觉验收：**精简核心项已通过（口述转录，见 [VISUAL-ACCEPTANCE-RESULTS.zh-CN.md](VISUAL-ACCEPTANCE-RESULTS.zh-CN.md)）**；宽度逐档、浅色真实会话、B6 逐字段对照与部分状态仍未覆盖。补齐或由所有者明示接受当前覆盖度，均可满足决策记录的重评条件 1。
-3. 跨平台矩阵（CI 运行 Linux/macOS/Windows × Node 22.19.0/24）：未执行。
+3. 跨平台矩阵（CI 运行 Linux/macOS/Windows × Node 22.19.0/24）：**已执行通过**（运行 35541018928，8/8 job；Windows CRLF 问题由 `.gitattributes` 修复）。
 4. 默认 footer 切换：**独立评估已完成**，结论“当前不切换；视觉验收、字段缺口取舍、跨平台、实时场景、所有者批准全部满足后重评”，见 [DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)。
 
 ## 另一台电脑恢复
@@ -79,7 +79,7 @@ B2b（验收轮）与三轮 review 已完成；后续材料已交付；视觉验
 
 1. 字段缺口书面取舍（决策记录条件 2）：**已闭合（2026-09-20）**——所有者书面接受缺口（footer 接管模式无 auto/sub/xp，ctx 为快照），见决策记录追加节。
 2. 视觉验收覆盖度处置（条件 1）：**已闭合（2026-09-20）**——所有者明示接受精简覆盖度（宽度逐档、浅色真实会话、B6 逐字段对照、部分状态以 ➖ 未覆盖形式被明确接受）。
-3. CI 跨平台矩阵（条件 3）：**进行中（2026-09-20）**——所有者授权解除"不推送"约束，推送触发 GitHub Actions；是否通过以 Actions 运行记录为准。
+3. 跨平台矩阵（条件 3）：**已闭合（2026-09-20）**——Actions 运行 35541018928 全部 8 个 job 通过（ubuntu/macos/windows × Node 22.19.0/24、性能门禁、Pi 0.85.1 契约与 RPC）；首轮 Windows CRLF 失败已由 `.gitattributes`（`c0f0948`）修复。
 4. 剩余实时协议场景（条件 4）：未闭合（流中 resize、测量中实时压缩、abort/重试、第二并发扩展 widget；补齐或豁免）。
 5. 全部满足后由所有者批准单独的默认切换变更（条件 5，两步走且不连带，见决策记录）。
 
@@ -99,7 +99,7 @@ B1 契约约束仍然全部有效：
 B2b、三轮 review、B2b 后续材料均已交付，不要重做。视觉验收已精简执行并转录收紧
 （docs/VISUAL-ACCEPTANCE-RESULTS.zh-CN.md），所有者已接受当前覆盖度（条件 1 闭合）
 并书面接受字段缺口（条件 2 闭合，见决策记录追加节）。保持 observed 与 widget 默认。
-跨平台矩阵已推送触发 CI（条件 3 进行中，结果以 Actions 为准）；剩余实时场景
+跨平台矩阵已通过（条件 3 闭合，运行 35541018928）；剩余实时场景
 （条件 4）未闭合；条件 5 需所有者单独批准。不新增额度功能；推送仅限本决策
 授权，发布（release）仍需单独授权。
 ```

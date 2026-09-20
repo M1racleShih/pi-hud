@@ -1,6 +1,6 @@
 # 第三阶段 B1：全会话用量统计契约
 
-日期：2026-09-20。项目审查基线：`94676b3`。状态：**B2a 已实现（源码+测试+固定 SDK 核对，2026-09-20）；B2b（长历史性能测量与真实宿主验收）待执行**。本轮实现见 [验证记录](VERIFICATION.md) 的“Phase 3 B2a”一节与文末的 B2b 待验清单。
+日期：2026-09-20。项目审查基线：`94676b3`。状态：**B2a 已实现；B2b（长历史性能测量与真实宿主验收）已执行（2026-09-20，见文末）**。实测数据见 [PERFORMANCE.md](PERFORMANCE.md) 与 [VERIFICATION.md](VERIFICATION.md) 的 Phase 3 B2b 一节。
 
 [交接](HANDOFF.zh-CN.md) · [视觉/footer 规划](VISUAL-FOOTER-PLAN.zh-CN.md) · [当前架构](ARCHITECTURE.md) · [验证记录](VERIFICATION.md)
 
@@ -161,16 +161,20 @@ B2 不扩展这两个字段为历史重建或实时估计：保留当前 observe
 - 数值：四项 token 独立累计；非负有限数才计入，否则该字段计为未知（`+?`）；assistant 缺 usage 标记数据不完整；无 usage 的 toolResult 仅口径外；无 usage 的摘要保留 token 小计、费用计不完整；cost=0 为有效零；费用全未知显示 `?`；饱和显示 `limited*`。
 - 展示：`sess*`（中文 `全会话*`）标签在最前，随后 `↻`（更新中，ASCII `~`）、`+?`（不完整）、`?`（装载中）、`limited*`（饱和）等紧凑标记**始终位于数值之前**，右缘截断先删数值，被裁剪的饱和值不会丢失提示；费用字段独立携带同样的 sess* 范围与状态标记（balanced widget 与窄屏 footer 不显示 token 字段时仍自描述，费用自身的不完整显示在数值后、其余不完整显示在标记上，不重复）；宿主缺少只读接口时显式降级为 observed 标签；诊断公开 status/updating/重建原因与次数/host 调用次数/字段缺失数/耗时等有界标量。二次追赶失败留下的覆盖缺口在下一次成功锚定核对提交该段记录时确认补齐并清除（真实字段缺失/饱和仍保持 partial）；补齐发布即使无待处理标记也会通知 UI。
 - 验证：244 项测试（新增 46 项覆盖正确性矩阵及两轮评审修复）、独立 oracle、`scripts/usage-oracle-check.mjs`（真实 SessionManager + SDK 自带 usage-totals 作为 oracle，含 resetLeaf 回根与超限追加恢复场景）、固定 SDK 类型检查、`npm run verify`、`npm run package:check` 全部通过。详见 [VERIFICATION.md](VERIFICATION.md)。
-- 仍未做（不得宣称）：1k/10k/100k 长历史测量、稳态增量成本测量、同机交替 A/B、真实宿主（resume/压缩/树导航/双 footer 扩展）验收、流式验收、默认 footer 切换评估。
+- B2b 已执行（见文末“B2b 实测结果”）：长历史测量、稳态增量、同机交替 A/B、真实宿主（resume/压缩/树导航/双 footer）与流式验收全部完成；默认 footer 切换评估仍未进行。
 
-## B2b 待验清单（下一轮）
+## B2b 实测结果（2026-09-20，验收轮）
 
-1. 按“测量设计”构造 1k/10k/100k 线性与分支 fixture（固定 seed、比例、内容大小，记录 Node/CPU/OS、SDK lock hash、前后提交与 dirty 状态）：分别报告 getEntries 同步复制、汇总 CPU/总耗时、最大单片耗时、峰值与释放后 heap/RSS、重建与会话切换成本；用事件循环延迟/外部输入探针区分“让出后总耗时”与最长不可中断停顿。
-2. 每档规模另测新增 1/32/2048 条的稳定核对：getEntries 调用数保持 0，成本随新增条数而非历史规模增长；超过 2048 上限的恢复路径单独测量。
-3. 至少 8 组同机交替微基准 A/B（session 模式 on/off），报告绝对与相对变化；后台重建不得藏进 hook/render 低耗时数字。
-4. 真实宿主验收：真实长历史 resume、真实压缩（含相同 summary）、真实树导航、模型切换、双 footer 扩展共存、快速切换会话时的取消释放；核对 `/hud status` 诊断。
-5. 真实流式/工具/键盘验收仍按 PERFORMANCE.md 的至少 20 组交替方案执行。
-6. 数据覆盖与性能验收都通过后，再单独评估是否切默认 footer（不改配置默认值，不自动迁移）。
+按“测量设计”全部执行；工具入库（scripts/usage-fixtures.mjs、usage-ledger-bench.mjs、usage-ledger-bench-run.mjs、usage-ab.mjs、usage-ab-run.mjs、usage-session-file.mjs、session-file-oracle.mjs、pi-host-acceptance.py、pi-stream-ab.py、tests/fixtures/*），原始 JSON 在 docs/ 下。
+
+- **附挂成本**（真实 SessionManager，线性/分支）：1k 2.2/3.3ms、10k 20.8/23.9ms、100k 199/234ms（含 SDK 自身 O(N) getEntries 复制 2.05/2.37ms）。最大分片 0.25–0.67ms，预算 2ms 不变。100k 附挂最长事件循环停顿 3.3–6.9ms，主要成分为 SDK 复制+首片+一次 GC；分片不能补救 SDK 复制这一步（契约已明示）。
+- **稳态增量**：每档 +1/+32/+2048 条，getEntries 新增调用恒为 0（断言）；账本内部增量 0.065–0.46ms，只随新增条数增长。超 2048 上限路径：丢弃整批、恰好一次恢复重建（1k 12.1–12.3ms、100k 208–245ms），failureReason 恢复后清空。恢复再失败路径在每档单独测量：6240 条跨基线与其恢复重建的追加在扰动期间产生可见失败/覆盖缺口，防自延续守卫保持为恰好一次恢复重建，下一个事件边界的锚定核对一次性补齐全部缺口（与 oracle 对齐）。切片期间的追赶在所有规模均被触发并验证。100k 基线进行中快速切会话：同步取消 16–30µs，旧 generation 不发布。
+- **内存**：释放后保留 0.01–2.1MiB（含 V8 碎片影响）；峰值读数需要零工作对照窗口（同探针同时长无账本工作在压缩后堆上同样增长 54.9MiB）与沉淀 GC，单次 GC 前后差会把加载阶段垃圾归因到附挂阶段。
+- **A/B**：8 组交替 observed/session：完整轮次 +1.2µs、sess* 渲染 +1.5µs、hook 与缓存路径不变；门禁未放宽且全部通过。
+- **真实宿主**：9 场景全部通过与独立文件 oracle 精确对齐（10k 分支 resume、真实 read 工具轮次、同 summary 双压缩（SDK find(summary) 命中旧 entry 的边界真实发生）、树导航+回根+重追加、模型切换、快速切会话、双 footer 两种 -e 顺序（HUD 延迟配置挂载总是落在所有 session_start 之后，启动时拥有槽位；启动后手动接管→HUD 抑制不清除；/hud surface footer 重夺）、后置异步 message_end 替换扩展（账本按最终记录计数）。
+- **真实 TUI 流式/工具/键盘 A/B**：20 组交替；热态 token 间隔 ±1.4% 内一致、键盘回显与工具轮次在噪声内；HUD 每轮真实终端成本为一次约 455 字节 footer 发布（约 150ms 合并窗口后），maxFlushMs 保持个位数毫秒。
+- **修复**：accumulateUsage 每记录元组数组（100k 约 24MiB 垃圾）→ TOKEN_FIELDS 模块常量；/hud status 诊断新增 totals（有界标量，便于真实宿主对 oracle 核对）。
+- **发现的上游事实**（非 HUD 缺陷）：Pi 0.85.1 原生 footer 对无 usage 的 assistant 消息会 addUsageToTotals(undefined) 崩溃，真实 provider 会话总是携带 usage，故仅影响含缺失 usage 的合成会话文件；验收夹具对这类记录注入确定性 usage。B2b 期间未放宽任何门槛，未切默认 footer。
 
 核对文件的 SHA-256（用于后续确认审查版本，不替代依赖锁文件）：
 

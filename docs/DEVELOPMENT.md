@@ -54,6 +54,28 @@ python3 scripts/pi-pty-smoke.py
 
 The SDK check type-checks the pinned `ExtensionAPI`/`Theme` contracts, the bridge example, the HUD's theme-role tokens against Pi's `ThemeColor` union, and the footer surface: the HUD's structural `FooterDataLike` must accept Pi's real `ReadonlyFooterDataProvider`, `setFooter(factory)`/`setFooter(undefined)` must match `Component & { dispose? }`, and the session-name/`session_info_changed` surfaces are asserted too. Since phase 3 B2a it also type-checks the session usage ledger contract: `SessionManagerLike` must accept the real `ExtensionContext["sessionManager"]`, `SessionEntryLike` must accept real `SessionEntry` values, and `pi.on("turn_end")` plus the public ledger lifecycle must exist. `usage-oracle-check.mjs` additionally runs the ledger against real `SessionManager.inMemory` histories and compares the totals with the SDK's own `createUsageTotals`/`addUsageToTotals` (no network, model, credentials or file persistence). The PTY script requires a Unix-like environment. SDK checks and examples use the actual pinned TypeScript API; implementation behavior remains covered by separate runtime tests. RPC and PTY smoke use disposable homes/workspaces with no provider credentials and make no model requests. The PTY smoke loads `examples/bridge-demo.ts` and `examples/status-demo.ts`, switches presets/surface/palette, verifies that the built-in footer is replaced and later restored, checks an independent `setStatus` update, and resizes the real TUI, but it is not a streaming A/B. A real streaming A/B is a separate acceptance step.
 
+### B2b reproducible measurement and acceptance tools (pinned SDK required)
+
+```sh
+node scripts/usage-ledger-bench-run.mjs --json=docs/performance-b2b-ledger.json   # 1k/10k/100k x linear/branched
+node scripts/usage-ab-run.mjs --pairs=8 --json=docs/performance-b2b-usage-ab.json  # interleaved observed/session A/B
+python3 scripts/pi-host-acceptance.py --json=docs/host-acceptance-b2b.json          # 9 real-TUI scenarios
+python3 scripts/pi-stream-ab.py --pairs=10 --json=docs/pi-stream-ab-b2b.json        # 20 live streaming/tool/keyboard trials
+node scripts/usage-session-file.mjs /tmp/s.jsonl --size=10000 --shape=branched      # build a resumable fixture session
+node scripts/session-file-oracle.mjs /tmp/s.jsonl                                   # independent file oracle
+```
+
+All of them run offline with the deterministic in-process fixture provider
+(`tests/fixtures/fixture-provider.ts`, loaded via `pi -e`; zero network, credentials or
+billing) in disposable homes/workspaces. The ledger benchmark spawns one child per cell
+with `--expose-gc`; every timing is asserted against the fixture oracle before being
+recorded, and heap attribution uses settling GCs plus a zero-work control window (see
+[PERFORMANCE.md](PERFORMANCE.md)). The host acceptance compares the published ledger
+totals (from `/hud status` diagnostics) with `session-file-oracle.mjs` over the live
+session file at every checkpoint. Supporting fixtures live in `tests/fixtures/`
+(`fixture-provider.ts`, `replacer-extension.ts`, `other-footer.ts`); they are test-only
+and not part of the shipped package.
+
 For a new phase, copy `scripts/perf-ab.mjs` into a `git worktree` of the pre-change commit and run `node scripts/perf-ab-run.mjs --before=<worktree> --after=. --pairs=8 --json=docs/performance-phaseN-ab.json`. The probe imports `src/footer.ts` dynamically, so a tree without that module reports the footer scenarios as new instead of failing; the runner records them with `before: null` rather than a fake comparison.
 
 Direct SDK packages are pinned; the network-installed host's transitive dependency tree is not vendored in this source delivery. Review dependency changes and record the resolved `.tmp/sdk/package-lock.json` for reproducible host investigations. The root lockfile intentionally has zero dependencies.

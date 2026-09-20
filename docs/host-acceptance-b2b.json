@@ -1,0 +1,144 @@
+{
+  "generatedAt": "2026-09-20T18:04:43+0800",
+  "passed": true,
+  "durationSeconds": 51.9,
+  "environment": {
+    "node": "v24.18.0",
+    "pi": "0.85.1 (isolated .tmp/sdk)",
+    "provider": "deterministic in-process fixture (zero network/billing)"
+  },
+  "results": [
+    {
+      "scenario": "resume-10k",
+      "passed": true,
+      "note": "10,000-entry branched resume in the real TUI; ledger == independent file oracle",
+      "ledger": {
+        "input": 642454429,
+        "output": 4074603,
+        "cacheRead": 44388377,
+        "cacheWrite": 878548,
+        "cost": 40372.51999999996,
+        "usageRecords": "8147"
+      },
+      "oracle": {
+        "input": 642454429,
+        "output": 4074603,
+        "cacheRead": 44388377,
+        "cacheWrite": 878548,
+        "cost": 40372.51999999996,
+        "usageRecords": 8147
+      },
+      "diagnostics": {
+        "status": "partial",
+        "rebuilds": "1",
+        "getEntries": 1,
+        "lastBaselineMs": "43.680282000000034",
+        "maxChunkMs": "0.7011029999999892",
+        "failureReason": "null"
+      },
+      "waitReadySeconds": 0.64
+    },
+    {
+      "scenario": "live-turn",
+      "passed": true,
+      "note": "real read-tool turn reconciled incrementally; getEntries stayed at 1",
+      "before": {
+        "input": 4329873,
+        "usageRecords": "130"
+      },
+      "after": {
+        "input": 4331876,
+        "usageRecords": "132"
+      },
+      "getEntries": 1,
+      "oracle": {
+        "input": 4331876,
+        "usageRecords": 132
+      }
+    },
+    {
+      "scenario": "compact-twice",
+      "passed": true,
+      "note": "two live /compact runs with the same summary; both counted exactly once",
+      "sameSummaryEntries": 12,
+      "before": 6505282,
+      "afterFirst": 6506284,
+      "afterSecond": 6516299,
+      "oracle": {
+        "input": 6516299,
+        "usageRecords": 202
+      },
+      "rebuilds": "3"
+    },
+    {
+      "scenario": "tree-branch",
+      "passed": true,
+      "note": "branch via /tree navigation + decline summary, then root navigation (leaf reset) + re-append; totals == full-history oracle",
+      "before": 723827,
+      "afterBranch": 724828,
+      "afterRoot": 725830,
+      "oracle": {
+        "input": 725830,
+        "usageRecords": 28
+      },
+      "rebuilds": "3",
+      "recoveries": "0",
+      "failureReason": "null"
+    },
+    {
+      "scenario": "model-switch",
+      "passed": true,
+      "note": "fixture-alpha -> fixture-beta mid-session; session totals keep accumulating across models",
+      "before": 3595805,
+      "afterFirstTurn": 3596806,
+      "afterSecondTurn": 3597808,
+      "oracle": {
+        "input": 3597808,
+        "usageRecords": 100
+      }
+    },
+    {
+      "scenario": "fast-switch",
+      "passed": true,
+      "note": "/new during the 10k baseline; the stale generation never published",
+      "newSessionTotals": {
+        "input": 0,
+        "output": 0,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "usageRecords": "0"
+      },
+      "status": "ready",
+      "rebuilds": "1"
+    },
+    {
+      "scenario": "dual-footer-hud-first",
+      "passed": true,
+      "note": "HUD owns the slot at startup in both -e orders (deferred attach runs after session_start); a post-startup claim suppresses the HUD without clearing the other footer; /hud surface footer re-claims",
+      "hudOwnsAtStartup": true,
+      "hudSuppressedAfterOtherClaim": true,
+      "otherSurvivesHudRefresh": true,
+      "reclaimedAfterSurfaceCommand": true
+    },
+    {
+      "scenario": "dual-footer-other-first",
+      "passed": true,
+      "note": "HUD owns the slot at startup in both -e orders (deferred attach runs after session_start); a post-startup claim suppresses the HUD without clearing the other footer; /hud surface footer re-claims",
+      "hudOwnsAtStartup": true,
+      "hudSuppressedAfterOtherClaim": true,
+      "otherSurvivesHudRefresh": true,
+      "reclaimedAfterSurfaceCommand": true
+    },
+    {
+      "scenario": "replacer",
+      "passed": true,
+      "note": "post-HUD async message_end replacer doubled usage; ledger counts the final committed record",
+      "before": 2161742,
+      "after": 2163744,
+      "oracle": {
+        "input": 2163744,
+        "usageRecords": 66
+      }
+    }
+  ]
+}

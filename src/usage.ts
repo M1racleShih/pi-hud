@@ -144,6 +144,13 @@ const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 type TokenField = "input" | "output" | "cacheRead" | "cacheWrite";
 type MissingKey = "missingInput" | "missingOutput" | "missingCacheRead" | "missingCacheWrite";
+/** Invariant token-field table; module-level so aggregation allocates nothing per record
+ *  (a B2b measurement found per-call tuple arrays produced ~24 MiB of garbage on a
+ *  100k-entry rebuild, inflating GC pauses during the baseline). */
+const TOKEN_FIELDS: readonly (readonly [TokenField, MissingKey])[] = Object.freeze([
+  ["input", "missingInput"], ["output", "missingOutput"],
+  ["cacheRead", "missingCacheRead"], ["cacheWrite", "missingCacheWrite"],
+] as const);
 /** Non-negative finite numbers only; everything else is an unknown field value. */
 const counter = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
@@ -177,11 +184,7 @@ function fieldsIncomplete(totals: SessionTotals): boolean {
  * compaction/branch_summary only when they carry usage).
  */
 function accumulateUsage(usage: UsageLike, totals: SessionTotals): void {
-  const tokenFields: [TokenField, MissingKey][] = [
-    ["input", "missingInput"], ["output", "missingOutput"],
-    ["cacheRead", "missingCacheRead"], ["cacheWrite", "missingCacheWrite"],
-  ];
-  for (const [field, missing] of tokenFields) {
+  for (const [field, missing] of TOKEN_FIELDS) {
     const value = counter(usage[field]);
     if (value === null) totals[missing]++;
     else add(totals, field, value);
@@ -525,6 +528,13 @@ export class SessionUsageLedger {
       failureReason: this.failureReason,
       examinedEntries: this.examinedTotal,
       publishedEntries: this.published?.examined ?? 0,
+      // Published totals: bounded scalars so a real-host verification can compare the
+      // ledger with an independent oracle without parsing the abbreviated display.
+      totals: this.published ? {
+        input: this.published.input, output: this.published.output,
+        cacheRead: this.published.cacheRead, cacheWrite: this.published.cacheWrite,
+        cost: this.published.cost, costKnown: this.published.costKnown, costMissing: this.published.costMissing,
+      } : null,
       usageRecords: this.published?.usageRecords ?? 0,
       missingFields: this.published ? {
         input: this.published.missingInput, output: this.published.missingOutput,
@@ -739,11 +749,11 @@ export class SessionUsageLedger {
   }
 
   private addTotals(target: SessionTotals, delta: SessionTotals): void {
-    const sums: ["input" | "output" | "cacheRead" | "cacheWrite" | "cost", number][] = [
-      ["input", delta.input], ["output", delta.output], ["cacheRead", delta.cacheRead],
-      ["cacheWrite", delta.cacheWrite], ["cost", delta.cost],
-    ];
-    for (const [key, value] of sums) add(target, key, value);
+    add(target, "input", delta.input);
+    add(target, "output", delta.output);
+    add(target, "cacheRead", delta.cacheRead);
+    add(target, "cacheWrite", delta.cacheWrite);
+    add(target, "cost", delta.cost);
     target.usageRecords += delta.usageRecords;
     target.costKnown += delta.costKnown;
     target.costMissing += delta.costMissing;

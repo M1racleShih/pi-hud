@@ -207,3 +207,47 @@ Gates after this round: `npm run verify` (244 tests), `npm run package:check`, `
 
 Passing the checks above must not be described as phase-3-B acceptance as a whole, as a performance
 result for long histories, or as live-host validation of the session ledger.
+
+## Phase 3 B2b: long-history measurements and real-host acceptance (2026-09-20)
+
+Executed the B1 measurement plan and the live-host acceptance protocol. Environment: Linux x64,
+Node **v24.18.0**, 11th Gen Intel i7-11800H, Pi `@earendil-works/pi-coding-agent@0.85.1` isolated
+under ignored `.tmp/sdk` (unchanged from B2a); every raw record lists the exact commit (`7155af0`),
+the working-tree dirty paths at measurement start, and the SDK lock hash. All numbers live in
+[PERFORMANCE.md](PERFORMANCE.md); this section records what was executed, fixed and what remains open.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | **244 tests passed**, zero failed/skipped (the B2a suite plus extended diagnostics assertions for the new published-totals field). |
+| `npm run verify` | Passed end to end; every gate unchanged (hook p99 ≤ 250 µs, uncached render p99 ≤ 5 ms, cached means ≤ 5 µs). |
+| `npm run package:check` | Passed: `pi-hud-0.1.0.tgz`, 44 files, empty-cache offline production install and packed entry import. |
+| `node scripts/sdk-check.mjs` | Passed against the pinned package (no SDK surface change this round; re-run anyway). |
+| `node scripts/usage-oracle-check.mjs` | Passed (real `SessionManager` oracle, unchanged scenarios, re-run after the `TOKEN_FIELDS` fix). |
+| `node scripts/pi-rpc-smoke.mjs` | Passed (re-run: loader registration, strict JSON framing, no HUD UI output in RPC). |
+| `python3 scripts/pi-pty-smoke.py` | Passed (re-run: widget/footer mounting, ownership, native-footer restore, resize, no model call). |
+| Long-history benchmark | **New, executed.** `node scripts/usage-ledger-bench-run.mjs --json=docs/performance-b2b-ledger.json`: 1k/10k/100k × linear/branched against the real pinned `SessionManager`, one child per cell (`--expose-gc`), fixture/host-load/attach timed separately, external `setImmediate` pause probe with an idle noise floor, settling GCs plus a zero-work control window for heap attribution, and oracle equality asserted before any timing is recorded. Headline: attach 2.2/3.3 ms (1k) → 20.8/23.9 ms (10k) → 199/234 ms (100k); max slice 0.25–0.67 ms against the unchanged 2 ms budget; max pause at 100k 3.3–6.9 ms, dominated by the SDK's own 2.1–2.4 ms O(N) `getEntries()` copy; retained-after-release ≤ 2.1 MiB. |
+| Steady-state increments | **New, executed.** +1/+32/+2048 per size: `getEntries` delta exactly 0 (asserted), ledger-internal increment 0.065–0.46 ms, cost tracks added records not history size. Over-cap (2049): walk dropped, exactly one recovery rebuild (12.1–12.3 ms at 1k; 208–245 ms at 100k), `failureReason` healed. The recovery-fails-again path is measured in every cell: 6,240 records straddling a baseline and its own recovery produce visible failures/coverage gaps, the anti-loop guard holds at one recovery rebuild, and the next event boundary's anchored verify heals every missing segment (oracle-verified). Mid-slice catch-up exercised at every size; fast switch during the 100k baseline cancels in 16–30 µs with the stale generation never publishing. |
+| Usage-scope A/B | **New, executed.** `node scripts/usage-ab-run.mjs --pairs=8 --json=docs/performance-b2b-usage-ab.json`: interleaved observed/session pairs, order alternated, full provenance. Session marginal cost +1.2 µs per full turn, +1.5 µs per `sess*` render, hooks/cached unchanged. |
+| Real-host acceptance | **New, executed.** `python3 scripts/pi-host-acceptance.py --json=docs/host-acceptance-b2b.json`: **9/9 scenarios passed** in the real TUI with the deterministic in-process fixture provider (zero network/credentials/billing), isolated HOME/workspace. Covers: 10k-entry branched resume (ledger == independent file oracle, exact integers), a live read-tool turn (getEntries stays at 1), two live `/compact`s with identical summary text over an all-same-summary resumed history (the SDK `find(summary)` hazard live; both counted exactly once), `/tree` branch navigation + back-to-root leaf reset + re-append, model switch fixture-alpha→fixture-beta with totals accumulating, `/new` during the 10k baseline (stale generation never publishes), dual-footer coexistence in **both** `-e` orders (startup ownership, post-startup takeover, suppression without clearing, `/hud surface footer` re-claim), and a **post-HUD async `message_end` replacer** that doubles usage — the ledger counts the final committed record, matching the file oracle. |
+| Live streaming/tool/keyboard A/B | **New, executed.** `python3 scripts/pi-stream-ab.py --pairs=10 --json=docs/pi-stream-ab-b2b.json`: 20 real-TUI trials alternating HUD on/off within and across pairs, deterministic provider streaming 40 deltas × 2 ms, cold+warm streams. Warm inter-token cadence identical (±1.4%), keyboard echo and tool-turn within noise, tool completion observed in all trials; the HUD's measured per-turn terminal cost is one ~455-byte coalesced footer publication ~148 ms after completion. |
+
+### Issues found and fixed this round
+
+| # | Finding | Fix and evidence |
+| --- | --- | --- |
+| P1 | `accumulateUsage` allocated a fresh 4-tuple array per usage record: ~24 MiB of garbage per 100k-entry rebuild, inflating GC pauses during the baseline (found by the first 100k measurement run). | The invariant table is now the module-level `TOKEN_FIELDS` constant; `addTotals` unrolled. Verified allocation-free (1M `aggregateEntry` calls retain 0.03 MiB); the 100k attach heap peak delta dropped from ledger-attributable garbage to parity with the zero-work control. 244 tests and the pinned-SDK oracle re-run green. |
+| P3 | `/hud status` diagnostics exposed counters but not the published totals, so a real-host verification could not compare the ledger with an independent oracle without parsing the abbreviated footer display. | `inspect().totals` now publishes the bounded scalars (input/output/cacheRead/cacheWrite/cost/costKnown/costMissing, `null` when inactive). Covered by the extended round-trip test; used by every host-acceptance scenario. |
+| — (methodology) | A single immediate GC after the manager-load phase attributes ~40–56 MiB of un-swept load-phase garbage to the attach phase; V8 old-space re-growth after compaction further inflates "peak heap" readings. | The benchmark settles with two spaced GCs and measures a zero-work control window under identical probe load; both numbers are reported and the retained-after-release figure is the attribution anchor. |
+| — (fixture) | Pi 0.85.1's native footer crashes (`addUsageToTotals` on undefined) when resuming a session containing assistant messages without `usage`; real provider sessions always carry usage, so this is an upstream robustness gap, not an HUD bug. | The session-file builder injects deterministic usage into those records (`--sameSummary` fixtures likewise); the HUD's own missing-usage semantics stay covered by unit tests and the pinned-SDK oracle, which never run the native footer. |
+
+### Still pending (evidence gaps with concrete blockers)
+
+| Item | Blocker |
+| --- | --- |
+| Human dark/light terminal visual acceptance | Requires a human observer driving the footer/widget in a real terminal on both background colors at 40/80/120/180 columns. A PTY harness can capture bytes but cannot make a perceptual judgment; per the phase contract this must not be claimed from PTY output alone. |
+| Cross-platform matrix | Only local Linux executed; the CI workflow still prepares macOS/Windows × Node 22.19.0/24 and has not run in this sandbox. |
+| Live-provider streaming A/B | Deliberately not run: no paid provider may be used for acceptance calls. The deterministic in-process provider covers the TUI pipeline; provider-network variance is out of scope for this repository's acceptance. |
+| Default-footer evaluation | Explicitly not taken: `widget` + `observed` remain the defaults. The B2b data (one ~455 B publication per turn, ~200 ms background baseline at 100k entries) is the input for that separate decision, which must not happen automatically. |
+
+Passing everything above is still not a human visual acceptance, a cross-machine guarantee, or
+an instruction to switch the default surface; those remain the listed gaps.

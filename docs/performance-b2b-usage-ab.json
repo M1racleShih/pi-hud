@@ -1,0 +1,1385 @@
+{
+  "generatedAt": "2026-09-20T10:03:47.454Z",
+  "methodology": "Interleaved same-machine synthetic microbenchmarks: one flag different (usageScope observed vs session), separate processes, alternating order inside each pair, identical fixtures (2000-entry fake-manager history), sample counts and probe file. turnDrain includes the incremental walk, publication and render scheduling through the fake clock; hooks are the observer callbacks only. The existing gates (hook p99 <= 250us, uncached render p99 <= 5ms, cached mean <= 5us) are unchanged and remain enforced by bench/run.mjs. NOT a live Pi/provider/terminal A/B.",
+  "environment": {
+    "node": "v24.18.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+    "cores": 16,
+    "totalMemBytes": 33383649280,
+    "sdkLockSha256": "8a0902c7e9563f26eb73f346856a9f3cfc002c94a727ef4338209b96ed64fdda",
+    "commit": "7155af0328bcdaa92c31bd17783a61bbc7838693",
+    "dirtyPathsAtStart": [
+      "M src/usage.ts",
+      " M tests/usage.test.mjs",
+      "?? docs/performance-b2b-ledger.json",
+      "?? scripts/pi-host-acceptance.py",
+      "?? scripts/pi-stream-ab.py",
+      "?? scripts/session-file-oracle.mjs",
+      "?? scripts/usage-ab-run.mjs",
+      "?? scripts/usage-ab.mjs",
+      "?? scripts/usage-fixtures.mjs",
+      "?? scripts/usage-ledger-bench-run.mjs",
+      "?? scripts/usage-ledger-bench.mjs",
+      "?? scripts/usage-session-file.mjs",
+      "?? tests/fixtures/"
+    ]
+  },
+  "treeStateNote": "dirtyPathsAtStart is captured before any probe runs; the JSON record is written afterwards. Both sides run the same tree with the same dirty state.",
+  "pairs": 8,
+  "runsPerSide": 8,
+  "summary": {
+    "hooks.messageEnd.p99Us": {
+      "observed": 1.95400000000312,
+      "session": 1.6093749999974705,
+      "deltaAbsoluteUs": -0.34462500000564944,
+      "deltaPercent": -17.63689866965707,
+      "pairedDeltaMeanUs": -0.34462500000564944,
+      "pairedDeltaStdDevUs": 0.23945560000724664,
+      "pairsPositive": 0
+    },
+    "hooks.toolPair.p99Us": {
+      "observed": 3.9773749999998387,
+      "session": 3.2010000000006755,
+      "deltaAbsoluteUs": -0.7763749999991632,
+      "deltaPercent": -19.519783776968342,
+      "pairedDeltaMeanUs": -0.7763749999991632,
+      "pairedDeltaStdDevUs": 0.5706699872730331,
+      "pairsPositive": 1
+    },
+    "hooks.turnEndBare.meanUs": {
+      "observed": 0.11874630208337368,
+      "session": 0.4646548749999817,
+      "deltaAbsoluteUs": 0.34590857291660804,
+      "deltaPercent": 291.30050102422564,
+      "pairedDeltaMeanUs": 0.345908572916608,
+      "pairedDeltaStdDevUs": 0.07609382297532533,
+      "pairsPositive": 8
+    },
+    "hooks.turnEndBare.p99Us": {
+      "observed": 0.30987499999923784,
+      "session": 1.7096249999948299,
+      "deltaAbsoluteUs": 1.399749999995592,
+      "deltaPercent": 451.71440096782084,
+      "pairedDeltaMeanUs": 1.399749999995592,
+      "pairedDeltaStdDevUs": 0.29112400708203834,
+      "pairsPositive": 8
+    },
+    "turnDrain.meanUs": {
+      "observed": 1.2096431249999937,
+      "session": 2.416558333333354,
+      "deltaAbsoluteUs": 1.2069152083333603,
+      "deltaPercent": 99.77448582889822,
+      "pairedDeltaMeanUs": 1.2069152083333599,
+      "pairedDeltaStdDevUs": 0.18309494778092064,
+      "pairsPositive": 8
+    },
+    "turnDrain.p95Us": {
+      "observed": 1.1549999999971305,
+      "session": 3.170250000000152,
+      "deltaAbsoluteUs": 2.0152500000030216,
+      "deltaPercent": 174.48051948121457,
+      "pairedDeltaMeanUs": 2.0152500000030216,
+      "pairedDeltaStdDevUs": 0.45333259037380363,
+      "pairsPositive": 8
+    },
+    "turnDrain.p99Us": {
+      "observed": 1.664250000001033,
+      "session": 6.81200000000004,
+      "deltaAbsoluteUs": 5.147749999999007,
+      "deltaPercent": 309.3135045813917,
+      "pairedDeltaMeanUs": 5.147749999999007,
+      "pairedDeltaStdDevUs": 2.3185968682565177,
+      "pairsPositive": 8
+    },
+    "renders.widgetFull120.meanUs": {
+      "observed": 11.29758770833336,
+      "session": 12.784432541666657,
+      "deltaAbsoluteUs": 1.486844833333297,
+      "deltaPercent": 13.160728393695639,
+      "pairedDeltaMeanUs": 1.4868448333332982,
+      "pairedDeltaStdDevUs": 1.480757798360858,
+      "pairsPositive": 7
+    },
+    "renders.widgetFull120.p99Us": {
+      "observed": 27.299124999995428,
+      "session": 29.437000000005042,
+      "deltaAbsoluteUs": 2.1378750000096147,
+      "deltaPercent": 7.831294959124048,
+      "pairedDeltaMeanUs": 2.1378750000096147,
+      "pairedDeltaStdDevUs": 3.0302635791984907,
+      "pairsPositive": 7
+    },
+    "renders.footerFull120.meanUs": {
+      "observed": 11.79266862500004,
+      "session": 13.334723999999959,
+      "deltaAbsoluteUs": 1.5420553749999186,
+      "deltaPercent": 13.076390289902795,
+      "pairedDeltaMeanUs": 1.5420553749999206,
+      "pairedDeltaStdDevUs": 1.223310171228363,
+      "pairsPositive": 7
+    },
+    "renders.footerFull120.p99Us": {
+      "observed": 27.44725000000159,
+      "session": 30.573500000002696,
+      "deltaAbsoluteUs": 3.1262500000011073,
+      "deltaPercent": 11.390029966575618,
+      "pairedDeltaMeanUs": 3.1262500000011073,
+      "pairedDeltaStdDevUs": 2.510197688928029,
+      "pairsPositive": 7
+    },
+    "renders.widgetCached.meanUs": {
+      "observed": 0.021833608125000018,
+      "session": 0.02179514000000001,
+      "deltaAbsoluteUs": -0.00003846812500000671,
+      "deltaPercent": -0.1761876680197432,
+      "pairedDeltaMeanUs": -0.00003846812500000736,
+      "pairedDeltaStdDevUs": 0.004881580617816058,
+      "pairsPositive": 5
+    },
+    "renders.footerCached.meanUs": {
+      "observed": 0.03903306500000006,
+      "session": 0.03833962499999988,
+      "deltaAbsoluteUs": -0.0006934400000001839,
+      "deltaPercent": -1.7765450906819202,
+      "pairedDeltaMeanUs": -0.0006934400000001865,
+      "pairedDeltaStdDevUs": 0.0019276153798929926,
+      "pairsPositive": 3
+    }
+  },
+  "runs": [
+    {
+      "pair": 0,
+      "side": "observed",
+      "report": {
+        "label": "observed",
+        "scope": "observed",
+        "generatedAt": "2026-09-20T10:03:42.762Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8885980833332698,
+            "p50Us": 0.6750000000010914,
+            "p95Us": 1.0199999999969123,
+            "p99Us": 1.9560000000069522
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.267156249999991,
+            "p50Us": 1.0379999999940992,
+            "p95Us": 1.8370000000089703,
+            "p99Us": 3.5060000000015634
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.0941525000000188,
+            "p50Us": 0.06999999999379725,
+            "p95Us": 0.0849999999843476,
+            "p99Us": 0.22599999999783904
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 1.1709180000000765,
+          "p50Us": 0.8489999999881093,
+          "p95Us": 1.2250000000051386,
+          "p99Us": 1.5829999999823485
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 11.041905333333755,
+            "p50Us": 10.221999999998843,
+            "p95Us": 13.672000000013895,
+            "p99Us": 26.568999999994958
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 11.772619333332662,
+            "p50Us": 10.812000000015587,
+            "p95Us": 13.848999999993339,
+            "p99Us": 26.907999999991716
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.03600468000000006
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.023009509999999976
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 0,
+      "side": "session",
+      "report": {
+        "label": "session",
+        "scope": "session",
+        "generatedAt": "2026-09-20T10:03:43.107Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8833282500001233,
+            "p50Us": 0.6510000000048421,
+            "p95Us": 1.6969999999929541,
+            "p99Us": 1.954999999995266
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.1474739999998584,
+            "p50Us": 1.0050000000205728,
+            "p95Us": 1.383000000004131,
+            "p99Us": 2.577999999999747
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.40796566666656575,
+            "p50Us": 0.3100000000131331,
+            "p95Us": 0.5230000000153723,
+            "p99Us": 1.5789999999924476
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 2.210549666666771,
+          "p50Us": 1.7420000000072378,
+          "p95Us": 3.039000000001124,
+          "p99Us": 5.992999999989479
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 11.788870333333096,
+            "p50Us": 10.929000000004407,
+            "p95Us": 12.72199999999657,
+            "p99Us": 27.602999999999156
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 12.628741666666686,
+            "p50Us": 11.631999999963227,
+            "p95Us": 17.042000000003554,
+            "p99Us": 28.68100000000595
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.03799697999999978
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.023557490000000028
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 1,
+      "side": "session",
+      "report": {
+        "label": "session",
+        "scope": "session",
+        "generatedAt": "2026-09-20T10:03:43.423Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8020055833333304,
+            "p50Us": 0.6559999999922184,
+            "p95Us": 0.9520000000122764,
+            "p99Us": 1.3170000000002346
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.1458585833333281,
+            "p50Us": 1.0400000000032605,
+            "p95Us": 1.4489999999938163,
+            "p99Us": 2.8750000000030695
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.424761666666639,
+            "p50Us": 0.3169999999954598,
+            "p95Us": 0.6190000000003693,
+            "p99Us": 1.5190000000018244
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 2.5025189999998854,
+          "p50Us": 1.7849999999839383,
+          "p95Us": 3.022999999984677,
+          "p99Us": 7.556000000022323
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 11.778692000000303,
+            "p50Us": 10.944999999992433,
+            "p95Us": 12.405999999998585,
+            "p99Us": 28.737000000006674
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 12.204252666666648,
+            "p50Us": 11.381999999969139,
+            "p95Us": 13.380999999981213,
+            "p99Us": 28.799999999989723
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.03580930499999994
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.016483474999999997
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 1,
+      "side": "observed",
+      "report": {
+        "label": "observed",
+        "scope": "observed",
+        "generatedAt": "2026-09-20T10:03:43.711Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.9545386666667586,
+            "p50Us": 0.704999999996403,
+            "p95Us": 1.5499999999946112,
+            "p99Us": 2.0910000000071705
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.2778425000000226,
+            "p50Us": 1.033000000006723,
+            "p95Us": 1.7989999999912243,
+            "p99Us": 4.125000000001933
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.09354716666676309,
+            "p50Us": 0.06700000000137152,
+            "p95Us": 0.07999999999697138,
+            "p99Us": 0.2389999999934389
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 1.1761956666666078,
+          "p50Us": 0.8310000000051332,
+          "p95Us": 1.0109999999770025,
+          "p99Us": 1.3730000000009568
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 11.224505999999765,
+            "p50Us": 10.108999999999924,
+            "p95Us": 17.221999999975424,
+            "p99Us": 26.90699999999424
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 12.315237000000527,
+            "p50Us": 11.153000000007296,
+            "p95Us": 16.357999999996764,
+            "p99Us": 29.173000000014326
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.04061907500000018
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.014701890000000049
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 2,
+      "side": "observed",
+      "report": {
+        "label": "observed",
+        "scope": "observed",
+        "generatedAt": "2026-09-20T10:03:44.008Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8866558333332955,
+            "p50Us": 0.7350000000059254,
+            "p95Us": 1.0500000000064347,
+            "p99Us": 1.849000000007095
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.320588333333362,
+            "p50Us": 1.068999999986886,
+            "p95Us": 1.928000000006591,
+            "p99Us": 4.2989999999889505
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.1156174166666825,
+            "p50Us": 0.07199999998874773,
+            "p95Us": 0.1420000000109667,
+            "p99Us": 0.45099999999820284
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 1.305395666666534,
+          "p50Us": 0.8660000000020318,
+          "p95Us": 1.1399999999923693,
+          "p99Us": 2.213000000011789
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 11.274309000000033,
+            "p50Us": 10.236999999989393,
+            "p95Us": 15.388999999998987,
+            "p99Us": 27.377999999998792
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 11.765307999999449,
+            "p50Us": 10.569000000003825,
+            "p95Us": 15.977999999961412,
+            "p99Us": 27.859000000006517
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.04510228500000011
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.025293875000000125
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 2,
+      "side": "session",
+      "report": {
+        "label": "session",
+        "scope": "session",
+        "generatedAt": "2026-09-20T10:03:44.340Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8191988333331621,
+            "p50Us": 0.7250000000027512,
+            "p95Us": 0.9620000000012396,
+            "p99Us": 1.2409999999931642
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.2725890000000257,
+            "p50Us": 1.0480000000114842,
+            "p95Us": 1.4769999999941774,
+            "p99Us": 2.996999999993477
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.39755858333330557,
+            "p50Us": 0.3169999999954598,
+            "p95Us": 0.5659999999920728,
+            "p99Us": 1.5929999999997335
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 2.530951999999638,
+          "p50Us": 1.7899999999997362,
+          "p95Us": 3.0909999999835236,
+          "p99Us": 12.676999999996497
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 15.503072000000016,
+            "p50Us": 11.530999999990854,
+            "p95Us": 22.50999999998271,
+            "p99Us": 35.22600000002285
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 16.10047500000049,
+            "p50Us": 12.441000000023905,
+            "p95Us": 23.11000000003105,
+            "p99Us": 36.524999999983265
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.043223649999999905
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.01575034500000015
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 3,
+      "side": "session",
+      "report": {
+        "label": "session",
+        "scope": "session",
+        "generatedAt": "2026-09-20T10:03:44.657Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8186594999999426,
+            "p50Us": 0.6750000000010914,
+            "p95Us": 1.01399999999785,
+            "p99Us": 1.6899999999964166
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.3148565833332722,
+            "p50Us": 1.0529999999988604,
+            "p95Us": 1.8160000000051468,
+            "p99Us": 3.4129999999947813
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.4134947499999878,
+            "p50Us": 0.31300000000555883,
+            "p95Us": 0.6290000000035434,
+            "p99Us": 1.455999999990354
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 2.2733650000001373,
+          "p50Us": 1.6789999999957672,
+          "p95Us": 2.8420000000153323,
+          "p99Us": 4.392999999993208
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 12.65246933333321,
+            "p50Us": 11.457000000007156,
+            "p95Us": 17.81400000001554,
+            "p99Us": 29.29800000001137
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 13.044311666665962,
+            "p50Us": 11.790999999959695,
+            "p95Us": 18.276000000014392,
+            "p99Us": 30.03400000000056
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.040562704999999824
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.023634029999999764
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 3,
+      "side": "observed",
+      "report": {
+        "label": "observed",
+        "scope": "observed",
+        "generatedAt": "2026-09-20T10:03:44.960Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8769665833333805,
+            "p50Us": 0.6409999999874572,
+            "p95Us": 0.992000000010762,
+            "p99Us": 1.9070000000027676
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.311522833333308,
+            "p50Us": 1.0430000000098971,
+            "p95Us": 1.8969999999995935,
+            "p99Us": 4.236000000005902
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.09989533333339769,
+            "p50Us": 0.07199999998874773,
+            "p95Us": 0.08700000000771979,
+            "p99Us": 0.31599999999798456
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 1.319799666666556,
+          "p50Us": 0.8769999999742595,
+          "p95Us": 1.1989999999855172,
+          "p99Us": 1.766000000003487
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 10.40857933333342,
+            "p50Us": 9.898000000021057,
+            "p95Us": 10.939000000007582,
+            "p99Us": 24.731000000002723
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 11.068963000000457,
+            "p50Us": 10.487000000011903,
+            "p95Us": 11.816000000010263,
+            "p99Us": 25.88900000000649
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.04137991
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.026882085000000014
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 4,
+      "side": "observed",
+      "report": {
+        "label": "observed",
+        "scope": "observed",
+        "generatedAt": "2026-09-20T10:03:45.252Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.879048583333191,
+            "p50Us": 0.641000000001668,
+            "p95Us": 1.2009999999946785,
+            "p99Us": 1.8890000000055807
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.297417000000104,
+            "p50Us": 1.0180000000019618,
+            "p95Us": 1.9149999999967804,
+            "p99Us": 3.776999999999475
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.10656175000000563,
+            "p50Us": 0.07399999999790907,
+            "p95Us": 0.091999999995096,
+            "p99Us": 0.2740000000045484
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 1.2146230000000224,
+          "p50Us": 0.8620000000121308,
+          "p95Us": 1.0460000000023228,
+          "p99Us": 1.4560000000187756
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 10.471401666666493,
+            "p50Us": 9.851999999995087,
+            "p95Us": 10.934999999989259,
+            "p99Us": 26.054999999985284
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 12.634844333333525,
+            "p50Us": 11.393999999995685,
+            "p95Us": 17.84000000000674,
+            "p99Us": 28.2320000000027
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.03686086500000016
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.02273597499999994
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 4,
+      "side": "session",
+      "report": {
+        "label": "session",
+        "scope": "session",
+        "generatedAt": "2026-09-20T10:03:45.571Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8687896666666947,
+            "p50Us": 0.6710000000111904,
+            "p95Us": 1.1590000000012424,
+            "p99Us": 1.7869999999930997
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.2412584166666067,
+            "p50Us": 1.0109999999912134,
+            "p95Us": 1.5360000000015361,
+            "p99Us": 2.993000000003576
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.3991045833333982,
+            "p50Us": 0.3099999999847114,
+            "p95Us": 0.5439999999907741,
+            "p99Us": 1.4999999999929514
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 2.329704333333103,
+          "p50Us": 1.7260000000192122,
+          "p95Us": 2.9759999999896536,
+          "p99Us": 4.509000000012975
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 12.185499666666786,
+            "p50Us": 11.268999999998641,
+            "p95Us": 15.323999999992566,
+            "p99Us": 27.93700000000854
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 13.452554333333275,
+            "p50Us": 12.109000000009473,
+            "p95Us": 19.151000000022123,
+            "p99Us": 30.500000000017735
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.03689808999999997
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.023551800000000185
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 5,
+      "side": "session",
+      "report": {
+        "label": "session",
+        "scope": "session",
+        "generatedAt": "2026-09-20T10:03:45.886Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8514207499998905,
+            "p50Us": 0.7659999999987122,
+            "p95Us": 1.0169999999902757,
+            "p99Us": 1.6710000000017544
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.2459955833333196,
+            "p50Us": 1.0359999999991487,
+            "p95Us": 1.7670000000009622,
+            "p99Us": 3.5900000000026466
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.4081844999999067,
+            "p50Us": 0.30399999999985994,
+            "p95Us": 0.5179999999995744,
+            "p99Us": 1.5599999999835745
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 2.3507126666669835,
+          "p50Us": 1.6980000000046402,
+          "p95Us": 2.910000000014179,
+          "p99Us": 5.854999999996835
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 12.390450333333247,
+            "p50Us": 11.536000000006652,
+            "p95Us": 16.443000000009533,
+            "p99Us": 28.289000000000897
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 12.93454700000028,
+            "p50Us": 11.663999999996122,
+            "p95Us": 18.391999999948894,
+            "p99Us": 29.71100000002025
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.036085134999999866
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.022310085000000018
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 5,
+      "side": "observed",
+      "report": {
+        "label": "observed",
+        "scope": "observed",
+        "generatedAt": "2026-09-20T10:03:46.190Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8856523333334884,
+            "p50Us": 0.6559999999922184,
+            "p95Us": 1.2189999999918655,
+            "p99Us": 1.9649999999984402
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.5636005000001048,
+            "p50Us": 1.0540000000105465,
+            "p95Us": 2.448000000001116,
+            "p99Us": 4.909999999995307
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.10377566666673488,
+            "p50Us": 0.07099999999127249,
+            "p95Us": 0.08600000001024455,
+            "p99Us": 0.28399999999351166
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 1.2261746666667914,
+          "p50Us": 0.8929999999907068,
+          "p95Us": 1.1800000000050659,
+          "p99Us": 1.6870000000039909
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 13.451163999999851,
+            "p50Us": 10.880000000014434,
+            "p95Us": 19.799000000006117,
+            "p99Us": 31.857000000002245
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 11.647881000000273,
+            "p50Us": 10.833999999988464,
+            "p95Us": 13.196999999991021,
+            "p99Us": 27.32900000000882
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.034879870000000035
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.023007704999999986
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 6,
+      "side": "observed",
+      "report": {
+        "label": "observed",
+        "scope": "observed",
+        "generatedAt": "2026-09-20T10:03:46.492Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.9772185000000803,
+            "p50Us": 0.8109999999987849,
+            "p95Us": 1.324000000010983,
+            "p99Us": 2.0769999999998845
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.1832657500000057,
+            "p50Us": 1.0220000000060736,
+            "p95Us": 1.880999999997357,
+            "p99Us": 3.292000000001849
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.23400474999997573,
+            "p50Us": 0.1769999999794436,
+            "p95Us": 0.273000000021284,
+            "p99Us": 0.36600000001385524
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 1.055215666666755,
+          "p50Us": 0.9750000000110504,
+          "p95Us": 1.1590000000012424,
+          "p99Us": 1.563000000004422
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 11.019648333333688,
+            "p50Us": 10.075999999997975,
+            "p95Us": 14.120000000019672,
+            "p99Us": 26.92199999998479
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 11.71374133333357,
+            "p50Us": 10.739999999998417,
+            "p95Us": 13.676000000032218,
+            "p99Us": 27.42399999999634
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.03861604999999997
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.023600250000000073
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 6,
+      "side": "session",
+      "report": {
+        "label": "session",
+        "scope": "session",
+        "generatedAt": "2026-09-20T10:03:46.830Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8064214166666859,
+            "p50Us": 0.6330000000076552,
+            "p95Us": 1.0090000000104737,
+            "p99Us": 1.7540000000053624
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.3324639166665608,
+            "p50Us": 1.0709999999960473,
+            "p95Us": 2.009999999998513,
+            "p99Us": 3.7470000000041637
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.6394459999999964,
+            "p50Us": 0.5189999999970496,
+            "p95Us": 0.8550000000013824,
+            "p99Us": 2.27099999997904
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 2.635207333333352,
+          "p50Us": 2.4499999999818556,
+          "p95Us": 4.3359999999950105,
+          "p99Us": 7.545999999990727
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 13.580773999999693,
+            "p50Us": 11.64899999997715,
+            "p95Us": 21.048000000007505,
+            "p99Us": 29.279000000002497
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 12.997413666666294,
+            "p50Us": 11.606000000028871,
+            "p95Us": 20.884999999964293,
+            "p99Us": 29.211999999972704
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.03793763999999982
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.024493134999999885
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 7,
+      "side": "session",
+      "report": {
+        "label": "session",
+        "scope": "session",
+        "generatedAt": "2026-09-20T10:03:47.154Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.9046891666666694,
+            "p50Us": 0.8010000000098216,
+            "p95Us": 1.3440000000031205,
+            "p99Us": 1.4599999999944657
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.335439583333228,
+            "p50Us": 1.0249999999984993,
+            "p95Us": 1.9659999999959155,
+            "p99Us": 3.4150000000039427
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.626723250000054,
+            "p50Us": 0.5230000000153723,
+            "p95Us": 0.8200000000044838,
+            "p99Us": 2.1990000000187138
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 2.49945666666696,
+          "p50Us": 1.8029999999953361,
+          "p95Us": 3.145000000017717,
+          "p99Us": 5.966999999998279
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 12.395632666666913,
+            "p50Us": 11.33199999998169,
+            "p95Us": 16.970000000014807,
+            "p99Us": 29.126999999988357
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 13.315496000000042,
+            "p50Us": 11.817000000007738,
+            "p95Us": 20.071000000029926,
+            "p99Us": 31.125000000031378
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.03820349499999992
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.024580760000000056
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    },
+    {
+      "pair": 7,
+      "side": "observed",
+      "report": {
+        "label": "observed",
+        "scope": "observed",
+        "generatedAt": "2026-09-20T10:03:47.444Z",
+        "environment": {
+          "node": "v24.18.0",
+          "platform": "linux",
+          "arch": "x64",
+          "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+        },
+        "historyEntries": 2000,
+        "methodology": "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+        "hooks": {
+          "messageEnd": {
+            "samples": 12000,
+            "meanUs": 0.8396322499999522,
+            "p50Us": 0.6179999999886832,
+            "p95Us": 0.9610000000037644,
+            "p99Us": 1.8979999999970687
+          },
+          "toolPair": {
+            "samples": 12000,
+            "meanUs": 1.2986625833333796,
+            "p50Us": 1.0300000000000864,
+            "p95Us": 1.7829999999889878,
+            "p99Us": 3.67400000000373
+          },
+          "turnEndBare": {
+            "samples": 12000,
+            "meanUs": 0.10241583333341117,
+            "p50Us": 0.06700000000137152,
+            "p95Us": 0.183999999990192,
+            "p99Us": 0.3229999999945221
+          }
+        },
+        "turnDrain": {
+          "samples": 3000,
+          "meanUs": 1.2088226666666075,
+          "p50Us": 0.8410000000083073,
+          "p95Us": 1.2800000000083855,
+          "p99Us": 1.672999999982494
+        },
+        "renders": {
+          "widgetFull120": {
+            "samples": 3000,
+            "meanUs": 11.489187999999873,
+            "p50Us": 10.342000000008511,
+            "p95Us": 16.30500000001689,
+            "p99Us": 27.974000000000387
+          },
+          "footerFull120": {
+            "samples": 3000,
+            "meanUs": 11.422754999999848,
+            "p50Us": 10.609999999985575,
+            "p95Us": 15.116000000006125,
+            "p99Us": 26.7639999999858
+          },
+          "footerCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.038801785
+          },
+          "widgetCached": {
+            "frames": 200000,
+            "identicalCacheHits": 200000,
+            "meanUs": 0.015437574999999981
+          }
+        },
+        "structural": {
+          "ledgerQuietAtStart": true,
+          "steadyGetEntries": 0
+        }
+      }
+    }
+  ]
+}

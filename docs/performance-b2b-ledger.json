@@ -1,0 +1,1493 @@
+{
+  "generatedAt": "2026-09-20T10:16:09.259Z",
+  "environment": {
+    "node": "v24.18.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz",
+    "cores": 16,
+    "totalMemBytes": 33383649280,
+    "sdkLockSha256": "8a0902c7e9563f26eb73f346856a9f3cfc002c94a727ef4338209b96ed64fdda",
+    "commit": "9d657216c75de4f0c6237afee53b5010ed6d9610",
+    "dirtyPathsAtStart": [
+      "M scripts/usage-ledger-bench.mjs"
+    ]
+  },
+  "methodology": "One child process per (size, shape) with --expose-gc so per-cell heap attribution is not polluted by earlier cells. Real pinned Pi 0.85.1 SessionManager (inMemory) loaded from the same seeded op stream the plain fixture derives from; fixture build, manager load and HUD attach are timed separately. External pause probe: a setImmediate loop measures the gap between iterations (approximates the longest uninterruptible pause including GC); the same probe over an idle window is reported as its noise floor. It also samples heapUsed/rss every 32 iterations. CPU deltas include the probe; attach.netCpuMs subtracts the measured idle probe rate. Wall times include yield waits by design (the contract distinguishes yield-inclusive total time from the max pause). Every phase asserts the published totals against the independent fixture oracle before its timing is recorded; steady-state phases additionally assert zero new getEntries calls. getEntries copy timings are five standalone samples over the fully loaded manager (median/max reported).",
+  "gates": "hook p99 <= 250us, uncached render p99 <= 5ms, cached render mean <= 5us are unchanged and measured separately in bench/run.mjs; this record covers ledger history work only.",
+  "fixture": {
+    "seed": 187391725,
+    "ratios": {
+      "assistantUsage": 0.42,
+      "user": 0.2,
+      "toolResultUsage": 0.18,
+      "toolResultPlain": 0.12,
+      "assistantNoUsage": 0.03,
+      "compactionUsage": 0.02,
+      "compactionNoUsage": 0.015,
+      "branchSide": 0.15
+    },
+    "contentChars": 220,
+    "summaryChars": 400
+  },
+  "cells": [
+    {
+      "size": 1000,
+      "shape": "linear",
+      "gcAvailable": true,
+      "startedAt": "2026-09-20T10:15:58.449Z",
+      "probeIdle": {
+        "iterations": 143809,
+        "maxGapMs": 0.8424709999999891,
+        "p50GapMs": 0.0007650000000012369,
+        "p95GapMs": 0.0019419999999854554,
+        "p99GapMs": 0.005395000000021355,
+        "cpuMs": 167.568,
+        "heapPeakBytes": 28522792,
+        "rssPeakBytes": 116318208
+      },
+      "fixtureBuildMs": 3.201057999999989,
+      "fixtureMeta": {
+        "size": 1000,
+        "shape": "linear",
+        "seed": 187391725,
+        "entryCount": 1000,
+        "usageRecordCount": 620,
+        "contentChars": 220,
+        "summaryChars": 400,
+        "ratios": {
+          "assistantUsage": 0.42,
+          "user": 0.2,
+          "toolResultUsage": 0.18,
+          "toolResultPlain": 0.12,
+          "assistantNoUsage": 0.03,
+          "compactionUsage": 0.02,
+          "compactionNoUsage": 0.015,
+          "branchSide": 0.15
+        }
+      },
+      "managerLoad": {
+        "wallMs": 1.7439600000000155,
+        "cpuMs": 2.615000000000009,
+        "entryCount": 1000
+      },
+      "getEntriesCopy": {
+        "samples": [
+          {
+            "ms": 0.011609999999961929,
+            "length": 1000
+          },
+          {
+            "ms": 0.011792000000014013,
+            "length": 1000
+          },
+          {
+            "ms": 0.011843999999996413,
+            "length": 1000
+          },
+          {
+            "ms": 0.012799000000029537,
+            "length": 1000
+          },
+          {
+            "ms": 0.031775000000038744,
+            "length": 1000
+          }
+        ],
+        "medianMs": 0.011843999999996413,
+        "maxMs": 0.031775000000038744
+      },
+      "attach": {
+        "wallMs": 2.469590999999923,
+        "cpuMs": 10.211000000000013,
+        "netCpuMs": 7.452170502080099,
+        "lastBaselineMs": 1.4389119999999593,
+        "maxSliceMs": 0.5390579999999545,
+        "probe": {
+          "iterations": 155,
+          "maxGapMs": 0.7572529999999915,
+          "p50GapMs": 0.004605999999967025,
+          "p95GapMs": 0.02124500000002172,
+          "p99GapMs": 0.6210909999999785,
+          "cpuMs": 10.288,
+          "heapPeakBytes": 20430360,
+          "rssPeakBytes": 128536576
+        },
+        "heapBeforeBytes": 19717840,
+        "rssBeforeBytes": 128536576,
+        "heapPeakBytes": 20430360,
+        "rssPeakBytes": 128536576,
+        "heapAfterReleaseBytes": 19738632,
+        "rssAfterReleaseBytes": 128536576,
+        "heapDeltaPeakBytes": 712520,
+        "heapDeltaAfterReleaseBytes": 20792,
+        "shallowArrayBytes": 8000,
+        "memoryControl": {
+          "durationMs": 2.469590999999923,
+          "heapPeakBytes": 20117272,
+          "heapDeltaPeakBytes": 378640,
+          "note": "same probe load, same duration, zero ledger work: the V8 peak-growth noise floor after a post-load compaction"
+        },
+        "getEntriesCalls": 1,
+        "getEntryCalls": 0
+      },
+      "rebuild_tree": {
+        "wallMs": 2.4832760000000462,
+        "cpuMs": 3.5439999999999827,
+        "lastBaselineMs": 1.2561220000000048,
+        "maxSliceMs": 0.5390579999999545,
+        "probe": {
+          "iterations": 268,
+          "maxGapMs": 0.6630539999999883,
+          "p50GapMs": 0.0035940000000209693,
+          "p95GapMs": 0.007994000000053347,
+          "p99GapMs": 0.2361630000000332,
+          "cpuMs": 3.605,
+          "heapPeakBytes": 20990240,
+          "rssPeakBytes": 128536576
+        }
+      },
+      "rebuild_compact": {
+        "wallMs": 2.7145679999999857,
+        "cpuMs": 2.9869999999999663,
+        "lastBaselineMs": 1.2905580000000327,
+        "maxSliceMs": 0.5390579999999545,
+        "probe": {
+          "iterations": 374,
+          "maxGapMs": 0.5237990000000536,
+          "p50GapMs": 0.003604999999993197,
+          "p95GapMs": 0.0077059999999846696,
+          "p99GapMs": 0.030937999999991916,
+          "cpuMs": 3.003,
+          "heapPeakBytes": 21869872,
+          "rssPeakBytes": 128536576
+        }
+      },
+      "steady": {
+        "plus_1": {
+          "appendMs": 0.09787199999993845,
+          "wallMs": 1.5317309999999225,
+          "cpuMs": 1.63799999999992,
+          "verifyPause": {
+            "iterations": 470,
+            "maxGapMs": 0.2828429999999571,
+            "p50GapMs": 0.002173999999968146,
+            "p95GapMs": 0.0028120000000626533,
+            "p99GapMs": 0.015207000000032167,
+            "cpuMs": 1.647,
+            "heapPeakBytes": 22236376,
+            "rssPeakBytes": 128536576
+          },
+          "maxIncrementMs": 0.09385900000006586
+        },
+        "plus_32": {
+          "appendMs": 0.2407699999999977,
+          "wallMs": 1.356029000000035,
+          "cpuMs": 4.611000000000104,
+          "verifyPause": {
+            "iterations": 394,
+            "maxGapMs": 0.1069999999999709,
+            "p50GapMs": 0.002181999999947948,
+            "p95GapMs": 0.008985000000052423,
+            "p99GapMs": 0.02348199999994449,
+            "cpuMs": 4.622,
+            "heapPeakBytes": 22721312,
+            "rssPeakBytes": 128536576
+          },
+          "maxIncrementMs": 0.09385900000006586
+        },
+        "plus_2048": {
+          "appendMs": 3.2887620000000197,
+          "wallMs": 2.518538000000035,
+          "cpuMs": 7.409999999999968,
+          "verifyPause": {
+            "iterations": 818,
+            "maxGapMs": 1.0871439999999666,
+            "p50GapMs": 0.0015079999999443316,
+            "p95GapMs": 0.0017419999999219726,
+            "p99GapMs": 0.006569000000013148,
+            "cpuMs": 7.418,
+            "heapPeakBytes": 28126144,
+            "rssPeakBytes": 128798720
+          },
+          "maxIncrementMs": 0.37037499999996726
+        }
+      },
+      "overCap": {
+        "wallMs": 12.175765999999953,
+        "cpuMs": 16.415000000000077,
+        "probe": {
+          "iterations": 4379,
+          "maxGapMs": 0.7801759999999831,
+          "p50GapMs": 0.0014660000000503715,
+          "p95GapMs": 0.0029419999999618085,
+          "p99GapMs": 0.008491999999932887,
+          "cpuMs": 16.431,
+          "heapPeakBytes": 35520704,
+          "rssPeakBytes": 134041600
+        },
+        "lastBaselineMs": 9.70422300000007,
+        "maxSliceMs": 0.5390579999999545
+      },
+      "catchupDuringRebuild": {
+        "exercisedMidSlice": true,
+        "wallMs": 10.198313999999982,
+        "cpuMs": 19.043000000000006,
+        "probe": {
+          "iterations": 6137,
+          "maxGapMs": 0.3497499999999718,
+          "p50GapMs": 0.001040999999986525,
+          "p95GapMs": 0.0016319999999723223,
+          "p99GapMs": 0.0063589999999749125,
+          "cpuMs": 19.056,
+          "heapPeakBytes": 32786184,
+          "rssPeakBytes": 134041600
+        },
+        "maxIncrementMs": 0.37037499999996726
+      },
+      "recoveryFailsAgain": {
+        "sawFailureDuringChurn": true,
+        "sawCoverageGapDuringChurn": true,
+        "guardHeld": true,
+        "recoveryRebuilds": 1,
+        "healedByNextEventBoundary": true,
+        "totalAppendedDuringChurn": 6240,
+        "note": "appends straddling a baseline and its own recovery stop at the anti-loop guard; no timer retries; the next anchored verify commits every missing segment exactly once"
+      },
+      "fastSwitch": {
+        "cancelledBusyBaseline": true,
+        "syncRestartMs": 0.10350100000005114,
+        "wallMs": 1.4839500000000498,
+        "cpuMs": 5.621999999999957,
+        "probe": {
+          "iterations": 123,
+          "maxGapMs": 0.4744150000000218,
+          "p50GapMs": 0.004512999999974454,
+          "p95GapMs": 0.03723999999999705,
+          "p99GapMs": 0.10030700000004344,
+          "cpuMs": 5.648,
+          "heapPeakBytes": 39931360,
+          "rssPeakBytes": 140333056
+        },
+        "lastBaselineMs": 0.3008260000000291,
+        "note": "syncRestartMs is the synchronous cancel+replan cost of the second restart; the stale generation never publishes"
+      },
+      "finishedAt": "2026-09-20T10:15:59.259Z"
+    },
+    {
+      "size": 1000,
+      "shape": "branched",
+      "gcAvailable": true,
+      "startedAt": "2026-09-20T10:15:59.498Z",
+      "probeIdle": {
+        "iterations": 144149,
+        "maxGapMs": 0.8823579999999822,
+        "p50GapMs": 0.0007640000000037617,
+        "p95GapMs": 0.0016230000000234668,
+        "p99GapMs": 0.005671000000006643,
+        "cpuMs": 166.507,
+        "heapPeakBytes": 28616256,
+        "rssPeakBytes": 113000448
+      },
+      "fixtureBuildMs": 3.394713999999965,
+      "fixtureMeta": {
+        "size": 1000,
+        "shape": "branched",
+        "seed": 187391725,
+        "entryCount": 1167,
+        "usageRecordCount": 732,
+        "contentChars": 220,
+        "summaryChars": 400,
+        "ratios": {
+          "assistantUsage": 0.42,
+          "user": 0.2,
+          "toolResultUsage": 0.18,
+          "toolResultPlain": 0.12,
+          "assistantNoUsage": 0.03,
+          "compactionUsage": 0.02,
+          "compactionNoUsage": 0.015,
+          "branchSide": 0.15
+        }
+      },
+      "managerLoad": {
+        "wallMs": 1.9012930000000097,
+        "cpuMs": 4.350000000000023,
+        "entryCount": 1167
+      },
+      "getEntriesCopy": {
+        "samples": [
+          {
+            "ms": 0.013011000000005879,
+            "length": 1167
+          },
+          {
+            "ms": 0.013284999999996217,
+            "length": 1167
+          },
+          {
+            "ms": 0.014210999999988871,
+            "length": 1167
+          },
+          {
+            "ms": 0.020171000000004824,
+            "length": 1167
+          },
+          {
+            "ms": 0.023156000000028598,
+            "length": 1167
+          }
+        ],
+        "medianMs": 0.014210999999988871,
+        "maxMs": 0.023156000000028598
+      },
+      "attach": {
+        "wallMs": 4.050830000000019,
+        "cpuMs": 10.137000000000057,
+        "netCpuMs": 5.640389661266703,
+        "lastBaselineMs": 2.084579000000076,
+        "maxSliceMs": 0.6124950000000808,
+        "probe": {
+          "iterations": 580,
+          "maxGapMs": 0.7856419999999389,
+          "p50GapMs": 0.0030179999999973006,
+          "p95GapMs": 0.010662000000024818,
+          "p99GapMs": 0.03762699999992947,
+          "cpuMs": 10.202,
+          "heapPeakBytes": 21137640,
+          "rssPeakBytes": 125104128
+        },
+        "heapBeforeBytes": 20033600,
+        "rssBeforeBytes": 125104128,
+        "heapPeakBytes": 21137640,
+        "rssPeakBytes": 125104128,
+        "heapAfterReleaseBytes": 20037360,
+        "rssAfterReleaseBytes": 125104128,
+        "heapDeltaPeakBytes": 1104040,
+        "heapDeltaAfterReleaseBytes": 3760,
+        "shallowArrayBytes": 9336,
+        "memoryControl": {
+          "durationMs": 4.050830000000019,
+          "heapPeakBytes": 21022264,
+          "heapDeltaPeakBytes": 984904,
+          "note": "same probe load, same duration, zero ledger work: the V8 peak-growth noise floor after a post-load compaction"
+        },
+        "getEntriesCalls": 1,
+        "getEntryCalls": 0
+      },
+      "rebuild_tree": {
+        "wallMs": 3.3677690000000666,
+        "cpuMs": 3.518000000000029,
+        "lastBaselineMs": 2.0591779999999744,
+        "maxSliceMs": 0.6124950000000808,
+        "probe": {
+          "iterations": 1041,
+          "maxGapMs": 0.6589569999999867,
+          "p50GapMs": 0.0015130000000453947,
+          "p95GapMs": 0.0031919999998990534,
+          "p99GapMs": 0.011154000000033193,
+          "cpuMs": 3.556,
+          "heapPeakBytes": 22683968,
+          "rssPeakBytes": 125104128
+        }
+      },
+      "rebuild_compact": {
+        "wallMs": 3.8250229999999874,
+        "cpuMs": 5.423999999999978,
+        "lastBaselineMs": 2.140698000000043,
+        "maxSliceMs": 0.6124950000000808,
+        "probe": {
+          "iterations": 1573,
+          "maxGapMs": 0.4107400000000325,
+          "p50GapMs": 0.0015099999999392821,
+          "p95GapMs": 0.002784999999903448,
+          "p99GapMs": 0.010169000000018968,
+          "cpuMs": 5.432,
+          "heapPeakBytes": 24531704,
+          "rssPeakBytes": 125104128
+        }
+      },
+      "steady": {
+        "plus_1": {
+          "appendMs": 0.08784100000002582,
+          "wallMs": 1.4307640000000674,
+          "cpuMs": 1.4890000000000327,
+          "verifyPause": {
+            "iterations": 612,
+            "maxGapMs": 0.25099599999998645,
+            "p50GapMs": 0.0015369999999848005,
+            "p95GapMs": 0.0029130000000350265,
+            "p99GapMs": 0.01463699999999335,
+            "cpuMs": 1.496,
+            "heapPeakBytes": 25185864,
+            "rssPeakBytes": 125104128
+          },
+          "maxIncrementMs": 0.06657600000005459
+        },
+        "plus_32": {
+          "appendMs": 0.1337660000000369,
+          "wallMs": 1.6161759999999958,
+          "cpuMs": 2.4969999999999573,
+          "verifyPause": {
+            "iterations": 891,
+            "maxGapMs": 0.07993600000008882,
+            "p50GapMs": 0.0014810000000125,
+            "p95GapMs": 0.0021240000000943837,
+            "p99GapMs": 0.008738999999991393,
+            "cpuMs": 2.502,
+            "heapPeakBytes": 25915256,
+            "rssPeakBytes": 125104128
+          },
+          "maxIncrementMs": 0.06657600000005459
+        },
+        "plus_2048": {
+          "appendMs": 2.951632000000018,
+          "wallMs": 3.79654400000004,
+          "cpuMs": 7.951999999999998,
+          "verifyPause": {
+            "iterations": 920,
+            "maxGapMs": 2.24703999999997,
+            "p50GapMs": 0.0013000000000147338,
+            "p95GapMs": 0.0026450000000295404,
+            "p99GapMs": 0.007080999999971027,
+            "cpuMs": 7.961,
+            "heapPeakBytes": 31516384,
+            "rssPeakBytes": 127725568
+          },
+          "maxIncrementMs": 0.47085900000001857
+        }
+      },
+      "overCap": {
+        "wallMs": 12.911457000000041,
+        "cpuMs": 22.69100000000003,
+        "probe": {
+          "iterations": 6564,
+          "maxGapMs": 1.0201729999999998,
+          "p50GapMs": 0.0010490000000800137,
+          "p95GapMs": 0.002378999999905318,
+          "p99GapMs": 0.008010000000012951,
+          "cpuMs": 22.706,
+          "heapPeakBytes": 35680680,
+          "rssPeakBytes": 131133440
+        },
+        "lastBaselineMs": 9.96864400000004,
+        "maxSliceMs": 0.6124950000000808
+      },
+      "catchupDuringRebuild": {
+        "exercisedMidSlice": true,
+        "wallMs": 10.851554999999962,
+        "cpuMs": 17.359000000000037,
+        "probe": {
+          "iterations": 6676,
+          "maxGapMs": 0.8051360000000614,
+          "p50GapMs": 0.0009759999999232605,
+          "p95GapMs": 0.0017420000000356595,
+          "p99GapMs": 0.005981000000019776,
+          "cpuMs": 17.376,
+          "heapPeakBytes": 35816840,
+          "rssPeakBytes": 132444160
+        },
+        "maxIncrementMs": 0.47085900000001857
+      },
+      "recoveryFailsAgain": {
+        "sawFailureDuringChurn": true,
+        "sawCoverageGapDuringChurn": true,
+        "guardHeld": true,
+        "recoveryRebuilds": 1,
+        "healedByNextEventBoundary": true,
+        "totalAppendedDuringChurn": 6240,
+        "note": "appends straddling a baseline and its own recovery stop at the anti-loop guard; no timer retries; the next anchored verify commits every missing segment exactly once"
+      },
+      "fastSwitch": {
+        "cancelledBusyBaseline": true,
+        "syncRestartMs": 0.042521999999962645,
+        "wallMs": 2.014019999999846,
+        "cpuMs": 7.2309999999999945,
+        "probe": {
+          "iterations": 167,
+          "maxGapMs": 0.5321549999998751,
+          "p50GapMs": 0.0011899999999513966,
+          "p95GapMs": 0.06979200000000674,
+          "p99GapMs": 0.23044300000015028,
+          "cpuMs": 7.248,
+          "heapPeakBytes": 34568312,
+          "rssPeakBytes": 138866688
+        },
+        "lastBaselineMs": 0.14563299999986157,
+        "note": "syncRestartMs is the synchronous cancel+replan cost of the second restart; the stale generation never publishes"
+      },
+      "finishedAt": "2026-09-20T10:16:00.305Z"
+    },
+    {
+      "size": 10000,
+      "shape": "linear",
+      "gcAvailable": true,
+      "startedAt": "2026-09-20T10:16:00.534Z",
+      "probeIdle": {
+        "iterations": 139329,
+        "maxGapMs": 1.12057200000001,
+        "p50GapMs": 0.0007889999999974862,
+        "p95GapMs": 0.00166299999997932,
+        "p99GapMs": 0.005649000000005344,
+        "cpuMs": 166.717,
+        "heapPeakBytes": 28217960,
+        "rssPeakBytes": 116125696
+      },
+      "fixtureBuildMs": 28.797663,
+      "fixtureMeta": {
+        "size": 10000,
+        "shape": "linear",
+        "seed": 187391725,
+        "entryCount": 10000,
+        "usageRecordCount": 6200,
+        "contentChars": 220,
+        "summaryChars": 400,
+        "ratios": {
+          "assistantUsage": 0.42,
+          "user": 0.2,
+          "toolResultUsage": 0.18,
+          "toolResultPlain": 0.12,
+          "assistantNoUsage": 0.03,
+          "compactionUsage": 0.02,
+          "compactionNoUsage": 0.015,
+          "branchSide": 0.15
+        }
+      },
+      "managerLoad": {
+        "wallMs": 17.559379000000035,
+        "cpuMs": 37.54499999999996,
+        "entryCount": 10000
+      },
+      "getEntriesCopy": {
+        "samples": [
+          {
+            "ms": 0.10592200000002094,
+            "length": 10000
+          },
+          {
+            "ms": 0.10667200000000321,
+            "length": 10000
+          },
+          {
+            "ms": 0.11807400000003554,
+            "length": 10000
+          },
+          {
+            "ms": 0.11869200000001001,
+            "length": 10000
+          },
+          {
+            "ms": 0.15716800000001285,
+            "length": 10000
+          }
+        ],
+        "medianMs": 0.11807400000003554,
+        "maxMs": 0.15716800000001285
+      },
+      "attach": {
+        "wallMs": 20.28754600000002,
+        "cpuMs": 33.65499999999997,
+        "netCpuMs": 11.106474623453284,
+        "lastBaselineMs": 18.867407999999955,
+        "maxSliceMs": 0.24537200000008852,
+        "probe": {
+          "iterations": 9999,
+          "maxGapMs": 0.5103729999999587,
+          "p50GapMs": 0.0014649999999392094,
+          "p95GapMs": 0.00245499999994081,
+          "p99GapMs": 0.007067000000006374,
+          "cpuMs": 33.695,
+          "heapPeakBytes": 41212288,
+          "rssPeakBytes": 148316160
+        },
+        "heapBeforeBytes": 30430272,
+        "rssBeforeBytes": 148316160,
+        "heapPeakBytes": 41212288,
+        "rssPeakBytes": 148316160,
+        "heapAfterReleaseBytes": 30562704,
+        "rssAfterReleaseBytes": 148316160,
+        "heapDeltaPeakBytes": 10782016,
+        "heapDeltaAfterReleaseBytes": 132432,
+        "shallowArrayBytes": 80000,
+        "memoryControl": {
+          "durationMs": 20.28754600000002,
+          "heapPeakBytes": 39131944,
+          "heapDeltaPeakBytes": 8569240,
+          "note": "same probe load, same duration, zero ledger work: the V8 peak-growth noise floor after a post-load compaction"
+        },
+        "getEntriesCalls": 1,
+        "getEntryCalls": 0
+      },
+      "rebuild_tree": {
+        "wallMs": 20.67415799999992,
+        "cpuMs": 33.903999999999996,
+        "lastBaselineMs": 18.796418000000017,
+        "maxSliceMs": 0.25302799999997205,
+        "probe": {
+          "iterations": 12910,
+          "maxGapMs": 0.5198040000000219,
+          "p50GapMs": 0.0009620000000722939,
+          "p95GapMs": 0.0023179999999456413,
+          "p99GapMs": 0.0066429999999400025,
+          "cpuMs": 33.948,
+          "heapPeakBytes": 50885952,
+          "rssPeakBytes": 153952256
+        }
+      },
+      "rebuild_compact": {
+        "wallMs": 20.645843000000013,
+        "cpuMs": 30.235000000000014,
+        "lastBaselineMs": 18.846194999999966,
+        "maxSliceMs": 0.25302799999997205,
+        "probe": {
+          "iterations": 13560,
+          "maxGapMs": 0.6369600000000446,
+          "p50GapMs": 0.0008980000000065047,
+          "p95GapMs": 0.0023280000000340806,
+          "p99GapMs": 0.006637999999952626,
+          "cpuMs": 30.299,
+          "heapPeakBytes": 58187232,
+          "rssPeakBytes": 161030144
+        }
+      },
+      "steady": {
+        "plus_1": {
+          "appendMs": 0.10788800000000265,
+          "wallMs": 1.966201999999953,
+          "cpuMs": 1.974999999999909,
+          "verifyPause": {
+            "iterations": 1497,
+            "maxGapMs": 0.3043410000000222,
+            "p50GapMs": 0.000891000000024178,
+            "p95GapMs": 0.000965999999948508,
+            "p99GapMs": 0.005292000000054031,
+            "cpuMs": 1.988,
+            "heapPeakBytes": 37473992,
+            "rssPeakBytes": 160935936
+          },
+          "maxIncrementMs": 0.09492599999998674
+        },
+        "plus_32": {
+          "appendMs": 0.15779199999997218,
+          "wallMs": 1.3950310000000172,
+          "cpuMs": 1.3949999999999818,
+          "verifyPause": {
+            "iterations": 1219,
+            "maxGapMs": 0.07474400000000969,
+            "p50GapMs": 0.0008770000000595246,
+            "p95GapMs": 0.0009749999999257852,
+            "p99GapMs": 0.005310000000008586,
+            "cpuMs": 1.403,
+            "heapPeakBytes": 38291360,
+            "rssPeakBytes": 160935936
+          },
+          "maxIncrementMs": 0.09492599999998674
+        },
+        "plus_2048": {
+          "appendMs": 3.5629829999999174,
+          "wallMs": 2.1110760000000255,
+          "cpuMs": 7.08299999999997,
+          "verifyPause": {
+            "iterations": 911,
+            "maxGapMs": 1.021729999999934,
+            "p50GapMs": 0.0009109999999736829,
+            "p95GapMs": 0.0013460000000122818,
+            "p99GapMs": 0.006222999999977219,
+            "cpuMs": 7.099,
+            "heapPeakBytes": 42614000,
+            "rssPeakBytes": 161067008
+          },
+          "maxIncrementMs": 0.4358879999999772
+        }
+      },
+      "overCap": {
+        "wallMs": 29.23171500000001,
+        "cpuMs": 32.58299999999997,
+        "probe": {
+          "iterations": 21674,
+          "maxGapMs": 0.43469600000003084,
+          "p50GapMs": 0.000827999999955864,
+          "p95GapMs": 0.0019690000000309738,
+          "p99GapMs": 0.00546899999994821,
+          "cpuMs": 32.596,
+          "heapPeakBytes": 59011080,
+          "rssPeakBytes": 170766336
+        },
+        "lastBaselineMs": 27.104626999999937,
+        "maxSliceMs": 0.39894300000003113
+      },
+      "catchupDuringRebuild": {
+        "exercisedMidSlice": true,
+        "wallMs": 27.708961000000045,
+        "cpuMs": 31.344999999999914,
+        "probe": {
+          "iterations": 22702,
+          "maxGapMs": 0.2639159999999947,
+          "p50GapMs": 0.0008200000000897489,
+          "p95GapMs": 0.001408999999966909,
+          "p99GapMs": 0.005500999999981104,
+          "cpuMs": 31.365,
+          "heapPeakBytes": 50728896,
+          "rssPeakBytes": 175104000
+        },
+        "maxIncrementMs": 0.4358879999999772
+      },
+      "recoveryFailsAgain": {
+        "sawFailureDuringChurn": true,
+        "sawCoverageGapDuringChurn": true,
+        "guardHeld": true,
+        "recoveryRebuilds": 1,
+        "healedByNextEventBoundary": true,
+        "totalAppendedDuringChurn": 6240,
+        "note": "appends straddling a baseline and its own recovery stop at the anti-loop guard; no timer retries; the next anchored verify commits every missing segment exactly once"
+      },
+      "fastSwitch": {
+        "cancelledBusyBaseline": true,
+        "syncRestartMs": 0.29223000000001775,
+        "wallMs": 1.4329709999999523,
+        "cpuMs": 2.8890000000001237,
+        "probe": {
+          "iterations": 318,
+          "maxGapMs": 0.34850200000005316,
+          "p50GapMs": 0.0021379999998316634,
+          "p95GapMs": 0.013160999999854539,
+          "p99GapMs": 0.02906099999995604,
+          "cpuMs": 2.943,
+          "heapPeakBytes": 47844944,
+          "rssPeakBytes": 180953088
+        },
+        "lastBaselineMs": 0.2370130000001609,
+        "note": "syncRestartMs is the synchronous cancel+replan cost of the second restart; the stale generation never publishes"
+      },
+      "finishedAt": "2026-09-20T10:16:01.522Z"
+    },
+    {
+      "size": 10000,
+      "shape": "branched",
+      "gcAvailable": true,
+      "startedAt": "2026-09-20T10:16:01.764Z",
+      "probeIdle": {
+        "iterations": 147477,
+        "maxGapMs": 0.8105319999999949,
+        "p50GapMs": 0.0007600000000138607,
+        "p95GapMs": 0.0014139999999542852,
+        "p99GapMs": 0.0054379999999980555,
+        "cpuMs": 164.753,
+        "heapPeakBytes": 28623888,
+        "rssPeakBytes": 116367360
+      },
+      "fixtureBuildMs": 36.50726300000002,
+      "fixtureMeta": {
+        "size": 10000,
+        "shape": "branched",
+        "seed": 187391725,
+        "entryCount": 11647,
+        "usageRecordCount": 7299,
+        "contentChars": 220,
+        "summaryChars": 400,
+        "ratios": {
+          "assistantUsage": 0.42,
+          "user": 0.2,
+          "toolResultUsage": 0.18,
+          "toolResultPlain": 0.12,
+          "assistantNoUsage": 0.03,
+          "compactionUsage": 0.02,
+          "compactionNoUsage": 0.015,
+          "branchSide": 0.15
+        }
+      },
+      "managerLoad": {
+        "wallMs": 15.087252999999976,
+        "cpuMs": 30.043000000000006,
+        "entryCount": 11647
+      },
+      "getEntriesCopy": {
+        "samples": [
+          {
+            "ms": 0.21876100000002907,
+            "length": 11647
+          },
+          {
+            "ms": 0.22441400000002432,
+            "length": 11647
+          },
+          {
+            "ms": 0.2246579999999767,
+            "length": 11647
+          },
+          {
+            "ms": 0.23628999999999678,
+            "length": 11647
+          },
+          {
+            "ms": 0.41508199999998396,
+            "length": 11647
+          }
+        ],
+        "medianMs": 0.2246579999999767,
+        "maxMs": 0.41508199999998396
+      },
+      "attach": {
+        "wallMs": 23.224503000000027,
+        "cpuMs": 41.567999999999984,
+        "netCpuMs": 16.059289714939954,
+        "lastBaselineMs": 21.747712999999976,
+        "maxSliceMs": 0.4492880000000241,
+        "probe": {
+          "iterations": 9262,
+          "maxGapMs": 0.9328689999999824,
+          "p50GapMs": 0.001556000000050517,
+          "p95GapMs": 0.002491999999961081,
+          "p99GapMs": 0.00840800000003128,
+          "cpuMs": 41.635,
+          "heapPeakBytes": 45339744,
+          "rssPeakBytes": 152375296
+        },
+        "heapBeforeBytes": 32641584,
+        "rssBeforeBytes": 152375296,
+        "heapPeakBytes": 45339744,
+        "rssPeakBytes": 152375296,
+        "heapAfterReleaseBytes": 32758856,
+        "rssAfterReleaseBytes": 152506368,
+        "heapDeltaPeakBytes": 12698160,
+        "heapDeltaAfterReleaseBytes": 117272,
+        "shallowArrayBytes": 93176,
+        "memoryControl": {
+          "durationMs": 23.224503000000027,
+          "heapPeakBytes": 42447104,
+          "heapDeltaPeakBytes": 9688248,
+          "note": "same probe load, same duration, zero ledger work: the V8 peak-growth noise floor after a post-load compaction"
+        },
+        "getEntriesCalls": 1,
+        "getEntryCalls": 0
+      },
+      "rebuild_tree": {
+        "wallMs": 23.91512799999998,
+        "cpuMs": 35.89099999999996,
+        "lastBaselineMs": 21.74075700000003,
+        "maxSliceMs": 0.4492880000000241,
+        "probe": {
+          "iterations": 15680,
+          "maxGapMs": 0.6310479999999643,
+          "p50GapMs": 0.0009400000000141517,
+          "p95GapMs": 0.0021809999999504726,
+          "p99GapMs": 0.006455999999957385,
+          "cpuMs": 35.967,
+          "heapPeakBytes": 56343576,
+          "rssPeakBytes": 159715328
+        }
+      },
+      "rebuild_compact": {
+        "wallMs": 23.981745000000046,
+        "cpuMs": 35.62099999999998,
+        "lastBaselineMs": 21.643922999999972,
+        "maxSliceMs": 0.4492880000000241,
+        "probe": {
+          "iterations": 17777,
+          "maxGapMs": 0.6459730000000263,
+          "p50GapMs": 0.0008639999999786596,
+          "p95GapMs": 0.001702000000022963,
+          "p99GapMs": 0.00594300000000203,
+          "cpuMs": 35.644,
+          "heapPeakBytes": 60598320,
+          "rssPeakBytes": 163909632
+        }
+      },
+      "steady": {
+        "plus_1": {
+          "appendMs": 0.11023499999998876,
+          "wallMs": 1.2388459999999668,
+          "cpuMs": 1.245999999999981,
+          "verifyPause": {
+            "iterations": 878,
+            "maxGapMs": 0.2777290000000221,
+            "p50GapMs": 0.0008350000000518776,
+            "p95GapMs": 0.0009109999999736829,
+            "p99GapMs": 0.005448999999998705,
+            "cpuMs": 1.257,
+            "heapPeakBytes": 45320432,
+            "rssPeakBytes": 163921920
+          },
+          "maxIncrementMs": 0.08144100000004073
+        },
+        "plus_32": {
+          "appendMs": 0.14515800000003765,
+          "wallMs": 1.5642840000000433,
+          "cpuMs": 2.0950000000000273,
+          "verifyPause": {
+            "iterations": 1387,
+            "maxGapMs": 0.11210800000003474,
+            "p50GapMs": 0.0008139999999912106,
+            "p95GapMs": 0.0014169999999467109,
+            "p99GapMs": 0.005899999999996908,
+            "cpuMs": 2.104,
+            "heapPeakBytes": 46088536,
+            "rssPeakBytes": 163921920
+          },
+          "maxIncrementMs": 0.08144100000004073
+        },
+        "plus_2048": {
+          "appendMs": 3.410425000000032,
+          "wallMs": 1.2418270000000575,
+          "cpuMs": 3.7369999999999663,
+          "verifyPause": {
+            "iterations": 198,
+            "maxGapMs": 0.9616160000000491,
+            "p50GapMs": 0.0008209999999735373,
+            "p95GapMs": 0.005200999999942724,
+            "p99GapMs": 0.033326999999985674,
+            "cpuMs": 3.747,
+            "heapPeakBytes": 49991200,
+            "rssPeakBytes": 164184064
+          },
+          "maxIncrementMs": 0.46898699999997007
+        }
+      },
+      "overCap": {
+        "wallMs": 32.833372000000054,
+        "cpuMs": 35.969999999999914,
+        "probe": {
+          "iterations": 23529,
+          "maxGapMs": 1.0241989999999532,
+          "p50GapMs": 0.0008229999999684878,
+          "p95GapMs": 0.001975000000015825,
+          "p99GapMs": 0.005776999999966392,
+          "cpuMs": 35.984,
+          "heapPeakBytes": 62895400,
+          "rssPeakBytes": 175628288
+        },
+        "lastBaselineMs": 29.758131999999932,
+        "maxSliceMs": 0.4492880000000241
+      },
+      "catchupDuringRebuild": {
+        "exercisedMidSlice": true,
+        "wallMs": 30.24913200000003,
+        "cpuMs": 34.763999999999896,
+        "probe": {
+          "iterations": 23778,
+          "maxGapMs": 0.2635649999999714,
+          "p50GapMs": 0.000853000000006432,
+          "p95GapMs": 0.0015220000000226719,
+          "p99GapMs": 0.005759000000011838,
+          "cpuMs": 34.787,
+          "heapPeakBytes": 62282600,
+          "rssPeakBytes": 177332224
+        },
+        "maxIncrementMs": 0.46898699999997007
+      },
+      "recoveryFailsAgain": {
+        "sawFailureDuringChurn": true,
+        "sawCoverageGapDuringChurn": true,
+        "guardHeld": true,
+        "recoveryRebuilds": 1,
+        "healedByNextEventBoundary": true,
+        "totalAppendedDuringChurn": 6240,
+        "note": "appends straddling a baseline and its own recovery stop at the anti-loop guard; no timer retries; the next anchored verify commits every missing segment exactly once"
+      },
+      "fastSwitch": {
+        "cancelledBusyBaseline": true,
+        "syncRestartMs": 0.0323519999999462,
+        "wallMs": 1.3642589999999473,
+        "cpuMs": 2.137000000000171,
+        "probe": {
+          "iterations": 1057,
+          "maxGapMs": 0.18104300000004514,
+          "p50GapMs": 0.000854000000117594,
+          "p95GapMs": 0.0009479999998802668,
+          "p99GapMs": 0.0057979999999133724,
+          "cpuMs": 2.144,
+          "heapPeakBytes": 55557032,
+          "rssPeakBytes": 185278464
+        },
+        "lastBaselineMs": 0.11513500000000931,
+        "note": "syncRestartMs is the synchronous cancel+replan cost of the second restart; the stale generation never publishes"
+      },
+      "finishedAt": "2026-09-20T10:16:02.779Z"
+    },
+    {
+      "size": 100000,
+      "shape": "linear",
+      "gcAvailable": true,
+      "startedAt": "2026-09-20T10:16:03.012Z",
+      "probeIdle": {
+        "iterations": 139633,
+        "maxGapMs": 0.826562000000024,
+        "p50GapMs": 0.0007880000000000109,
+        "p95GapMs": 0.001630999999974847,
+        "p99GapMs": 0.005658999999980097,
+        "cpuMs": 166.3,
+        "heapPeakBytes": 28485352,
+        "rssPeakBytes": 115863552
+      },
+      "fixtureBuildMs": 276.50478000000004,
+      "fixtureMeta": {
+        "size": 100000,
+        "shape": "linear",
+        "seed": 187391725,
+        "entryCount": 100000,
+        "usageRecordCount": 62000,
+        "contentChars": 220,
+        "summaryChars": 400,
+        "ratios": {
+          "assistantUsage": 0.42,
+          "user": 0.2,
+          "toolResultUsage": 0.18,
+          "toolResultPlain": 0.12,
+          "assistantNoUsage": 0.03,
+          "compactionUsage": 0.02,
+          "compactionNoUsage": 0.015,
+          "branchSide": 0.15
+        }
+      },
+      "managerLoad": {
+        "wallMs": 180.84652499999993,
+        "cpuMs": 262.6790000000001,
+        "entryCount": 100000
+      },
+      "getEntriesCopy": {
+        "samples": [
+          {
+            "ms": 1.7361130000000458,
+            "length": 100000
+          },
+          {
+            "ms": 1.8028249999999844,
+            "length": 100000
+          },
+          {
+            "ms": 1.9711750000000166,
+            "length": 100000
+          },
+          {
+            "ms": 2.005356000000006,
+            "length": 100000
+          },
+          {
+            "ms": 2.0623429999999416,
+            "length": 100000
+          }
+        ],
+        "medianMs": 1.9711750000000166,
+        "maxMs": 2.0623429999999416
+      },
+      "attach": {
+        "wallMs": 199.6709699999999,
+        "cpuMs": 262.4949999999999,
+        "netCpuMs": 41.12645126000001,
+        "lastBaselineMs": 194.99990200000002,
+        "maxSliceMs": 0.4183700000000954,
+        "probe": {
+          "iterations": 162021,
+          "maxGapMs": 3.5580889999998817,
+          "p50GapMs": 0.0007990000001427688,
+          "p95GapMs": 0.0015829999999823485,
+          "p99GapMs": 0.005472000000054322,
+          "cpuMs": 262.543,
+          "heapPeakBytes": 195436632,
+          "rssPeakBytes": 356392960
+        },
+        "heapBeforeBytes": 136530776,
+        "rssBeforeBytes": 351674368,
+        "heapPeakBytes": 195436632,
+        "rssPeakBytes": 356392960,
+        "heapAfterReleaseBytes": 138046464,
+        "rssAfterReleaseBytes": 353189888,
+        "heapDeltaPeakBytes": 58905856,
+        "heapDeltaAfterReleaseBytes": 1515688,
+        "shallowArrayBytes": 800000,
+        "memoryControl": {
+          "durationMs": 199.6709699999999,
+          "heapPeakBytes": 195571552,
+          "heapDeltaPeakBytes": 57525088,
+          "note": "same probe load, same duration, zero ledger work: the V8 peak-growth noise floor after a post-load compaction"
+        },
+        "getEntriesCalls": 1,
+        "getEntryCalls": 0
+      },
+      "rebuild_tree": {
+        "wallMs": 198.19062499999995,
+        "cpuMs": 214.75999999999976,
+        "lastBaselineMs": 194.38002299999994,
+        "maxSliceMs": 0.4183700000000954,
+        "probe": {
+          "iterations": 170796,
+          "maxGapMs": 2.82172700000001,
+          "p50GapMs": 0.0008199999999760621,
+          "p95GapMs": 0.0009800000000268483,
+          "p99GapMs": 0.005285999999841806,
+          "cpuMs": 214.85,
+          "heapPeakBytes": 202404736,
+          "rssPeakBytes": 363352064
+        }
+      },
+      "rebuild_compact": {
+        "wallMs": 199.19211099999984,
+        "cpuMs": 210.92000000000007,
+        "lastBaselineMs": 195.0474710000001,
+        "maxSliceMs": 0.4183700000000954,
+        "probe": {
+          "iterations": 171719,
+          "maxGapMs": 2.1708770000000186,
+          "p50GapMs": 0.0008309999998346029,
+          "p95GapMs": 0.000945000000001528,
+          "p99GapMs": 0.0052730000002156885,
+          "cpuMs": 210.999,
+          "heapPeakBytes": 204332240,
+          "rssPeakBytes": 365326336
+        }
+      },
+      "steady": {
+        "plus_1": {
+          "appendMs": 0.0957469999998466,
+          "wallMs": 1.173594000000321,
+          "cpuMs": 1.1779999999998836,
+          "verifyPause": {
+            "iterations": 801,
+            "maxGapMs": 0.29775100000006205,
+            "p50GapMs": 0.0008210000000872242,
+            "p95GapMs": 0.0009039999999913562,
+            "p99GapMs": 0.005298000000038883,
+            "cpuMs": 1.191,
+            "heapPeakBytes": 199899320,
+            "rssPeakBytes": 367501312
+          },
+          "maxIncrementMs": 0.08340199999975084
+        },
+        "plus_32": {
+          "appendMs": 0.13021000000026106,
+          "wallMs": 1.5765309999997044,
+          "cpuMs": 1.6720000000000255,
+          "verifyPause": {
+            "iterations": 1439,
+            "maxGapMs": 0.08614199999965422,
+            "p50GapMs": 0.0008259999999609136,
+            "p95GapMs": 0.0009410000002390007,
+            "p99GapMs": 0.005317999999988388,
+            "cpuMs": 1.68,
+            "heapPeakBytes": 200660552,
+            "rssPeakBytes": 367501312
+          },
+          "maxIncrementMs": 0.08340199999975084
+        },
+        "plus_2048": {
+          "appendMs": 3.401937000000089,
+          "wallMs": 1.2517829999997048,
+          "cpuMs": 3.9710000000000036,
+          "verifyPause": {
+            "iterations": 286,
+            "maxGapMs": 0.9111669999997503,
+            "p50GapMs": 0.0008760000000620494,
+            "p95GapMs": 0.0010649999999259308,
+            "p99GapMs": 0.01759600000013961,
+            "cpuMs": 3.979,
+            "heapPeakBytes": 204522264,
+            "rssPeakBytes": 367632384
+          },
+          "maxIncrementMs": 0.4270349999997052
+        }
+      },
+      "overCap": {
+        "wallMs": 208.26214600000003,
+        "cpuMs": 214.95699999999988,
+        "probe": {
+          "iterations": 177345,
+          "maxGapMs": 2.4494720000002417,
+          "p50GapMs": 0.0008330000000569271,
+          "p95GapMs": 0.0009250000002793968,
+          "p99GapMs": 0.005286999999952968,
+          "cpuMs": 214.981,
+          "heapPeakBytes": 208895368,
+          "rssPeakBytes": 371560448
+        },
+        "lastBaselineMs": 203.16910999999982,
+        "maxSliceMs": 0.4183700000000954
+      },
+      "catchupDuringRebuild": {
+        "exercisedMidSlice": true,
+        "wallMs": 203.0757749999998,
+        "cpuMs": 203.3720000000003,
+        "probe": {
+          "iterations": 177642,
+          "maxGapMs": 0.8427379999998266,
+          "p50GapMs": 0.0008330000000569271,
+          "p95GapMs": 0.0009060000002136803,
+          "p99GapMs": 0.00525999999990745,
+          "cpuMs": 203.392,
+          "heapPeakBytes": 214542424,
+          "rssPeakBytes": 376111104
+        },
+        "maxIncrementMs": 0.4270349999997052
+      },
+      "recoveryFailsAgain": {
+        "sawFailureDuringChurn": true,
+        "sawCoverageGapDuringChurn": true,
+        "guardHeld": true,
+        "recoveryRebuilds": 1,
+        "healedByNextEventBoundary": true,
+        "totalAppendedDuringChurn": 6240,
+        "note": "appends straddling a baseline and its own recovery stop at the anti-loop guard; no timer retries; the next anchored verify commits every missing segment exactly once"
+      },
+      "fastSwitch": {
+        "cancelledBusyBaseline": true,
+        "syncRestartMs": 0.07815200000004552,
+        "wallMs": 1.8798200000001088,
+        "cpuMs": 3.5119999999997162,
+        "probe": {
+          "iterations": 577,
+          "maxGapMs": 0.318449999999757,
+          "p50GapMs": 0.0020650000001296576,
+          "p95GapMs": 0.002648000000135653,
+          "p99GapMs": 0.021287999999913154,
+          "cpuMs": 3.525,
+          "heapPeakBytes": 180688568,
+          "rssPeakBytes": 382906368
+        },
+        "lastBaselineMs": 0.2257710000003499,
+        "note": "syncRestartMs is the synchronous cancel+replan cost of the second restart; the stale generation never publishes"
+      },
+      "finishedAt": "2026-09-20T10:16:05.813Z"
+    },
+    {
+      "size": 100000,
+      "shape": "branched",
+      "gcAvailable": true,
+      "startedAt": "2026-09-20T10:16:06.064Z",
+      "probeIdle": {
+        "iterations": 145320,
+        "maxGapMs": 0.7425049999999942,
+        "p50GapMs": 0.0007689999999911379,
+        "p95GapMs": 0.0014760000000251239,
+        "p99GapMs": 0.005503000000032898,
+        "cpuMs": 163.96,
+        "heapPeakBytes": 28622168,
+        "rssPeakBytes": 116498432
+      },
+      "fixtureBuildMs": 302.128543,
+      "fixtureMeta": {
+        "size": 100000,
+        "shape": "branched",
+        "seed": 187391725,
+        "entryCount": 116212,
+        "usageRecordCount": 72767,
+        "contentChars": 220,
+        "summaryChars": 400,
+        "ratios": {
+          "assistantUsage": 0.42,
+          "user": 0.2,
+          "toolResultUsage": 0.18,
+          "toolResultPlain": 0.12,
+          "assistantNoUsage": 0.03,
+          "compactionUsage": 0.02,
+          "compactionNoUsage": 0.015,
+          "branchSide": 0.15
+        }
+      },
+      "managerLoad": {
+        "wallMs": 206.43947500000002,
+        "cpuMs": 286.83799999999997,
+        "entryCount": 116212
+      },
+      "getEntriesCopy": {
+        "samples": [
+          {
+            "ms": 2.5076990000000023,
+            "length": 116212
+          },
+          {
+            "ms": 2.53014399999995,
+            "length": 116212
+          },
+          {
+            "ms": 2.5343829999999343,
+            "length": 116212
+          },
+          {
+            "ms": 2.5787010000000237,
+            "length": 116212
+          },
+          {
+            "ms": 2.6092089999999644,
+            "length": 116212
+          }
+        ],
+        "medianMs": 2.5343829999999343,
+        "maxMs": 2.6092089999999644
+      },
+      "attach": {
+        "wallMs": 231.17482099999984,
+        "cpuMs": 306.7840000000001,
+        "netCpuMs": 54.09450899226695,
+        "lastBaselineMs": 225.95449299999996,
+        "maxSliceMs": 0.7095179999998891,
+        "probe": {
+          "iterations": 187649,
+          "maxGapMs": 4.783758000000034,
+          "p50GapMs": 0.0007860000000619038,
+          "p95GapMs": 0.0015700000001288572,
+          "p99GapMs": 0.0054270000000542495,
+          "cpuMs": 306.86,
+          "heapPeakBytes": 216995840,
+          "rssPeakBytes": 381710336
+        },
+        "heapBeforeBytes": 157002752,
+        "rssBeforeBytes": 375549952,
+        "heapPeakBytes": 216995840,
+        "rssPeakBytes": 381710336,
+        "heapAfterReleaseBytes": 159211000,
+        "rssAfterReleaseBytes": 381399040,
+        "heapDeltaPeakBytes": 59993088,
+        "heapDeltaAfterReleaseBytes": 2208248,
+        "shallowArrayBytes": 929696,
+        "memoryControl": {
+          "durationMs": 231.17482099999984,
+          "heapPeakBytes": 216762680,
+          "heapDeltaPeakBytes": 57551680,
+          "note": "same probe load, same duration, zero ledger work: the V8 peak-growth noise floor after a post-load compaction"
+        },
+        "getEntriesCalls": 1,
+        "getEntryCalls": 0
+      },
+      "rebuild_tree": {
+        "wallMs": 229.87314600000013,
+        "cpuMs": 242.404,
+        "lastBaselineMs": 225.29648799999995,
+        "maxSliceMs": 0.7095179999998891,
+        "probe": {
+          "iterations": 199922,
+          "maxGapMs": 2.995184999999992,
+          "p50GapMs": 0.0008139999999912106,
+          "p95GapMs": 0.0009580000000823929,
+          "p99GapMs": 0.005310999999892374,
+          "cpuMs": 242.479,
+          "heapPeakBytes": 222750592,
+          "rssPeakBytes": 390922240
+        }
+      },
+      "rebuild_compact": {
+        "wallMs": 232.65065300000015,
+        "cpuMs": 244.6289999999999,
+        "lastBaselineMs": 228.51513599999998,
+        "maxSliceMs": 0.7095179999998891,
+        "probe": {
+          "iterations": 195617,
+          "maxGapMs": 4.767158000000109,
+          "p50GapMs": 0.0008290000000670261,
+          "p95GapMs": 0.0009439999998903659,
+          "p99GapMs": 0.005380999999943015,
+          "cpuMs": 244.656,
+          "heapPeakBytes": 231565664,
+          "rssPeakBytes": 401063936
+        }
+      },
+      "steady": {
+        "plus_1": {
+          "appendMs": 0.11232099999961065,
+          "wallMs": 1.2606180000002496,
+          "cpuMs": 1.2659999999996217,
+          "verifyPause": {
+            "iterations": 763,
+            "maxGapMs": 0.3627150000002075,
+            "p50GapMs": 0.0008310000002893503,
+            "p95GapMs": 0.0010440000000926375,
+            "p99GapMs": 0.005474000000049273,
+            "cpuMs": 1.282,
+            "heapPeakBytes": 197277800,
+            "rssPeakBytes": 404049920
+          },
+          "maxIncrementMs": 0.12144100000023172
+        },
+        "plus_32": {
+          "appendMs": 0.12018999999963853,
+          "wallMs": 1.6135920000001533,
+          "cpuMs": 1.7270000000003165,
+          "verifyPause": {
+            "iterations": 1477,
+            "maxGapMs": 0.061216999999942345,
+            "p50GapMs": 0.00084500000002663,
+            "p95GapMs": 0.0009439999998903659,
+            "p99GapMs": 0.005297000000155094,
+            "cpuMs": 1.735,
+            "heapPeakBytes": 198070136,
+            "rssPeakBytes": 404049920
+          },
+          "maxIncrementMs": 0.12144100000023172
+        },
+        "plus_2048": {
+          "appendMs": 3.6965759999998227,
+          "wallMs": 2.868242999999893,
+          "cpuMs": 6.445000000000164,
+          "verifyPause": {
+            "iterations": 1568,
+            "maxGapMs": 1.1206169999995836,
+            "p50GapMs": 0.0008430000002590532,
+            "p95GapMs": 0.0009870000003502355,
+            "p99GapMs": 0.005525999999917985,
+            "cpuMs": 6.455,
+            "heapPeakBytes": 202459720,
+            "rssPeakBytes": 404443136
+          },
+          "maxIncrementMs": 0.5746420000000398
+        }
+      },
+      "overCap": {
+        "wallMs": 245.03044599999976,
+        "cpuMs": 254.95300000000043,
+        "probe": {
+          "iterations": 201377,
+          "maxGapMs": 4.893278999999893,
+          "p50GapMs": 0.00084500000002663,
+          "p95GapMs": 0.000984000000244123,
+          "p99GapMs": 0.0054530000002159795,
+          "cpuMs": 254.981,
+          "heapPeakBytes": 248668152,
+          "rssPeakBytes": 416096256
+        },
+        "lastBaselineMs": 238.8573419999998,
+        "maxSliceMs": 0.7095179999998891
+      },
+      "catchupDuringRebuild": {
+        "exercisedMidSlice": true,
+        "wallMs": 236.94140700000025,
+        "cpuMs": 237.48500000000013,
+        "probe": {
+          "iterations": 203877,
+          "maxGapMs": 1.5552929999998923,
+          "p50GapMs": 0.0008319999997183913,
+          "p95GapMs": 0.0009389999995619291,
+          "p99GapMs": 0.005376000000069325,
+          "cpuMs": 237.525,
+          "heapPeakBytes": 257023664,
+          "rssPeakBytes": 424083456
+        },
+        "maxIncrementMs": 0.5746420000000398
+      },
+      "recoveryFailsAgain": {
+        "sawFailureDuringChurn": true,
+        "sawCoverageGapDuringChurn": true,
+        "guardHeld": true,
+        "recoveryRebuilds": 1,
+        "healedByNextEventBoundary": true,
+        "totalAppendedDuringChurn": 6240,
+        "note": "appends straddling a baseline and its own recovery stop at the anti-loop guard; no timer retries; the next anchored verify commits every missing segment exactly once"
+      },
+      "fastSwitch": {
+        "cancelledBusyBaseline": true,
+        "syncRestartMs": 0.0816330000002381,
+        "wallMs": 1.9116550000003372,
+        "cpuMs": 3.696999999999207,
+        "probe": {
+          "iterations": 1323,
+          "maxGapMs": 0.23297699999966426,
+          "p50GapMs": 0.0009340000001429871,
+          "p95GapMs": 0.001247000000148546,
+          "p99GapMs": 0.00644300000021758,
+          "cpuMs": 3.714,
+          "heapPeakBytes": 221924736,
+          "rssPeakBytes": 430448640
+        },
+        "lastBaselineMs": 0.15485399999988658,
+        "note": "syncRestartMs is the synchronous cancel+replan cost of the second restart; the stale generation never publishes"
+      },
+      "finishedAt": "2026-09-20T10:16:09.221Z"
+    }
+  ]
+}

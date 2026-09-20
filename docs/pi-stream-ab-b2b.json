@@ -1,0 +1,896 @@
+{
+  "generatedAt": "2026-09-20T18:06:02+0800",
+  "pairs": 10,
+  "trials": [
+    {
+      "hud": false,
+      "index": 0,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1486.3,
+        "p95Us": 2040.4,
+        "meanUs": 1344.2
+      },
+      "firstTokenMs": 53.43,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15776.9,
+        "p95Us": 26121.9,
+        "meanUs": 15574.2
+      },
+      "streamBytes": 3981,
+      "warmFirstTokenMs": 33.56,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15613.4,
+        "p95Us": 16178.6,
+        "meanUs": 15414.5
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 20.83,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 0,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 981.8,
+        "p95Us": 1621.2,
+        "meanUs": 1084.4
+      },
+      "firstTokenMs": 50.15,
+      "interToken": {
+        "n": 8,
+        "p50Us": 15614.2,
+        "p95Us": 28134.9,
+        "meanUs": 11698.7
+      },
+      "streamBytes": 3381,
+      "warmFirstTokenMs": 49.49,
+      "warmInterToken": {
+        "n": 6,
+        "p50Us": 15436.1,
+        "p95Us": 17306.8,
+        "meanUs": 12902.1
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 164.0,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 176.3,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 18.17,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 1,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1142.2,
+        "p95Us": 3511.3,
+        "meanUs": 1237.1
+      },
+      "firstTokenMs": 49.18,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15954.8,
+        "p95Us": 26439.9,
+        "meanUs": 15748.9
+      },
+      "streamBytes": 3381,
+      "warmFirstTokenMs": 34.21,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 16162.5,
+        "p95Us": 16573.9,
+        "meanUs": 15888.7
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 162.8,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 175.2,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 19.99,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 1,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1486.1,
+        "p95Us": 2341.1,
+        "meanUs": 1458.0
+      },
+      "firstTokenMs": 51.09,
+      "interToken": {
+        "n": 7,
+        "p50Us": 15579.3,
+        "p95Us": 29550.5,
+        "meanUs": 13516.9
+      },
+      "streamBytes": 3981,
+      "warmFirstTokenMs": 32.35,
+      "warmInterToken": {
+        "n": 7,
+        "p50Us": 15564.2,
+        "p95Us": 16337.7,
+        "meanUs": 11260.1
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 17.79,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 2,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1305.0,
+        "p95Us": 2360.4,
+        "meanUs": 1308.3
+      },
+      "firstTokenMs": 52.38,
+      "interToken": {
+        "n": 6,
+        "p50Us": 16001.0,
+        "p95Us": 28026.6,
+        "meanUs": 16022.2
+      },
+      "streamBytes": 3981,
+      "warmFirstTokenMs": 34.46,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 16820.4,
+        "p95Us": 17021.2,
+        "meanUs": 16010.3
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 18.9,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 2,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1125.9,
+        "p95Us": 1888.0,
+        "meanUs": 1075.5
+      },
+      "firstTokenMs": 49.12,
+      "interToken": {
+        "n": 7,
+        "p50Us": 15231.7,
+        "p95Us": 26225.6,
+        "meanUs": 13182.7
+      },
+      "streamBytes": 3381,
+      "warmFirstTokenMs": 35.33,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15181.0,
+        "p95Us": 16978.2,
+        "meanUs": 15121.1
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 164.4,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 177.7,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 20.83,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 3,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1170.4,
+        "p95Us": 1771.6,
+        "meanUs": 1119.5
+      },
+      "firstTokenMs": 64.6,
+      "interToken": {
+        "n": 8,
+        "p50Us": 15015.9,
+        "p95Us": 29348.2,
+        "meanUs": 11451.0
+      },
+      "streamBytes": 3381,
+      "warmFirstTokenMs": 34.47,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15473.1,
+        "p95Us": 17189.6,
+        "meanUs": 15598.4
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 170.4,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 175.7,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 18.29,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 3,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1324.4,
+        "p95Us": 3745.5,
+        "meanUs": 1539.8
+      },
+      "firstTokenMs": 68.0,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15548.7,
+        "p95Us": 27880.9,
+        "meanUs": 15413.7
+      },
+      "streamBytes": 3981,
+      "warmFirstTokenMs": 34.98,
+      "warmInterToken": {
+        "n": 6,
+        "p50Us": 16001.4,
+        "p95Us": 16699.1,
+        "meanUs": 13104.4
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 17.98,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 4,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1196.7,
+        "p95Us": 3989.3,
+        "meanUs": 1396.4
+      },
+      "firstTokenMs": 55.44,
+      "interToken": {
+        "n": 6,
+        "p50Us": 16467.5,
+        "p95Us": 33960.3,
+        "meanUs": 16586.2
+      },
+      "streamBytes": 4419,
+      "warmFirstTokenMs": 49.4,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15966.1,
+        "p95Us": 16932.0,
+        "meanUs": 15315.0
+      },
+      "warmStreamBytes": 3786,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": 0.1,
+      "warmPublicationBytes": 14,
+      "toolTurnMs": 20.87,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 4,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1014.3,
+        "p95Us": 2527.4,
+        "meanUs": 1096.0
+      },
+      "firstTokenMs": 50.67,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15557.4,
+        "p95Us": 30741.3,
+        "meanUs": 15757.8
+      },
+      "streamBytes": 3381,
+      "warmFirstTokenMs": 33.76,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15435.7,
+        "p95Us": 16418.6,
+        "meanUs": 15507.8
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 161.7,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 176.7,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 19.36,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 5,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1321.8,
+        "p95Us": 1741.6,
+        "meanUs": 1187.7
+      },
+      "firstTokenMs": 67.21,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15755.2,
+        "p95Us": 31165.0,
+        "meanUs": 15923.9
+      },
+      "streamBytes": 3375,
+      "warmFirstTokenMs": 33.29,
+      "warmInterToken": {
+        "n": 6,
+        "p50Us": 15646.6,
+        "p95Us": 17213.0,
+        "meanUs": 12976.1
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 0.1,
+      "coldPublicationBytes": 461,
+      "warmPublicationDelayMs": 175.4,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 17.86,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 5,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1166.9,
+        "p95Us": 2312.5,
+        "meanUs": 1287.3
+      },
+      "firstTokenMs": 52.64,
+      "interToken": {
+        "n": 7,
+        "p50Us": 15373.9,
+        "p95Us": 32907.9,
+        "meanUs": 13775.1
+      },
+      "streamBytes": 3981,
+      "warmFirstTokenMs": 34.04,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15610.2,
+        "p95Us": 16413.4,
+        "meanUs": 15472.1
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 18.47,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 6,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1348.7,
+        "p95Us": 3824.9,
+        "meanUs": 1433.1
+      },
+      "firstTokenMs": 69.28,
+      "interToken": {
+        "n": 7,
+        "p50Us": 15548.4,
+        "p95Us": 30970.5,
+        "meanUs": 13576.8
+      },
+      "streamBytes": 3981,
+      "warmFirstTokenMs": 34.78,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15847.3,
+        "p95Us": 16947.6,
+        "meanUs": 15856.8
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 18.23,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 6,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1110.9,
+        "p95Us": 3085.1,
+        "meanUs": 1234.6
+      },
+      "firstTokenMs": 52.26,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15553.0,
+        "p95Us": 33172.4,
+        "meanUs": 16233.4
+      },
+      "streamBytes": 3819,
+      "warmFirstTokenMs": 32.98,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 16068.2,
+        "p95Us": 16141.6,
+        "meanUs": 15847.0
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 159.6,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 174.8,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 18.68,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 7,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1319.2,
+        "p95Us": 2649.7,
+        "meanUs": 1294.2
+      },
+      "firstTokenMs": 66.07,
+      "interToken": {
+        "n": 10,
+        "p50Us": 14840.4,
+        "p95Us": 28002.8,
+        "meanUs": 9261.3
+      },
+      "streamBytes": 3381,
+      "warmFirstTokenMs": 33.74,
+      "warmInterToken": {
+        "n": 6,
+        "p50Us": 15516.6,
+        "p95Us": 17551.4,
+        "meanUs": 13140.0
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 172.0,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 174.0,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 20.42,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 7,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1403.0,
+        "p95Us": 2026.2,
+        "meanUs": 1293.0
+      },
+      "firstTokenMs": 55.02,
+      "interToken": {
+        "n": 6,
+        "p50Us": 17081.6,
+        "p95Us": 33724.8,
+        "meanUs": 16828.2
+      },
+      "streamBytes": 4419,
+      "warmFirstTokenMs": 33.85,
+      "warmInterToken": {
+        "n": 7,
+        "p50Us": 15315.2,
+        "p95Us": 16049.5,
+        "meanUs": 11049.6
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 23.23,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 8,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1322.0,
+        "p95Us": 1773.8,
+        "meanUs": 1248.8
+      },
+      "firstTokenMs": 49.47,
+      "interToken": {
+        "n": 6,
+        "p50Us": 16092.8,
+        "p95Us": 26768.9,
+        "meanUs": 15611.2
+      },
+      "streamBytes": 3981,
+      "warmFirstTokenMs": 32.05,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15440.0,
+        "p95Us": 16761.6,
+        "meanUs": 15627.6
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 21.21,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 8,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 893.8,
+        "p95Us": 1712.6,
+        "meanUs": 1015.5
+      },
+      "firstTokenMs": 49.81,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15518.4,
+        "p95Us": 30616.7,
+        "meanUs": 15653.7
+      },
+      "streamBytes": 3381,
+      "warmFirstTokenMs": 34.56,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15289.1,
+        "p95Us": 16793.7,
+        "meanUs": 15764.1
+      },
+      "warmStreamBytes": 3472,
+      "coldPublicationDelayMs": 162.9,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 0.1,
+      "warmPublicationBytes": 462,
+      "toolTurnMs": 18.82,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": true,
+      "index": 9,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1107.4,
+        "p95Us": 2191.5,
+        "meanUs": 1201.5
+      },
+      "firstTokenMs": 49.47,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15886.9,
+        "p95Us": 27915.6,
+        "meanUs": 15778.0
+      },
+      "streamBytes": 3381,
+      "warmFirstTokenMs": 35.13,
+      "warmInterToken": {
+        "n": 6,
+        "p50Us": 15475.5,
+        "p95Us": 16732.0,
+        "meanUs": 12986.1
+      },
+      "warmStreamBytes": 3478,
+      "coldPublicationDelayMs": 160.9,
+      "coldPublicationBytes": 455,
+      "warmPublicationDelayMs": 175.9,
+      "warmPublicationBytes": 456,
+      "toolTurnMs": 20.16,
+      "toolBytes": 2815,
+      "toolCompletionSeen": true
+    },
+    {
+      "hud": false,
+      "index": 9,
+      "keyboardEcho": {
+        "n": 12,
+        "p50Us": 1336.1,
+        "p95Us": 1938.2,
+        "meanUs": 1346.8
+      },
+      "firstTokenMs": 50.38,
+      "interToken": {
+        "n": 6,
+        "p50Us": 15897.0,
+        "p95Us": 26240.7,
+        "meanUs": 15729.1
+      },
+      "streamBytes": 3981,
+      "warmFirstTokenMs": 34.97,
+      "warmInterToken": {
+        "n": 5,
+        "p50Us": 15655.1,
+        "p95Us": 17233.7,
+        "meanUs": 16035.8
+      },
+      "warmStreamBytes": 3800,
+      "coldPublicationDelayMs": null,
+      "coldPublicationBytes": 0,
+      "warmPublicationDelayMs": null,
+      "warmPublicationBytes": 0,
+      "toolTurnMs": 20.77,
+      "toolBytes": 2388,
+      "toolCompletionSeen": true
+    }
+  ],
+  "toolCompletionSeenInAllTrials": true,
+  "environment": {
+    "node": "v24.18.0",
+    "pi": "0.85.1 (isolated .tmp/sdk)",
+    "provider": "deterministic in-process fixture, 40 deltas x 2ms",
+    "commit": "7155af0328bcdaa92c31bd17783a61bbc7838693"
+  },
+  "methodology": "Real Pi 0.85.1 TUI in a disposable PTY, HUD on/off alternated within and across pairs, identical instrumentation (write->first-output timing from the harness). Zero network/provider credentials. NOT a human perception check; dark/light visual acceptance remains open.",
+  "summary": {
+    "keyboardEcho.p50Us": {
+      "hudOff": {
+        "n": 10,
+        "mean": 1337.52,
+        "min": 1166.9,
+        "max": 1486.3
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 1118.77,
+        "min": 893.8,
+        "max": 1321.8
+      },
+      "deltaPercentMean": -16.35
+    },
+    "keyboardEcho.p95Us": {
+      "hudOff": {
+        "n": 10,
+        "mean": 2635.23,
+        "min": 1773.8,
+        "max": 3989.3
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 2270.0,
+        "min": 1621.2,
+        "max": 3511.3
+      },
+      "deltaPercentMean": -13.86
+    },
+    "keyboardEcho.meanUs": {
+      "hudOff": {
+        "n": 10,
+        "mean": 1365.57,
+        "min": 1248.8,
+        "max": 1539.8
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 1154.6,
+        "min": 1015.5,
+        "max": 1294.2
+      },
+      "deltaPercentMean": -15.45
+    },
+    "firstTokenMs": {
+      "hudOff": {
+        "n": 10,
+        "mean": 55.713,
+        "min": 49.47,
+        "max": 69.28
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 54.854,
+        "min": 49.12,
+        "max": 67.21
+      },
+      "deltaPercentMean": -1.54
+    },
+    "interToken.p50Us": {
+      "hudOff": {
+        "n": 10,
+        "mean": 15936.71,
+        "min": 15373.9,
+        "max": 17081.6
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 15492.79,
+        "min": 14840.4,
+        "max": 15954.8
+      },
+      "deltaPercentMean": -2.79
+    },
+    "interToken.p95Us": {
+      "hudOff": {
+        "n": 10,
+        "mean": 29615.3,
+        "min": 26121.9,
+        "max": 33960.3
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 29176.24,
+        "min": 26225.6,
+        "max": 33172.4
+      },
+      "deltaPercentMean": -1.48
+    },
+    "streamBytes": {
+      "hudOff": {
+        "n": 10,
+        "mean": 4068.6,
+        "min": 3981,
+        "max": 4419
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 3424.2,
+        "min": 3375,
+        "max": 3819
+      },
+      "deltaPercentMean": -15.84
+    },
+    "warmFirstTokenMs": {
+      "hudOff": {
+        "n": 10,
+        "mean": 35.444,
+        "min": 32.05,
+        "max": 49.4
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 35.696,
+        "min": 32.98,
+        "max": 49.49
+      },
+      "deltaPercentMean": 0.71
+    },
+    "warmInterToken.p50Us": {
+      "hudOff": {
+        "n": 10,
+        "mean": 15783.33,
+        "min": 15315.2,
+        "max": 16820.4
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 15568.44,
+        "min": 15181.0,
+        "max": 16162.5
+      },
+      "deltaPercentMean": -1.36
+    },
+    "warmInterToken.p95Us": {
+      "hudOff": {
+        "n": 10,
+        "mean": 16657.44,
+        "min": 16049.5,
+        "max": 17233.7
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 16889.88,
+        "min": 16141.6,
+        "max": 17551.4
+      },
+      "deltaPercentMean": 1.4
+    },
+    "warmStreamBytes": {
+      "hudOff": {
+        "n": 10,
+        "mean": 3798.6,
+        "min": 3786,
+        "max": 3800
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 3477.4,
+        "min": 3472,
+        "max": 3478
+      },
+      "deltaPercentMean": -8.46
+    },
+    "coldPublicationDelayMs": {
+      "hudOff": null,
+      "hudOn": {
+        "n": 10,
+        "mean": 147.88,
+        "min": 0.1,
+        "max": 172.0
+      },
+      "deltaPercentMean": null
+    },
+    "coldPublicationBytes": {
+      "hudOff": {
+        "n": 10,
+        "mean": 0.0,
+        "min": 0,
+        "max": 0
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 455.6,
+        "min": 455,
+        "max": 461
+      },
+      "deltaPercentMean": null
+    },
+    "toolTurnMs": {
+      "hudOff": {
+        "n": 10,
+        "mean": 19.828,
+        "min": 17.79,
+        "max": 23.23
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 19.258,
+        "min": 17.86,
+        "max": 20.83
+      },
+      "deltaPercentMean": -2.87
+    },
+    "toolBytes": {
+      "hudOff": {
+        "n": 10,
+        "mean": 2388.0,
+        "min": 2388,
+        "max": 2388
+      },
+      "hudOn": {
+        "n": 10,
+        "mean": 2815.0,
+        "min": 2815,
+        "max": 2815
+      },
+      "deltaPercentMean": 17.88
+    }
+  }
+}

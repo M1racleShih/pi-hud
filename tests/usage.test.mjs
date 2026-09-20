@@ -998,6 +998,16 @@ test("/hud scope command and status diagnostics round-trip", async () => {
   assert.equal(status.sessionUsage.status, "ready");
   assert.equal(status.sessionUsage.publishedEntries, 1);
   assert.equal(status.sessionUsage.hostCalls.getEntries, 1);
+  // Published totals let a real-host verification compare with an independent oracle.
+  assert.deepEqual(status.sessionUsage.totals, {
+    input: 1, output: 2, cacheRead: 3, cacheWrite: 4,
+    cost: 0.01, costKnown: 1, costMissing: 0,
+  });
+  assert.equal(status.sessionUsage.totals !== null, true, "an active ledger publishes totals");
+  await f.controller.command("scope observed", f.ctx);
+  assert.equal(f.controller.inspect().sessionUsage.status, "inactive", "scope exit deactivates the ledger");
+  assert.equal(f.controller.inspect().sessionUsage.totals, null, "scope exit drops the published totals");
+  await f.controller.command("scope session", f.ctx);
   assert.match(status.coverage.counters, /session ledger totals/);
   f.emit("session_shutdown");
 });

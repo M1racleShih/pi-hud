@@ -25,7 +25,7 @@
 
 ## 验证证据与边界
 
-- B2a 代码通过 npm run verify（239 项测试、仓库检查、性能门禁全不变）和 npm run package:check。
+- B2a 代码（含评审修复轮）通过 npm run verify（241 项测试、仓库检查、性能门禁全不变）和 npm run package:check。
 - 固定 SDK 检查全部通过：`node scripts/sdk-check.mjs`（含账本契约类型）、新增 `node scripts/usage-oracle-check.mjs`（真实 SessionManager + SDK 自带 usage-totals 作为独立 oracle，转录自 B1 探针）。RPC/PTY 冒烟本轮未重跑（无宿主边界变化）。
 - B2a 覆盖 B1 正确性矩阵的仓库内测试与真实 SDK oracle；**未做** 1k/10k/100k 长历史测量、稳态增量成本测量、同机交替 A/B、真实宿主（resume/压缩/树导航/双 footer）验收与流式验收。
 - 真实深浅色终端人工验收、流式/工具/键盘 A/B、真实会话统计对照、两个 footer 扩展的真实宿主共存、跨平台矩阵仍有待验项。

@@ -175,8 +175,10 @@ export function renderPreview() {
   push(
     "usageScope: session (phase 3 B2a) — full-session ledger totals replace the obs* counters;",
     "the sess* label leads, then compact markers: ↻ updating, +? incomplete, ? while loading,",
-    "limited* after a saturated sum. ctx(last), CH and tool categories keep their observed scope.",
-    "An unavailable host surface degrades to the observed-labelled fields.",
+    "limited* after a saturated sum. The cost field carries the same scope and markers on its",
+    "own (the balanced widget and narrow footers drop the token field). ctx(last), CH and tool",
+    "categories keep their observed scope. An unavailable host surface degrades to the",
+    "observed-labelled fields.",
     "",
   );
   {
@@ -187,16 +189,22 @@ export function renderPreview() {
     push("session updating during a rebuild (old snapshot kept and marked)");
     push(...rows(sessionFixture(sessionView({ updating: true })), "full", "en", 120, config));
     push("");
-    push("session partial: two summaries lack usage, so cost keeps its known subtotal +?;");
-    push("missing token fields would mark the same +? next to the label");
+    push("session partial: two summaries lack usage, so the cost field keeps its known");
+    push("subtotal with +?; missing token fields would mark the same +? next to the label");
     push(...rows(sessionFixture(sessionView({ fieldsIncomplete: true, costMissing: true, summaryMissingUsage: 2 })), "full", "en", 120, config));
     push("");
     push("session loading (zh-CN / full / 120 columns): totals unknown, ctx(last) still observed");
     push(...rows(sessionFixture(sessionView({ status: "loading", input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, costKnown: false, usageRecords: 0, examined: 0 })), "full", "zh-CN", 120, config));
     push("");
-    push("session unknown cost (records never reported cost) and saturated sums (full preset)");
-    push(rows(sessionFixture(sessionView({ cost: 0, costKnown: false })), "full", "en", 120, config).at(-1));
+    push("session unknown cost (records never reported cost) and saturated sums (full preset;");
+    push("row 2 carries the cost field, row 3 the token field)");
+    push(rows(sessionFixture(sessionView({ cost: 0, costKnown: false })), "full", "en", 120, config)[1]);
     push(rows(sessionFixture(sessionView({ limited: true })), "full", "en", 120, config).at(-1));
+    push("");
+    push("session updating and incomplete shown through the cost field alone (balanced widget:");
+    push("no token field, so the cost field carries the sess* scope, ↻ and +? marks itself)");
+    push(rows(sessionFixture(sessionView({ updating: true })), "balanced", "en", 120, config).at(-1));
+    push(rows(sessionFixture(sessionView({ fieldsIncomplete: true, missingInput: 2 })), "balanced", "en", 120, config).at(-1));
     push("");
     push("session scope and markers survive right-edge truncation (en / full / 30 and 38 columns)");
     for (const width of [30, 38]) push(`${width} columns: ${rows(sessionFixture(sessionView({ fieldsIncomplete: true, updating: true })), "full", "en", width, config).at(-1)}`);

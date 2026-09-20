@@ -3,6 +3,7 @@ import { createStyler } from "./palette.ts";
 import type { HudRole, HudStyler, HudThemeLike } from "./palette.ts";
 import type { HudConfig, HudLanguage } from "./config.ts";
 import type { HudSnapshot, ToolCategory, ToolOutcome } from "./state.ts";
+import type { SessionUsageView } from "./usage.ts";
 
 export interface HudWords {
   context: string;
@@ -273,15 +274,32 @@ export function tasksField(snapshot: HudSnapshot, words: HudWords): HudField | n
 
 export function costField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
   if (!config.showCost) return null;
-  if (config.usageScope === "session" && snapshot.sessionUsage) {
-    const usage = snapshot.sessionUsage;
-    // Recorded session cost: every record unknown renders `?`, a known subtotal with
-    // unknown parts renders `<known>+?`, an explicit reported zero stays a valid zero.
-    const value = usage.costKnown ? `$${usage.cost.toFixed(3)}${usage.costMissing ? "+?" : ""}` : "?";
-    return field(60, [seg("label", `${words.cost} `), seg("body", value)]);
-  }
+  if (config.usageScope === "session" && snapshot.sessionUsage) return sessionCostField(snapshot.sessionUsage, config, words);
   const value = snapshot.costReports ? `$${snapshot.cost.toFixed(3)}${snapshot.costReports < snapshot.usageReports ? "+?" : ""}` : "?";
   return field(60, [seg("label", `${words.cost} `), seg("body", value)]);
+}
+
+/**
+ * Full-session cost (`usageScope: "session"`). The cost field must stay self-describing:
+ * the balanced widget and narrow footers drop the token field, so the session scope
+ * label (`sess*`/`全会话*`, whose asterisk keeps the not-a-bill caveat), the updating
+ * mark (`↻`/ASCII `~`) and the incompleteness marks (`+?` for anything the value does
+ * not already show, `limited*` for a saturated sum) are carried here independently and
+ * sit directly behind the label so right-edge truncation removes the number first.
+ */
+export function sessionCostField(view: SessionUsageView, config: HudConfig, words: HudWords): HudField | null {
+  const segments: HudSegment[] = [seg("label", `${words.session} `)];
+  const marks: string[] = [];
+  if (view.updating) marks.push(config.ascii ? "~" : "↻");
+  // `+?` on the value already reports an unknown cost part; the mark covers every other
+  // incompleteness (missing token fields, coverage gap) so exactly one hint appears
+  // for each distinct problem.
+  if (view.fieldsIncomplete && !view.costMissing) marks.push("+?");
+  if (marks.length) segments.push(seg(view.fieldsIncomplete && !view.costMissing ? "warning" : "label", `${marks.join(" ")} `));
+  const value = view.costKnown ? `$${view.cost.toFixed(3)}${view.costMissing ? "+?" : ""}` : "?";
+  segments.push(seg("body", value));
+  if (view.limited) segments.push(seg("warning", " limited*"));
+  return field(60, segments);
 }
 
 /** Bridge agents/tasks are emitted only for valid bridge data; no empty placeholder. */

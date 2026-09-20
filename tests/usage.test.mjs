@@ -212,22 +212,41 @@ test("empty history baselines to a legal null cursor and verifies later appends"
   assert.equal(view.usageRecords, 1);
 });
 
-test("a non-empty history with a null leaf is recorded as a partial anomaly and refuses increments", () => {
+test("a null leaf after tree navigation is a legal cursor: history stays, root appends commit", () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(1));
-  manager.leaf = null; // only reachable through host-internal tree state
   const f = ledgerFixture({ manager });
   f.ledger.restart(manager, "test");
   drain(f);
-  const view = f.ledger.view();
-  assert.equal(view.status, "partial");
-  assert.equal(view.fieldsIncomplete, true);
-  assert.match(f.ledger.inspect().failureReason ?? "", /leaf-null-with-history/);
-  manager.leaf = manager.order.at(-1).id;
+  assert.equal(f.ledger.view().input, 1);
+  assert.equal(f.ledger.view().status, "ready");
+  // Pi's resetLeaf() (navigate to re-edit the first user message): history is kept,
+  // the leaf becomes null and the next append creates a new root entry.
+  manager.leaf = null;
+  f.ledger.onStructural("tree");
+  drain(f);
+  const navigated = f.ledger.view();
+  assert.equal(navigated.input, 1, "the rebuild keeps the full-history totals");
+  assert.equal(navigated.status, "ready", "a null cursor after tree navigation is not an anomaly");
+  assert.equal(f.ledger.inspect().cursor, null);
+  assert.equal(f.ledger.inspect().failureReason, null);
+  manager.appendMessage(assistantEntry(2)); // parentId null: a new root entry
+  f.ledger.onMessageEnd();
   f.ledger.requestVerify();
   drain(f);
-  assert.equal(f.ledger.view().input, 1, "the refused increment added nothing");
-  assert.equal(f.ledger.view().status, "partial", "the anomaly is only cleared by a rebuild");
+  const final = f.ledger.view();
+  assert.equal(final.input, 3, "the root-level append is counted exactly once");
+  assert.equal(final.status, "ready");
+  assert.equal(final.updating, false);
+  assert.equal(manager.calls.getEntries, 2, "the verify itself walked the chain, not the array");
+  // A second append chains onto the first (parent = previous leaf), so a later verify
+  // commits both without needing another rebuild.
+  manager.appendMessage(assistantEntry(4));
+  f.ledger.onMessageEnd();
+  f.ledger.requestVerify();
+  drain(f);
+  assert.equal(f.ledger.view().input, 7, "consecutive root-level appends chain and both count");
+  assert.equal(manager.calls.getEntries, 2);
 });
 
 test("session replacement discards in-flight work: an old generation never publishes", () => {
@@ -611,22 +630,50 @@ test("a malformed parentId fails the walk instead of following garbage", () => {
   assert.equal(view.status, "ready");
 });
 
-test("catch-up failure keeps valid totals up to the captured leaf and records the gap", () => {
+test("catch-up failure keeps valid totals, records the gap and recovers via one rebuild", () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(1));
   manager.appendMessage(assistantEntry(2));
   const f = ledgerFixture({ manager, chunkEntries: 1 });
   f.ledger.restart(manager, "test");
-  f.clock.step(); // capture: leaf = e2; one slice done
+  f.clock.step(); // capture: leaf = e2; first slice done
   manager.appendMessage(assistantEntry(3));
   manager.dropIndex("e3"); // the catch-up walk cannot resolve the new leaf
-  drain(f);
+  f.clock.step(); // last slice -> finishBaseline: catch-up fails, recovery planned
   const view = f.ledger.view();
   assert.equal(view.input, 3, "entries up to the captured leaf stay counted");
   assert.equal(view.status, "partial", "the un-walked delta marks the coverage gap");
   const diag = f.ledger.inspect();
   assert.match(diag.failureReason ?? "", /catchup:/);
   assert.equal(diag.coverageGap, true);
+  assert.ok(diag.recoveryRebuilds >= 1, "the swallowed verification is recovered by a rebuild");
+  assert.ok(f.clock.pending > 0, "the recovery is scheduled");
+  drain(f);
+  const recovered = f.ledger.view();
+  assert.equal(recovered.input, 6, "the recovery rebuild folds the un-indexed record from getEntries");
+  assert.equal(recovered.status, "ready");
+  assert.equal(f.ledger.inspect().failureReason, null, "the recovered read clears the failure record");
+});
+
+test("an over-cap append burst during slicing is recovered by a catch-up rebuild", () => {
+  const manager = new FakeSessionManager();
+  for (let index = 0; index < 600; index++) manager.appendMessage(assistantEntry(1));
+  const f = ledgerFixture({ manager, chunkEntries: 512 });
+  f.ledger.restart(manager, "test");
+  f.clock.step(); // capture: 600 entries; first slice of 512 leaves 88 slicing
+  assert.ok(f.ledger.busy(), "the baseline is still slicing");
+  for (let index = 0; index < 2_049; index++) manager.appendMessage(assistantEntry(1));
+  f.ledger.onMessageEnd();
+  f.ledger.requestVerify(); // arrives while the baseline is slicing and is swallowed
+  drain(f, 500);
+  const view = f.ledger.view();
+  const diag = f.ledger.inspect();
+  assert.equal(view.input, 600 + 2_049, "the recovery rebuild folds the whole burst");
+  assert.equal(view.status, "ready");
+  assert.equal(view.updating, false);
+  assert.ok(diag.recoveryRebuilds >= 1);
+  assert.equal(diag.failureReason, null, "a recovered full read clears the failure record");
+  assert.equal(f.clock.pending, 0, "no retry loop remains");
 });
 
 // ---------------------------------------------------------------------------
@@ -678,11 +725,30 @@ test("loading renders unknown, updating keeps the old snapshot marked, partial r
 test("session cost rendering: unknown ?, partial <known>+?, valid zero stays zero", () => {
   const config = normalizeConfig({ usageScope: "session", preset: "balanced", color: false });
   const rowsFor = (view) => formatHud(snapshotWith(view), config, 140).map((row) => row.text).join("\n");
-  assert.match(rowsFor(sessionView({ cost: 0, costKnown: true })), /est\* \$0\.000(?!\+\?)/);
-  assert.match(rowsFor(sessionView({ costMissing: true })), /est\* \$0\.420\+\?/);
-  assert.match(rowsFor(sessionView({ costKnown: false, cost: 0 })), /est\* \?/);
+  assert.match(rowsFor(sessionView({ cost: 0, costKnown: true })), /sess\* \$0\.000(?!\+\?)/, "an explicit zero stays a valid zero");
+  assert.match(rowsFor(sessionView({ costMissing: true })), /sess\* \$0\.420\+\?/, "an unknown cost part shows on the value");
+  assert.match(rowsFor(sessionView({ costKnown: false, cost: 0 })), /sess\* \?/, "all-unknown cost shows ?");
   // A summary without usage keeps tokens but marks cost incomplete.
-  assert.match(rowsFor(sessionView({ summaryMissingUsage: 1, fieldsIncomplete: true, costMissing: true })), /\+\?/);
+  assert.match(rowsFor(sessionView({ summaryMissingUsage: 1, fieldsIncomplete: true, costMissing: true })), /\$0\.420\+\?/);
+});
+
+test("the session cost field carries scope and status marks even without the token field", () => {
+  // balanced widget: the token field is not rendered, so the cost field is the only
+  // usage information and must be self-describing.
+  const config = normalizeConfig({ usageScope: "session", preset: "balanced", color: false });
+  const rowsFor = (view, extra = {}) => formatHud(snapshotWith(view), normalizeConfig({ usageScope: "session", preset: "balanced", color: false, ...extra }), 140).map((row) => row.text).join("\n");
+  assert.ok(!/sess\* ↑|obs\*/.test(rowsFor(sessionView())), "no token field in balanced");
+  assert.match(rowsFor(sessionView({ updating: true })), /sess\* ↻ \$0\.420/, "updating shows in the cost field");
+  assert.match(rowsFor(sessionView({ updating: true }), { ascii: true }), /sess\* ~ \$0\.420/, "ASCII updating mark");
+  assert.match(rowsFor(sessionView({ fieldsIncomplete: true, missingInput: 2 })), /sess\* \+\? \$0\.420/, "non-cost incompleteness shows as a mark");
+  assert.match(rowsFor(sessionView({ fieldsIncomplete: true, costMissing: true })), /sess\* \$0\.420\+\?/, "cost incompleteness stays on the value without a duplicate mark");
+  assert.match(rowsFor(sessionView({ limited: true })), /sess\* \$0\.420 limited\*/, "saturation shows in the cost field");
+  assert.match(rowsFor(sessionView({ status: "loading", costKnown: false })), /sess\* \?/, "loading shows unknown");
+  // The footer usage row keeps the same self-describing cost field when narrow width
+  // drops the token field.
+  const footer = formatFooter(snapshotWith(sessionView({ fieldsIncomplete: true, missingInput: 2, updating: true })), normalizeConfig({ usageScope: "session", preset: "balanced", color: false }), 46, EMPTY_IDENTITY).map((row) => row.text);
+  const usageRow = footer[1] ?? "";
+  if (!usageRow.includes("↑")) assert.match(usageRow, /sess\*/, "the cost field keeps the session scope when tokens fold");
 });
 
 test("an unavailable or inactive ledger renders the observed fields unchanged", () => {
@@ -724,11 +790,13 @@ test("footer usage row carries the session field and status markers at narrow wi
   if (usageRow.includes("sess")) assert.match(usageRow, /sess\*/);
 });
 
-test("empty ready session hides the token field instead of showing zero totals", () => {
+test("empty ready session hides the token counters instead of showing zero totals", () => {
   const config = normalizeConfig({ usageScope: "session", preset: "full", color: false });
-  const empty = sessionView({ status: "ready", usageRecords: 0, examined: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+  const empty = sessionView({ status: "ready", usageRecords: 0, examined: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, costKnown: false });
   const rows = formatHud(snapshotWith(empty), config, 120);
-  assert.ok(!rows.map((row) => row.text).join("\n").includes("sess*"), "a known-empty session shows no session token field");
+  const text = rows.map((row) => row.text).join("\n");
+  assert.ok(!/sess\* [↑i]/.test(text), "a known-empty session shows no session token counters");
+  assert.match(text, /sess\* \?/, "its unknown cost stays honestly unknown");
   const loading = formatHud(snapshotWith(sessionView({ status: "loading" })), config, 120);
   assert.match(loading.at(-1).text, /sess\* \?/, "loading stays visible even before any record exists");
 });

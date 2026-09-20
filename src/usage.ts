@@ -269,8 +269,6 @@ export class SessionUsageLedger {
   declare published: SessionTotals | null;
   declare publishedStatus: "ready" | "partial";
   declare cursor: string | null;
-  /** False when the cursor cannot safely anchor increments (defensive anomaly only). */
-  declare cursorValid: boolean;
   /** True when entries exist that the ledger could not fold in (catch-up/walk failure). */
   declare coverageGap: boolean;
   declare updating: boolean;
@@ -310,7 +308,6 @@ export class SessionUsageLedger {
     this.published = null;
     this.publishedStatus = "ready";
     this.cursor = null;
-    this.cursorValid = true;
     this.coverageGap = false;
     this.updating = false;
     this.pendingSinceCommit = 0;
@@ -401,7 +398,6 @@ export class SessionUsageLedger {
     this.published = null;
     this.publishedStatus = "ready";
     this.cursor = null;
-    this.cursorValid = true;
     this.coverageGap = false;
     this.updating = false;
     this.pendingSinceCommit = 0;
@@ -430,7 +426,6 @@ export class SessionUsageLedger {
     this.sessionId = null;
     this.published = null;
     this.cursor = null;
-    this.cursorValid = true;
     this.coverageGap = false;
     this.updating = false;
     this.pendingSinceCommit = 0;
@@ -457,7 +452,6 @@ export class SessionUsageLedger {
       if (!this.api) { this.failureReason = "session manager does not expose the read-only entry surface"; return; }
     }
     this.status = this.published ? this.publishedStatus : "loading";
-    this.cursorValid = true;
     this.updating = true;
     this.planBaseline(reason);
     this.onPublish();
@@ -525,7 +519,6 @@ export class SessionUsageLedger {
       updating: this.updating,
       sessionId: this.sessionId,
       cursor: this.cursor,
-      cursorValid: this.cursorValid,
       rebuilds: this.rebuilds,
       recoveryRebuilds: this.recoveries,
       lastRebuildReason: this.lastRebuildReason,
@@ -658,7 +651,6 @@ export class SessionUsageLedger {
     if (work.generation !== this.generation) return; // a newer task owns the session now
     const count = work.totals.examined;
     let cursor = work.leaf;
-    let cursorValid = true;
     this.coverageGap = false; // a fresh full read re-covers everything unless it fails below
     const leafNow = this.readLeaf();
     if (leafNow !== work.leaf) {
@@ -673,23 +665,28 @@ export class SessionUsageLedger {
         this.failureReason = `catchup:${walk.reason}`;
         this.coverageGap = true;
         cursor = work.leaf;
-        // A failed catch-up leaves a gap after the captured leaf; the cursor stays a
-        // valid anchor, but the gap is recorded and never silently counted.
+        // The catch-up failure also swallowed any requestVerify() that arrived while
+        // this baseline was slicing, so arrange exactly one recovery rebuild: a fresh
+        // getEntries() covers the gap without a walk. To keep a pathological append
+        // stream from self-perpetuating timer chains, a baseline that was itself a
+        // catch-up recovery does not schedule another one: the gap stays recorded and
+        // the next event boundary (turn_end/settled) retries through the verify path.
+        if (!this.lastRebuildReason?.startsWith("catchup:")) this.planRecovery(`catchup:${walk.reason}`);
       }
     }
-    if (work.leaf === null && count > 0) {
-      // Non-empty history with a null leaf is only acceptable as a recorded anomaly:
-      // increments from a null cursor would re-commit already-counted entries.
-      this.failureReason = "leaf-null-with-history";
-      this.coverageGap = true;
-      cursorValid = false;
-    }
+    // A null leaf with non-empty history is Pi's documented state after navigating to
+    // re-edit the first user message (`resetLeaf()`): the next append creates a new root
+    // entry with parentId null. The null cursor is therefore a legal anchor - a verify
+    // walk from a later root-level leaf commits only entries appended after the reset,
+    // never the already-counted history.
     if (work.generation !== this.generation || this.readSessionId() !== work.sessionId) return;
+    // A full read that re-covered everything supersedes the previous failure record;
+    // a catch-up that failed again keeps its reason alongside the coverage gap.
+    if (!this.coverageGap) this.failureReason = null;
     this.published = work.totals;
     this.publishedStatus = fieldsIncomplete(work.totals) || work.totals.limited || this.coverageGap ? "partial" : "ready";
     this.status = this.publishedStatus;
     this.cursor = cursor;
-    this.cursorValid = cursorValid;
     this.updating = false;
     this.pendingSinceCommit = 0;
     this.examinedTotal += count;
@@ -709,7 +706,6 @@ export class SessionUsageLedger {
     const started = this.monotonic();
     const leaf = this.readLeaf();
     if (leaf === null && this.cursor === null) { this.commitIdle(); return; }
-    if (!this.cursorValid) { this.updating = true; return; }
     const walk = this.walkChain(leaf, this.cursor);
     this.maxIncrementMs = Math.max(this.maxIncrementMs, this.monotonic() - started);
     if (!walk.ok) {

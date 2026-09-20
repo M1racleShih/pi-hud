@@ -47,7 +47,7 @@ function sdkOracle(manager) {
 
 /** Run the real event loop until the ledger has no planned or active task left. */
 async function quiet(ledger) {
-  for (let index = 0; index < 2_000; index++) {
+  for (let index = 0; index < 100_000; index++) {
     await new Promise((resolve) => setTimeout(resolve, 0));
     if (!ledger.busy()) {
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -151,6 +151,57 @@ const compare = (label, ledger, manager) => {
   await quiet(ledger);
   compare("after stranded walk", ledger, manager);
   assert.ok(ledger.inspect().recoveryRebuilds >= 1, "the stranded walk recovered via one rebuild");
+  ledger.dispose();
+}
+
+// ---------------------------------------------------------------------------
+// 4. Tree navigation back to the root: resetLeaf() keeps history, nulls the leaf and
+//    the next append becomes a new root entry. The null cursor must stay a legal
+//    anchor and the root-level append must be counted exactly once (review fix 1).
+// ---------------------------------------------------------------------------
+{
+  const manager = SessionManager.inMemory("/tmp/pi-hud-b2a-root");
+  manager.appendMessage(assistant(1));
+  const ledger = new SessionUsageLedger({});
+  ledger.restart(manager, "start");
+  await quiet(ledger);
+  compare("before root navigation", ledger, manager);
+  manager.resetLeaf();
+  ledger.onStructural("tree");
+  await quiet(ledger);
+  const navigated = ledger.view();
+  assert.equal(navigated.status, "ready", "a null leaf with history is Pi's documented re-edit state");
+  assert.equal(ledger.inspect().failureReason, null);
+  manager.appendMessage(assistant(2)); // parentId null: a new root entry
+  ledger.onMessageEnd();
+  ledger.requestVerify();
+  await quiet(ledger);
+  compare("after root re-append", ledger, manager);
+  assert.equal(ledger.view().input, 3, "1 (history) + 2 (new root) with no double count");
+  assert.equal(ledger.view().updating, false);
+  ledger.dispose();
+}
+
+// ---------------------------------------------------------------------------
+// 5. An over-cap append burst during baseline slicing: the failed catch-up must
+//    recover through one rebuild instead of leaving the totals frozen (review fix 2).
+// ---------------------------------------------------------------------------
+{
+  const manager = SessionManager.inMemory("/tmp/pi-hud-b2a-burst");
+  manager.appendMessage(assistant(1));
+  manager.appendMessage(assistant(1));
+  const ledger = new SessionUsageLedger({ chunkEntries: 1 });
+  ledger.restart(manager, "start");
+  await new Promise((resolve) => setTimeout(resolve, 0)); // capture + first slice
+  assert.ok(ledger.busy(), "the baseline is still slicing");
+  for (let index = 0; index < 2049; index++) manager.appendMessage(assistant(1));
+  ledger.onMessageEnd();
+  ledger.requestVerify(); // swallowed by the running baseline
+  await quiet(ledger);
+  compare("after the burst recovery", ledger, manager);
+  assert.equal(ledger.view().input, 2 + 2049);
+  assert.ok(ledger.inspect().recoveryRebuilds >= 1, "the catch-up failure scheduled a rebuild");
+  assert.equal(ledger.inspect().failureReason, null, "the recovered full read clears the failure");
   ledger.dispose();
 }
 

@@ -155,12 +155,12 @@ B2 不扩展这两个字段为历史重建或实时估计：保留当前 observe
 本节描述已交付的实现；性能与真实宿主验收仍未做，见下一节。
 
 - `src/usage.ts`：独立账本模块，历史访问全部限制在 `/* history-boundary */` 标记内；`scripts/check.mjs` 仅对该边界白名单 `getEntries/getEntry/getLeafId/getSessionId`，`getBranch/getContextUsage` 处处禁止。
-- 基线：事件回调只调度一次性可取消任务；任务在同一同步块确认 generation/sessionId，调用一次 `getEntries` 并捕获 leaf；每片最多 512 条或约 2 ms（先到者让出）；完成后从捕获 leaf 追赶增量，确认身份后一次性替换发布值；数组引用随即释放。
-- 增量：`turn_end`/`agent_settled` 触发核对，`message_end` 仅标记 updating；从当前 leaf 沿 `parentId` 回走到已提交游标，临时标量聚合、找到锚点才提交；重复事件不重计；缺 entry、链断裂、到 root 未遇锚点、循环或超过 2048 条时整批丢弃、标记 partial 并安排恰好一次恢复重建，不形成空闲重试循环。
+- 基线：事件回调只调度一次性可取消任务；任务在同一同步块确认 generation/sessionId，调用一次 `getEntries` 并捕获 leaf；每片最多 512 条或约 2 ms（先到者让出）；完成后从捕获 leaf 追赶增量，确认身份后一次性替换发布值；数组引用随即释放。追赶失败（含超过 2048 条）保留有效小计、记录缺口，并安排恰好一次恢复重建（恢复重建自身追赶再失败时不自我延续，缺口保留到下一个事件边界重试）。Pi 的 `resetLeaf()` 树导航（重编第一条用户消息）会保留历史并把 leaf 置空；该空游标是合法锚点，之后根级追加只计一次。
+- 增量：`turn_end`/`agent_settled` 触发核对，`message_end` 仅标记 updating；从当前 leaf 沿 `parentId` 回走到已提交游标，临时标量聚合、找到锚点才提交；重复事件不重计；缺 entry、链断裂、到 root 未遇锚点、循环或超过 2048 条时整批丢弃、标记 partial 并安排恰好一次恢复重建，不形成空闲重试循环；恢复成功后清除失败记录。
 - 生命周期：session_start（含 resume/fork/reload/new）、off、退出 session 口径都递增 generation 并丢弃任务/游标/快照；session_tree/session_compact 合并为一次重建；切 surface/主题/宽度不重建；`/hud reset` 保留账本并触发一次核对。
 - 数值：四项 token 独立累计；非负有限数才计入，否则该字段计为未知（`+?`）；assistant 缺 usage 标记数据不完整；无 usage 的 toolResult 仅口径外；无 usage 的摘要保留 token 小计、费用计不完整；cost=0 为有效零；费用全未知显示 `?`；饱和显示 `limited*`。
-- 展示：`sess*`（中文 `全会话*`）标签在最前，随后 `↻`（更新中，ASCII `~`）、`+?`（不完整）、`?`（装载中）；右侧截断先删计数器；宿主缺少只读接口时显式降级为 observed 标签；诊断公开 status/updating/重建原因与次数/host 调用次数/字段缺失数/耗时等有界标量。
-- 验证：239 项测试（新增 41 项覆盖正确性矩阵）、独立 oracle、`scripts/usage-oracle-check.mjs`（真实 SessionManager + SDK 自带 usage-totals 作为 oracle）、固定 SDK 类型检查、`npm run verify`、`npm run package:check` 全部通过。详见 [VERIFICATION.md](VERIFICATION.md)。
+- 展示：`sess*`（中文 `全会话*`）标签在最前，随后 `↻`（更新中，ASCII `~`）、`+?`（不完整）、`?`（装载中）；右侧截断先删计数器；**费用字段独立携带同样的 sess* 范围与状态标记**（balanced widget 与窄屏 footer 不显示 token 字段时仍自描述，费用自身的不完整显示在数值后、其余不完整显示在标记上，不重复）；宿主缺少只读接口时显式降级为 observed 标签；诊断公开 status/updating/重建原因与次数/host 调用次数/字段缺失数/耗时等有界标量。
+- 验证：241 项测试（新增 43 项覆盖正确性矩阵及评审修复）、独立 oracle、`scripts/usage-oracle-check.mjs`（真实 SessionManager + SDK 自带 usage-totals 作为 oracle，含 resetLeaf 回根与超限追加恢复场景）、固定 SDK 类型检查、`npm run verify`、`npm run package:check` 全部通过。详见 [VERIFICATION.md](VERIFICATION.md)。
 - 仍未做（不得宣称）：1k/10k/100k 长历史测量、稳态增量成本测量、同机交替 A/B、真实宿主（resume/压缩/树导航/双 footer 扩展）验收、流式验收、默认 footer 切换评估。
 
 ## B2b 待验清单（下一轮）

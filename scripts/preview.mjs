@@ -9,7 +9,11 @@ import { formatFooter, formatStatusRows } from "../src/footer.ts";
 import { normalizeConfig } from "../src/config.ts";
 import { PASTEL_DARK, PASTEL_LIGHT, THEME_ROLES, HUD_ROLES } from "../src/palette.ts";
 
-const fixture = (overrides = {}) => {
+/**
+ * Fixture builder shared with `scripts/visual-demo.mjs`; returns the live state so
+ * demos can also set fields that only exist before `snapshot()` (e.g. `waiting`).
+ */
+export const fixtureState = (overrides = {}) => {
   const state = new HudState("/workspace/pi-hud", { id: "example-model", name: overrides.modelName ?? "Example Model", provider: "demo", contextWindow: 200_000 }, 0);
   state.thinking = "high";
   state.messageEnd({ role: "assistant", stopReason: "stop", usage: { input: 12_000, cacheRead: 75_000, cacheWrite: 0, output: 3_000, cost: { total: 0.042 } } }, 1);
@@ -32,14 +36,15 @@ const fixture = (overrides = {}) => {
   }
   state.git = { available: true, branch: "main", dirty: true };
   if (overrides.contextRatio) state.contextTokens = Math.round(state.contextWindow * overrides.contextRatio);
-  return state.snapshot();
+  return state;
 };
+const fixture = (overrides = {}) => fixtureState(overrides).snapshot();
 
 const rows = (snapshot, preset, language, width, extra = {}) =>
   formatHud(snapshot, normalizeConfig({ preset, language, color: false, ...extra }), width).map((row) => row.text);
 
 /** Session-ledger views for the `usageScope: "session"` previews (phase 3 B2a). */
-const sessionView = (overrides = {}) => ({
+export const sessionView = (overrides = {}) => ({
   status: "ready", updating: false,
   input: 61_200, output: 14_800, cacheRead: 312_000, cacheWrite: 9_400,
   cost: 0.384, costKnown: true, costMissing: false, usageRecords: 46, examined: 210,
@@ -59,7 +64,7 @@ const sessionFixtureWith = (view, overrides = {}) => {
 };
 
 /** Synthetic identity cache for the footer surface; a real session fills this from lifecycle events. */
-const FOOTER_IDENTITY = Object.freeze({ cwd: "~/opensource/pi-hud", provider: "demo", title: "Compare HUDs", branch: "main", branchDirty: true });
+export const FOOTER_IDENTITY = Object.freeze({ cwd: "~/opensource/pi-hud", provider: "demo", title: "Compare HUDs", branch: "main", branchDirty: true });
 const footerRows = (snapshot, preset, language, width, statuses, extra = {}) => {
   const config = normalizeConfig({ preset, language, color: false, ...extra });
   const result = formatFooter(snapshot, config, width, FOOTER_IDENTITY).map((row) => row.text);

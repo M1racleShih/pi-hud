@@ -284,11 +284,37 @@ carries per-file provenance (commit, SHA-256, SDK lock hash).
 
 | Item | Blocker |
 | --- | --- |
-| Human dark/light terminal visual acceptance | Requires a human observer driving the footer/widget in a real terminal on both background colors at 40/80/120/180 columns. A PTY harness can capture bytes but cannot make a perceptual judgment; per the phase contract this must not be claimed from PTY output alone. |
+| Human dark/light terminal visual acceptance | Requires a human observer driving the footer/widget in a real terminal on both background colors at 40/80/120/180 columns. A PTY harness can capture bytes but cannot make a perceptual judgment; per the phase contract this must not be claimed from PTY output alone. **Preparation is now complete** (`docs/VISUAL-ACCEPTANCE.zh-CN.md` with exact commands, checkpoints CP-A/CP-B and a result template the observer fills in; `scripts/visual-demo.mjs` renders the synthetic colored matrix) — execution and the record remain human-only. |
 | Cross-platform matrix | Only local Linux executed; the CI workflow still prepares macOS/Windows × Node 22.19.0/24 and has not run in this sandbox. |
 | Live-provider streaming A/B | Deliberately not run: no paid provider may be used for acceptance calls. The deterministic in-process provider covers the TUI pipeline; provider-network variance is out of scope for this repository's acceptance. |
-| Default-footer evaluation | Explicitly not taken: `widget` + `observed` remain the defaults. The B2b data (~0.9–1.0 KiB of raw terminal bytes per tool turn, +1.0–2.6 KiB per streamed reply, ~200 ms background baseline at 100k entries, every timing metric within the measured noise envelope on both profiles) is the input for that separate decision, which must not happen automatically. |
+| Default-footer evaluation | **Evaluation completed as a separate record** ([DEFAULT-FOOTER-DECISION.zh-CN.md](DEFAULT-FOOTER-DECISION.zh-CN.md)): conclusion “do not switch now; re-evaluate after the human visual acceptance, an explicit field-gap decision (auto/sub/xp/live-context), the cross-platform matrix, the remaining live scenarios and owner approval”. `widget` + `observed` remain the defaults; no default, config, schema or code default was changed by that record. |
 | Remaining live-TUI protocol scenarios | Resize during an active stream, live compaction mid-A/B, abort/retry under measurement and a concurrent second extension's widget are not covered by the automated A/B; they need dedicated scenarios before the full PERFORMANCE.md live protocol can be called complete. |
 
 Passing everything above is still not a human visual acceptance, a cross-machine guarantee, or
 an instruction to switch the default surface; those remain the listed gaps.
+
+## Visual acceptance preparation and default-footer evaluation (2026-09-20)
+
+Stage after the B2b review rounds: prepare the human-executable real-terminal visual acceptance
+materials and produce the independent default-footer decision record. **No production source file,
+default, schema or user configuration was changed** (`src/` untouched; `scripts/preview.mjs` gained
+exports only). The deliverables are `scripts/visual-demo.mjs`, `docs/VISUAL-ACCEPTANCE.zh-CN.md`
+and `docs/DEFAULT-FOOTER-DECISION.zh-CN.md`, plus the handoff/plan updates. Environment: Linux x64,
+Node v24.18.0, same pinned Pi 0.85.1 SDK under ignored `.tmp/sdk`.
+
+| Check | Result |
+| --- | --- |
+| `scripts/preview.mjs` refactor | `fixtureState`/`sessionView`/`FOOTER_IDENTITY` exported so the colored demo shares one fixture source; `renderPreview()` output is byte-identical (diff against the committed `docs/preview.txt` empty before and after the change; `npm run check` re-asserts it). |
+| `node scripts/visual-demo.mjs` | Executed in these modes, all completing with the built-in technical self-check (every rendered row within its requested width): `--background dark` and `--light`, `--width 40/80/120/180` (default and narrowed), `--surface widget`/`footer`, `--language zh-CN`, `--preset` variants, `--ascii` (ASCII marks verified in output), `--mode 256color` (`38;5;…` escapes verified) and `--plain` (zero ANSI escapes verified). The dark/light variants are forced through the real `createStyler` detection path via stub theme text colors; a mismatch between the stub and the requested variant fails the script. Coverage rendered: palette role samples, widget/footer × presets × widths, ready/working/waiting/interrupted states, 96% context warning, long Chinese model name, footer long-title folding, 20-status `+N` folding, session ready/updating/partial/loading/limited, the unavailable degradation to `obs*` labels, and 40-column marker-surviving truncation. |
+| Human-observation boundary | The script is a viewing aid only: it prints an explicit “NOT an acceptance record” header and a technical-only self-check footer; no checkpoint anywhere is marked passed by this stage. `docs/VISUAL-ACCEPTANCE.zh-CN.md` carries the command list, the CP-A1..A10 / CP-B1..B9 checkpoints, the native-footer field comparison table and a result template that only the human observer fills in (`未覆盖` is a legal result; agent pre-filling is prohibited). |
+| Default-footer decision record | `docs/DEFAULT-FOOTER-DECISION.zh-CN.md` lists the public-SDK field sources and the native gaps (`auto`/`sub`/`xp`, live context estimate), the observed/session scopes, ownership/compatibility, the B2b performance and raw-terminal-byte inputs, migration impact, missing evidence and an explicit conditional recommendation (“do not switch now”). No default, config, schema, `DEFAULT_CONFIG`, example or preview was modified. |
+| `npm run check` | Passed: syntax/boundaries, docs links (including the two new documents), schema/example/defaults sync, and `docs/preview.txt` still matching the renderer byte-for-byte. |
+| `npm test` / `npm run verify` | Passed: 244 tests, zero failed/skipped; every performance gate unchanged. |
+| `npm run package:check` | Passed: packed, production offline install and packed entry import; the two new `docs/` files ship with the package. |
+
+### Pending for this stage
+
+| Item | Blocker |
+| --- | --- |
+| Execution of the visual acceptance runbook | Requires the human observer (dark/light × 40/80/120/180, both surfaces, the state matrix, the native-footer comparison). Until the result template is filled by the observer, the visual acceptance stays **not passed** and the default-footer re-evaluation conditions stay unmet. |
+| Everything in the B2b pending table above | Unchanged: cross-platform matrix, live-provider A/B (deliberately out of scope), remaining live-TUI protocol scenarios. |

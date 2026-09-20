@@ -22,7 +22,15 @@ const destination = argument("json") ?? "docs/performance-b2b-usage-ab.json";
 const sdkLock = ".tmp/sdk/package-lock.json";
 const lockHash = existsSync(sdkLock) ? createHash("sha256").update(readFileSync(sdkLock)).digest("hex") : null;
 const git = (args) => spawnSync("git", args, { encoding: "utf8" }).stdout.trim();
-const dirtyPaths = git(["status", "--porcelain"]).split("\n").filter(Boolean);
+const dirtyFiles = {};
+for (const line of git(["status", "--porcelain"]).split("\n").filter(Boolean)) {
+  const path = line.slice(3).trim();
+  try {
+    dirtyFiles[path] = createHash("sha256").update(readFileSync(path)).digest("hex");
+  } catch {
+    dirtyFiles[path] = "unreadable";
+  }
+}
 
 const run = (label) => {
   const result = spawnSync(process.execPath, ["scripts/usage-ab.mjs", `--label=${label}`], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
@@ -36,7 +44,7 @@ for (let pair = 0; pair < pairs; pair++) {
   for (const side of order) {
     const report = run(side);
     runs.push({ pair, side, order, report });
-    console.error(`pair ${pair + 1}/${pairs} ${side}: turnDrain mean=${report.turnDrain.meanUs.toFixed(2)}us widget=${report.renders.widgetFull120.meanUs.toFixed(2)}us`);
+    console.error(`pair ${pair + 1}/${pairs} ${side}: ledgerVerify=${report.ledgerVerify.meanUs.toFixed(2)}us fullTurn=${report.fullTurn.meanUs.toFixed(2)}us (flushes ${report.fullTurnFlushes}) widget=${report.renders.widgetFull120.meanUs.toFixed(2)}us`);
   }
 }
 
@@ -45,9 +53,11 @@ const metricPaths = [
   ["hooks.toolPair.p99Us", (r) => r.hooks.toolPair.p99Us],
   ["hooks.turnEndBare.meanUs", (r) => r.hooks.turnEndBare.meanUs],
   ["hooks.turnEndBare.p99Us", (r) => r.hooks.turnEndBare.p99Us],
-  ["turnDrain.meanUs", (r) => r.turnDrain.meanUs],
-  ["turnDrain.p95Us", (r) => r.turnDrain.p95Us],
-  ["turnDrain.p99Us", (r) => r.turnDrain.p99Us],
+  ["ledgerVerify.meanUs", (r) => r.ledgerVerify.meanUs],
+  ["ledgerVerify.p99Us", (r) => r.ledgerVerify.p99Us],
+  ["fullTurn.meanUs", (r) => r.fullTurn.meanUs],
+  ["fullTurn.p95Us", (r) => r.fullTurn.p95Us],
+  ["fullTurn.p99Us", (r) => r.fullTurn.p99Us],
   ["renders.widgetFull120.meanUs", (r) => r.renders.widgetFull120.meanUs],
   ["renders.widgetFull120.p99Us", (r) => r.renders.widgetFull120.p99Us],
   ["renders.footerFull120.meanUs", (r) => r.renders.footerFull120.meanUs],
@@ -81,15 +91,15 @@ for (const [path, read] of metricPaths) {
 
 const record = {
   generatedAt: new Date().toISOString(),
-  methodology: "Interleaved same-machine synthetic microbenchmarks: one flag different (usageScope observed vs session), separate processes, alternating order inside each pair, identical fixtures (2000-entry fake-manager history), sample counts and probe file. turnDrain includes the incremental walk, publication and render scheduling through the fake clock; hooks are the observer callbacks only. The existing gates (hook p99 <= 250us, uncached render p99 <= 5ms, cached mean <= 5us) are unchanged and remain enforced by bench/run.mjs. NOT a live Pi/provider/terminal A/B.",
+  methodology: "Interleaved same-machine synthetic microbenchmarks: one flag different (usageScope observed vs session), separate processes, alternating order inside each pair, identical fixtures (2000-entry fake-manager history), sample counts and probe file. ledgerVerify drains only the zero-delay reconciliation (advance(0)); fullTurn drains the 250ms coalesced publication too (advance(250)) and each run fails unless exactly one publication fired per turn, so the full-turn number includes flush+publish. The existing gates (hook p99 <= 250us, uncached render p99 <= 5ms, cached mean <= 5us) are unchanged and remain enforced by bench/run.mjs. NOT a live Pi/provider/terminal A/B.",
   environment: {
     node: runs[0].report.environment.node, platform: platform(), arch: arch(),
     cpu: cpus()[0]?.model ?? "unknown", cores: cpus().length, totalMemBytes: totalmem(),
     sdkLockSha256: lockHash,
     commit: git(["rev-parse", "HEAD"]),
-    dirtyPathsAtStart: dirtyPaths,
+    dirtyFilesSha256: dirtyFiles,
   },
-  treeStateNote: "dirtyPathsAtStart is captured before any probe runs; the JSON record is written afterwards. Both sides run the same tree with the same dirty state.",
+  treeStateNote: "dirtyFilesSha256 hashes every modified/untracked file's content before any probe runs; the JSON record is written afterwards. Both sides run the same tree with the same dirty state.",
   pairs, runsPerSide: runs.length / 2,
   summary,
   runs: runs.map((run) => ({ pair: run.pair, side: run.side, report: run.report })),

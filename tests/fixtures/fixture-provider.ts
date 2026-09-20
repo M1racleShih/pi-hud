@@ -10,10 +10,12 @@
  *   FIXTURE:ECHO:<text>            stream <text> back as plain text
  *   FIXTURE:STREAM:<text>          same, but in FIXTURE_CHUNKS deltas with
  *                                  FIXTURE_STREAM_DELAY_MS between them
- *   FIXTURE:REPLY:<word>          reply with a FIXED text independent of the command
- *                                  ("STREAM-REPLY-<word>-MARKER ..."), so harnesses can
- *                                  time first-token rendering without matching the
- *                                  echoed command line
+ *   FIXTURE:REPLY:<word>          reply with `«<word>-START»` as ONE first delta, then
+ *                                  FIXTURE_CHUNKS body deltas, then one `«END» delta
+ *                                  (total deltas = FIXTURE_CHUNKS + 2, exactly)
+ *   FIXTURE:LONGREPLY:<word>       same shape, but FIXTURE_LONG_CHUNKS body deltas with
+ *                                  FIXTURE_LONG_DELAY_MS between them (a long stream for
+ *                                  during-stream typing measurements)
  *   FIXTURE:FILLER:<paragraphs>    reply with <paragraphs> deterministic ~100-token
  *                                  paragraphs (for growing context between compactions)
  *   FIXTURE:TOOL:read:<path>       emit one `read` tool call; the follow-up call (after
@@ -90,8 +92,11 @@ function scriptFor(context) {
   if (echo) return { kind: "text", text: echo[1] };
   const filler = text.match(/^FIXTURE:FILLER:(\d+)$/s);
   if (filler) return { kind: "filler", count: Number(filler[1]) || 1 };
-  const reply = text.match(/^FIXTURE:REPLY:([A-Za-z0-9-]+)$/s);
-  if (reply) return { kind: "stream", text: `STREAM-REPLY-${reply[1]}-MARKER ${reply[1]} ${reply[1]} ${reply[1]} ${reply[1]} ${reply[1]} ${reply[1]} ${reply[1]} ${reply[1]} ${reply[1]}` };
+  const reply = text.match(/^FIXTURE:(LONG)?REPLY:([A-Za-z0-9-]+)$/s);
+  if (reply) {
+    const word = reply[2];
+    return { kind: reply[1] ? "longreply" : "reply", word };
+  }
   const stream = text.match(/^FIXTURE:STREAM:(.*)$/s);
   if (stream) return { kind: "stream", text: stream[1] };
   const tool = text.match(/^FIXTURE:TOOL:(read|bash|fail):(.*)$/s);
@@ -114,7 +119,14 @@ function fillerText(paragraphs) {
 }
 
 function emitText(stream, output, text, chunks, delayMs) {
-  const parts = String(text).match(new RegExp(`.{1,${Math.max(1, Math.ceil(String(text).length / Math.max(1, chunks)))}}`, "gs")) ?? [];
+  // Exact split: `chunks` evenly sized pieces (floor/ceil distribution), so the delta
+  // count is deterministic and equals the requested chunk count.
+  const parts = [];
+  for (let index = 0; index < chunks; index++) {
+    const start = Math.floor((text.length * index) / chunks);
+    const end = Math.floor((text.length * (index + 1)) / chunks);
+    if (end > start) parts.push(text.slice(start, end));
+  }
   output.content.push({ type: "text", text: "" });
   const contentIndex = output.content.length - 1;
   stream.push({ type: "text_start", contentIndex, partial: output });
@@ -127,6 +139,35 @@ function emitText(stream, output, text, chunks, delayMs) {
       block.text = accumulated;
       stream.push({ type: "text_delta", contentIndex, delta: part, partial: output });
     }
+    stream.push({ type: "text_end", contentIndex, content: accumulated, partial: output });
+  })();
+}
+
+/**
+ * Measurement reply: one atomic prefix delta, `chunks` evenly split body deltas, one
+ * atomic terminator delta (total = chunks + 2). The prefix/terminator use characters
+ * that never occur in the echoed command or the surrounding UI, so first-content and
+ * completion detection are unambiguous at the terminal.
+ */
+function emitMeasured(stream, output, prefix, body, terminator, chunks, delayMs) {
+  output.content.push({ type: "text", text: "" });
+  const contentIndex = output.content.length - 1;
+  stream.push({ type: "text_start", contentIndex, partial: output });
+  return (async () => {
+    let accumulated = "";
+    const emit = async (part) => {
+      if (delayMs > 0) await sleep(delayMs);
+      accumulated += part;
+      output.content[contentIndex].text = accumulated;
+      stream.push({ type: "text_delta", contentIndex, delta: part, partial: output });
+    };
+    await emit(prefix);
+    for (let index = 0; index < chunks; index++) {
+      const start = Math.floor((body.length * index) / chunks);
+      const end = Math.floor((body.length * (index + 1)) / chunks);
+      if (end > start) await emit(body.slice(start, end));
+    }
+    await emit(terminator);
     stream.push({ type: "text_end", contentIndex, content: accumulated, partial: output });
   })();
 }
@@ -162,6 +203,8 @@ function streamFixture(model, context) {
       stream.push({ type: "start", partial: output });
       const delayMs = Number(process.env.FIXTURE_STREAM_DELAY_MS ?? "0") || 0;
       const chunks = Number(process.env.FIXTURE_CHUNKS ?? "8") || 8;
+      const longDelayMs = Number(process.env.FIXTURE_LONG_DELAY_MS ?? "10") || 10;
+      const longChunks = Number(process.env.FIXTURE_LONG_CHUNKS ?? "150") || 150;
       if (script.kind === "tool") {
         output.content.push({ type: "toolCall", id: `fixture-call-${n}`, name: script.name, arguments: { ...script.arguments } });
         stream.push({
@@ -182,6 +225,16 @@ function streamFixture(model, context) {
           partial: output,
         });
         output.stopReason = "toolUse";
+      } else if (script.kind === "reply" || script.kind === "longreply") {
+        // Measurement-precise shape: one atomic first-content delta (the unique prefix,
+        // never present in the echoed command), exactly `chunks` evenly split body
+        // deltas, then one atomic terminator delta. Total deltas = chunks + 2.
+        const prefix = `«${script.word}-START»`;
+        const terminator = "«END»";
+        const body = Array.from({ length: 24 }, (_, index) => `${script.word}-body-token-${index}`).join(" ");
+        await emitMeasured(stream, output, prefix, body, terminator, script.kind === "longreply"
+          ? longChunks : chunks, script.kind === "longreply" ? longDelayMs : delayMs);
+        output.stopReason = "stop";
       } else {
         const body = script.kind === "filler" ? fillerText(script.count) : script.text;
         await emitText(stream, output, body, script.kind === "stream" ? chunks : 1, script.kind === "stream" ? delayMs : 0);

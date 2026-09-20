@@ -9,9 +9,10 @@
  *   hooks.toolPair     - tool start+end pair (identical code both modes; control)
  *   hooks.turnEndBare  - turn_end + full fake-clock drain with nothing appended
  *                        (the idle verify path: cursor==leaf, nothing to commit)
- *   turnDrain          - append 1 record + message_end + turn_end + drain: the full
- *                        per-turn session-mode cost including the incremental walk,
- *                        publication and render scheduling
+ *   ledgerVerify       - append 1 record + message_end + turn_end + advance(0): the
+ *                        zero-delay ledger reconciliation only
+ *   fullTurn           - the same turn drained through the 250ms coalesced publication
+ *                        (advance(250)); the run fails unless one publication per turn
  *   renders            - uncached widget/footer renders with (session) and without
  *                        (observed) the sess* usage row; cached widget render
  *
@@ -83,21 +84,37 @@ const hooks = {
   }),
 };
 
-// Full-turn cost: append one record, message_end, turn_end, drain the verify+publication.
+// Full-turn scenarios, measured separately per the B2b review:
+//   ledgerVerify - append + message_end + turn_end + advance(0): the zero-delay
+//                  ledger reconciliation only (a bare advance(0) never fires the
+//                  coalescer's 250ms publication - verified by a 100-turn repro:
+//                  0 flushes, one pending job at t=250).
+//   fullTurn     - the same turn drained through the 250ms coalesced publication
+//                  (advance(250) fires the flush; the run asserts exactly one flush
+//                  per sample and a non-empty pending-publication count afterwards).
 const appendedMessage = {
   role: "assistant", model: "m", provider: "p", stopReason: "stop",
   content: [{ type: "text", text: "turn text" }],
   usage: { input: 1200, output: 90, cacheRead: 4_000, cacheWrite: 40, totalTokens: 5330, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.02 } },
 };
 let turnIndex = 0;
-const turnDrain = sample((index) => {
-  void index;
+const oneTurn = (drainMs) => {
   manager.appendMessage({ ...appendedMessage, timestamp: turnIndex });
   host.emit("message_end", { message: appendedMessage });
   host.emit("turn_end", {}, host.ctx);
-  host.clock.advance(0);
+  host.clock.advance(drainMs);
   turnIndex++;
-}, 3_000);
+};
+const ledgerVerify = sample(() => oneTurn(0), 12_000);
+const flushesBeforeFullTurn = host.controller.flushes;
+const fullTurn = sample(() => oneTurn(250), 3_000);
+const fullTurnFlushes = host.controller.flushes - flushesBeforeFullTurn;
+// sample() runs 2_000 warmups + 3_000 observations; every one of them must have
+// drained exactly one coalesced publication, or the metric is not measuring it.
+const FULL_TURN_TURNS = 2_000 + 3_000;
+if (fullTurnFlushes !== FULL_TURN_TURNS) {
+  throw new Error(`fullTurn drained only ${fullTurnFlushes} publications for ${FULL_TURN_TURNS} turns; the coalesced publication is not being measured`);
+}
 
 // ---------------------------------------------------------------------------
 // Render scenarios: the snapshot differs exactly by the attached session view.
@@ -164,18 +181,34 @@ const footerData = { getGitBranch: () => "main", onBranchChange: () => () => {},
   view.dispose();
 }
 
+// Structural evidence, collected while the controller and ledger are still live
+// (the review found the old script inspected a disposed ledger, yielding zeros).
+const structuralDiagnostics = (() => {
+  const ledgerDiag = host.controller.ledger?.inspect();
+  return {
+    ledgerQuiet: !host.controller.ledger?.busy(),
+    ledgerStatus: ledgerDiag?.status ?? "absent",
+    ledgerPublishedEntries: ledgerDiag?.publishedEntries ?? 0,
+    steadyGetEntriesCalls: ledgerDiag?.hostCalls.getEntries ?? 0,
+    steadyGetEntryCalls: ledgerDiag?.hostCalls.getEntry ?? 0,
+    controllerFlushes: host.controller.flushes,
+    controllerPaints: host.calls.paint,
+    controllerCallbackErrors: host.controller.callbackErrors,
+    pendingClockJobs: [...host.clock.jobs.values()].filter((job) => job.at > host.clock.time).length,
+  };
+})();
+
 host.emit("session_shutdown");
 const report = {
   label, scope,
   generatedAt: new Date().toISOString(),
   environment: { node: process.version, platform: platform(), arch: arch(), cpu: cpus()[0]?.model ?? "unknown" },
   historyEntries: HISTORY,
-  methodology: "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. turnDrain includes the incremental walk + publication via the fake clock; the pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
-  hooks, turnDrain, renders,
-  structural: {
-    ledgerQuietAtStart: !(host.controller.ledger?.busy() ?? false),
-    steadyGetEntries: host.controller.ledger ? host.controller.ledger.inspect().hostCalls.getEntries : 0,
-  },
+  methodology: "Same tree, same fixtures, one flag different (usageScope). Separate processes; the runner alternates order across pairs. ledgerVerify drains only the zero-delay reconciliation (advance(0)); fullTurn additionally drains the 250ms coalesced publication (advance(250)) and the run fails unless exactly one publication fired per turn. The pinned-SDK history numbers live in the ledger benchmark. Synthetic microbenchmark, not a live host A/B.",
+  hooks, ledgerVerify, fullTurn, fullTurnFlushes, renders,
+  // Collected BEFORE session_shutdown (the review found the old script inspected a
+  // disposed ledger, yielding trivial zeros).
+  structural: structuralDiagnostics,
 };
 const destination = argument("json");
 if (destination) {

@@ -1,7 +1,21 @@
 {
-  "generatedAt": "2026-09-20T18:04:43+0800",
+  "generatedAt": "2026-09-20T18:37:35+0800",
   "passed": true,
-  "durationSeconds": 51.9,
+  "provenance": {
+    "commit": "6f466c797373d5aa66828992d2b11cb43f57d9e6",
+    "dirtyFilesSha256": {
+      "ocs/performance-b2b-usage-ab.json": "unreadable",
+      "scripts/pi-host-acceptance.py": "a7975388be4f883237368d57b1645b5f4a25a9fb2fe46d76623ed1e10f60b4d4",
+      "scripts/pi-stream-ab.py": "75b49d48f50dd3a787a8cc35f3f7f19c2f3d407221c5f93fecaceac0fafffd35",
+      "scripts/usage-ab-run.mjs": "f965c4e48a7cfbd0aa1428faa6b6e6411a1a746f571550f4452625356706c449",
+      "scripts/usage-ab.mjs": "a770e4665c6713b15999c69a81e6076d402fadcf8f4e1b46719ecb01b656216b",
+      "scripts/usage-ledger-bench-run.mjs": "459806277d9f6014a194181d4496a9fad007b32ee4c453ea4e74e6f7a4794c00",
+      "tests/fixtures/fixture-provider.ts": "e5381b84d1f895e96b1c08e88fb58dc97e71e3108d430d44e7ad489f556c9873"
+    },
+    "sdkLockSha256": "8a0902c7e9563f26eb73f346856a9f3cfc002c94a727ef4338209b96ed64fdda",
+    "node": "v24.18.0"
+  },
+  "durationSeconds": 55.7,
   "environment": {
     "node": "v24.18.0",
     "pi": "0.85.1 (isolated .tmp/sdk)",
@@ -32,8 +46,8 @@
         "status": "partial",
         "rebuilds": "1",
         "getEntries": 1,
-        "lastBaselineMs": "43.680282000000034",
-        "maxChunkMs": "0.7011029999999892",
+        "lastBaselineMs": "43.84640400000001",
+        "maxChunkMs": "0.708137000000022",
         "failureReason": "null"
       },
       "waitReadySeconds": 0.64
@@ -100,7 +114,12 @@
     {
       "scenario": "fast-switch",
       "passed": true,
-      "note": "/new during the 10k baseline; the stale generation never published",
+      "note": "/new issued while the 100k baseline footer still showed the loading marker; the switch was confirmed and the stale generation never published afterwards",
+      "loadingMarkerAtSeconds": 0.96,
+      "switchSentAtSeconds": 1.01,
+      "inFlightMarginSeconds": 0.05,
+      "switchConfirmed": true,
+      "stalePublicationObserved": false,
       "newSessionTotals": {
         "input": 0,
         "output": 0,
@@ -109,7 +128,8 @@
         "usageRecords": "0"
       },
       "status": "ready",
-      "rebuilds": "1"
+      "rebuilds": "1",
+      "lastBaselineMs": "0.12849099999993996"
     },
     {
       "scenario": "dual-footer-hud-first",

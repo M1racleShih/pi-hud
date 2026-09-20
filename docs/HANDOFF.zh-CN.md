@@ -1,6 +1,6 @@
 # pi-hud 开发交接
 
-更新：2026-09-20（B2b 验收轮）。代码基线：B2a 提交 `7155af0` + B2b 工作区改动（验收脚本/夹具入库、两处最小 src 修复）；B2b 本轮改动尚未提交，停在 B2b 评审点。
+更新：2026-09-20（B2b 验收轮 + review 修复轮）。代码基线：B2b 交付提交之上叠加 review 修复（四项证据缺陷重建，src 无需改动）；修复后停在 B2b 评审点。
 仓库：<https://github.com/M1racleShih/pi-hud>，继续使用 `main`。
 
 ## 当前完成情况
@@ -9,8 +9,8 @@
 - 有界工具分类：16 个真实工具名与独立 overflow 桶，成功/失败/中断分别计数；真实名为 other 的工具不与溢出桶混用。
 - 第三阶段 A：可选 footer 接管、surface 所有权与清理、缓存身份/标题/宿主 Git 分支、分项 token 和 CH、其他扩展状态的有界展示与独立更新。
 - 第三阶段 B2a：可选全会话 usage 账本（`usageScope: observed | session`，默认 observed；独立模块 `src/usage.ts`）。
-- 第三阶段 B2b（本轮）：**长历史性能实测与真实宿主验收已完成**。1k/10k/100k 线性+分支夹具实测（固定 seed/比例/内容大小）；稳态增量、超限恢复、重建/切换/取消实测；8 组同机交替 observed/session A/B；真实 TUI 中 9 场景验收（10k resume、同 summary 双压缩、树导航/回根、模型切换、快速切会话、双 footer 两种加载顺序、后置异步 message_end 替换扩展）全部与独立文件 oracle 对齐；20 组真实 TUI 流式/工具/键盘 A/B 完成。原始数据与结论见 [性能证据](PERFORMANCE.md)、[验证记录](VERIFICATION.md) 与 docs/ 下四份 JSON。
-- B2b 修复：`accumulateUsage` 每条记录分配元组数组（100k 重建约 24 MiB 垃圾）→ 提升为模块级常量；`/hud status` 诊断新增已发布 totals，便于真实宿主与独立 oracle 对齐。
+- 第三阶段 B2b（本轮）：**长历史性能实测与真实宿主验收已完成，并经一轮 review 修复四项证据缺陷后重建受影响证据**。1k/10k/100k 线性+分支夹具实测（固定 seed/比例/内容大小）；稳态增量、超限恢复（含恢复再失败）、重建/切换/取消实测；8 组同机交替 observed/session A/B（完整轮含 250ms 合并发布，断言每轮恰好一次发布）；真实 TUI 中 9 场景验收（10k resume、同 summary 双压缩、树导航/回根、模型切换、基线在途时快速切会话、双 footer 两种加载顺序、后置异步 message_end 替换扩展）全部与独立文件 oracle 对齐；20 对 × 2 配置（默认 observed+widget 与可选 session+footer）共 80 组真实 TUI 流式/工具/键盘 A/B，含流中输入与配对噪声包络。原始数据与结论见 [性能证据](PERFORMANCE.md)、[验证记录](VERIFICATION.md) 与 docs/ 下四份 JSON。
+- B2b 修复：`accumulateUsage` 每条记录分配元组数组（100k 重建约 24 MiB 垃圾）→ 提升为模块级常量；`/hud status` 诊断新增已发布 totals，便于真实宿主与独立 oracle 对齐。review 轮另修复四项测量缺陷（A/B 从不触发 250ms 发布、fast-switch 未命中在途基线、流式探针标记/超时/完成语义、组数与负载不足），仅重建受影响证据，详见 VERIFICATION.md 的 review round 一节。
 - 默认仍为 widget + observed。widget 主体为 1/2/3 行，footer 主体为 2/3/4 行，footer 另有最多 2 行扩展状态。
 - 最后一次 review 未发现可操作的回归问题。
 
@@ -27,8 +27,8 @@
 ## 验证证据与边界
 
 - B2b（本轮）已通过：npm run verify（244 项测试、仓库检查、性能门禁全不变）、npm run package:check、固定 SDK 检查（sdk-check、usage-oracle-check）、RPC/PTY 冒烟、长历史基准（docs/performance-b2b-ledger.json）、8 组交替 A/B（docs/performance-b2b-usage-ab.json）、真实宿主 9 场景（docs/host-acceptance-b2b.json）、20 组真实 TUI 流式/工具/键盘 A/B（docs/pi-stream-ab-b2b.json）。
-- B2b 关键实测结论：附挂 2.2/3.3ms（1k）→ 20.8/23.9ms（10k）→ 199/234ms（100k，含 SDK 自身 2.1–2.4ms 的 O(N) getEntries 同步复制）；分片最大 0.25–0.67ms（预算 2ms 不变）；稳态增量只随新增条数增长且 getEntries 保持 0 次；session 模式稳态边际成本约 +1.2µs/轮 + ~1.5µs/次 sess* 渲染；真实 TUI 每轮额外终端成本为一次约 455 字节的 footer 发布（约 150ms 合并富集后）。
-- 仍未验（不得宣称）：真人深浅色终端视觉验收、跨平台矩阵、真实付费 provider 流式 A/B（明确不使用付费 provider）。
+- B2b 关键实测结论：附挂 3.1/3.3ms（1k）→ 20.9/23.1ms（10k）→ 202/231ms（100k，含 SDK 自身 2.0–2.9ms 的 O(N) getEntries 同步复制）；分片最大 0.23–0.70ms（预算 2ms 不变）；稳态增量只随新增条数增长且 getEntries 保持 0 次；session 模式稳态边际成本约 +1.0µs 账本核对 + ~0.9µs 发布/轮，另 ~1.0µs/次 sess* 渲染；真实 TUI（两种配置各 20 对）所有时间指标均在同机噪声包络内，唯一确定性成本为每轮一次约 185–235 字节的合并 footer 发布（完成后约 150ms）。
+- 仍未验（不得宣称）：真人深浅色终端视觉验收、跨平台矩阵、真实付费 provider 流式 A/B（明确不使用付费 provider）、流中 resize/压缩/中止重试等剩余实时场景。
 - 默认 footer 切换评估仍未进行：widget + observed 保持默认，B2b 数据只是该决策的输入。
 
 ## B2b 之后的待验清单（评审点）

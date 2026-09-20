@@ -40,6 +40,7 @@ Usage: python3 scripts/pi-host-acceptance.py [--json=docs/host-acceptance-b2b.js
 import argparse
 import errno
 import fcntl
+import hashlib
 import json
 import os
 import pathlib
@@ -287,6 +288,29 @@ HUD = ROOT / "index.ts"
 PROVIDER = ROOT / "tests/fixtures/fixture-provider.ts"
 REPLACER = ROOT / "tests/fixtures/replacer-extension.ts"
 OTHER_FOOTER = ROOT / "tests/fixtures/other-footer.ts"
+
+
+def provenance():
+    def git(args):
+        return subprocess.run(["git", *args], capture_output=True, text=True, cwd=ROOT).stdout.strip()
+    dirty = {}
+    for line in git(["status", "--porcelain"]).splitlines():
+        if not line.strip():
+            continue
+        path = line[3:].strip()
+        try:
+            dirty[path] = hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+        except OSError:
+            dirty[path] = "unreadable"
+    lock = ROOT / ".tmp/sdk/package-lock.json"
+    return {
+        "commit": git(["rev-parse", "HEAD"]),
+        "dirtyFilesSha256": dirty,
+        "sdkLockSha256": hashlib.sha256(lock.read_bytes()).hexdigest() if lock.exists() else None,
+        "node": subprocess.run([NODE, "--version"], capture_output=True, text=True).stdout.strip(),
+    }
+
+
 RESULTS = []
 
 
@@ -479,21 +503,69 @@ def scenario_model_switch(directory):
 
 
 def scenario_fast_switch(directory):
-    session_file = build_session(directory, 10_000, "branched")
+    # 100k entries: the real-host baseline runs ~300ms, so the loading footer
+    # (`sess* ?`, no numbers) is observably in flight before the first publication
+    # (~0.3s window, measured). The switch must land inside that window; the scenario
+    # FAILS if the race was not exercised (published totals seen before /new) instead
+    # of silently testing an ordinary settled switch.
+    session_file = build_session(directory, 100_000, "branched")
     host = PiHost(directory, [HUD, PROVIDER], {"preset": "full", "usageScope": "session", "surface": "footer"}, session_file=session_file)
     try:
-        host.wait_for(b"sess*", timeout=40)
-        # Switch to a fresh session WHILE the 10k baseline is still slicing: the stale
-        # generation must be cancelled synchronously and never publish.
-        host.send(b"\x1b"); host.pump(0.2)
+        started = time.monotonic()
+        # Loading footer row (`sess* ?`, no numbers); styled segments break byte
+        # markers, so this waits on the ANSI-stripped stream.
+        plain_loading = host.wait_for_plain("sess* ?", timeout=60)
+        loading_seen_at = time.monotonic() - started
+        # The most recent sess* render must still be the loading state, not a published
+        # total (a `sess* ... <arrow><digits>` row would mean the baseline finished).
+        if re.search(r"sess\*[^\n\r]{0,40}[\u2191\u2193]\d", plain_loading):
+            raise RuntimeError("fast-switch: the baseline already published before the switch; race not exercised")
+        # Switch NOW, in the same burst that observed the in-flight loading render.
+        # A small gap separates the overlay-dismissing Escape from /new: sent
+        # back-to-back, pi drops the keystrokes while handling the escape (verified -
+        # the switch silently no-ops and the scenario would test nothing).
+        host.send(b"\x1b")
+        time.sleep(0.05)
         host.send(b"/new\r")
-        host.pump(3.0)
+        switched_at = time.monotonic() - started
+        # Watch only frames AFTER the switch: a stale old-generation publication would
+        # render the 100k totals (input ~10G -> an arrow-number row). None may appear
+        # (the fresh session's all-zero fields render hidden, so any arrow row is stale).
+        host.seen.clear()
+        stale_published = False
+        switch_confirmed = False
+        watchdog = time.monotonic() + 6.0
+        while time.monotonic() < watchdog:
+            readable, _, _ = select.select([host.fd], [], [], 0.05)
+            if not readable:
+                continue
+            try:
+                data = os.read(host.fd, 65536)
+            except OSError:
+                break
+            if not data:
+                break
+            host.seen.extend(data)
+            plain = host.plain()
+            if "New session started" in plain:
+                switch_confirmed = True
+            if re.search(r"sess\*[^\n\r]{0,40}[\u2191\u2193]\d", plain):
+                stale_published = True
+                break
+        if not switch_confirmed:
+            raise RuntimeError("fast-switch: /new was not processed; the scenario tested nothing")
         totals = wait_ledger_ready(host, timeout=30)
         leaked = totals["input"] != 0 or totals["usageRecords"] not in ("0", 0)
-        record("fast-switch", not leaked, {
-            "note": "/new during the 10k baseline; the stale generation never published",
+        record("fast-switch", (not leaked) and (not stale_published), {
+            "note": "/new issued while the 100k baseline footer still showed the loading marker; the switch was confirmed and the stale generation never published afterwards",
+            "loadingMarkerAtSeconds": round(loading_seen_at, 2),
+            "switchSentAtSeconds": round(switched_at, 2),
+            "inFlightMarginSeconds": round(switched_at - loading_seen_at, 3),
+            "switchConfirmed": switch_confirmed,
+            "stalePublicationObserved": stale_published,
             "newSessionTotals": {k: totals[k] for k in ("input", "output", "cacheRead", "cacheWrite", "usageRecords")},
             "status": totals.get("status"), "rebuilds": totals.get("rebuilds"),
+            "lastBaselineMs": totals.get("lastBaselineMs"),
         })
     finally:
         host.close()
@@ -596,6 +668,7 @@ def main() -> int:
     record_out = {
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
         "passed": passed,
+        "provenance": provenance(),
         "durationSeconds": round(time.time() - started, 1),
         "environment": {
             "node": subprocess.run([NODE, "--version"], capture_output=True, text=True).stdout.strip(),

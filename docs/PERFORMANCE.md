@@ -119,14 +119,17 @@ The widget path with observed usage is the only comparable scenario that got mea
 ## Phase 3 B2b: long-history ledger measurements and live-host A/B
 
 B2b executed the B1 measurement plan against the real pinned Pi 0.85.1 `SessionManager` and
-the real ledger, plus the live-TUI acceptance protocol. All raw records are committed:
-[performance-b2b-ledger.json](performance-b2b-ledger.json) (1k/10k/100k linear+branched),
-[performance-b2b-usage-ab.json](performance-b2b-usage-ab.json) (8 interleaved observed/session pairs),
-[host-acceptance-b2b.json](host-acceptance-b2b.json) (9 real-TUI scenarios) and
-[pi-stream-ab-b2b.json](pi-stream-ab-b2b.json) (20 live streaming/tool/keyboard trials).
-Environment for every record: Linux x64, Node v24.18.0, 11th Gen Intel i7-11800H (8C/16T),
-commit `7155af0` plus the B2b working tree (the records list the exact dirty paths), pinned
-SDK lock `8a0902c7…fdda`.
+the real ledger, plus the live-TUI acceptance protocol; a review round then rebuilt the
+A/B and live-TUI evidence (see VERIFICATION.md's review-round section). All raw records are
+committed: [performance-b2b-ledger.json](performance-b2b-ledger.json) (1k/10k/100k
+linear+branched), [performance-b2b-usage-ab.json](performance-b2b-usage-ab.json) (8
+interleaved observed/session pairs), [host-acceptance-b2b.json](host-acceptance-b2b.json)
+(9 real-TUI scenarios) and [pi-stream-ab-b2b.json](pi-stream-ab-b2b.json) (20 pairs × 2
+profiles = 80 live trials with raw samples). Environment: Linux x64, Node v24.18.0, 11th
+Gen Intel i7-11800H (8C/16T), pinned SDK lock `8a0902c7…fdda`. Each record's `provenance`
+(or `environment`) field carries the actual commit, the SHA-256 of every modified or
+untracked file at measurement time, and the SDK lock hash — the review round corrected an
+earlier claim of uniform provenance that the records did not actually carry.
 
 ### Fixtures and methodology
 
@@ -148,16 +151,16 @@ old-space re-growth noise.
 
 | Measurement | 1k linear/branched | 10k linear/branched | 100k linear/branched |
 | --- | ---: | ---: | ---: |
-| Fixture build (plain objects) | 3.2 / 3.4 ms | 29 / 37 ms | 277 / 302 ms |
-| Host manager load (real append APIs) | 1.7 / 1.9 ms | 17.6 / 15.1 ms | 181 / 206 ms |
-| `getEntries()` sync copy (median of 5) | 0.012 / 0.014 ms | 0.118 / 0.225 ms | 1.97 / 2.53 ms |
-| HUD attach: wall (yield-inclusive) | 2.5 / 4.1 ms | 20.3 / 23.2 ms | 200 / 231 ms |
-| HUD attach: net CPU (probe load subtracted) | 7.5 / 5.6 ms | 11.1 / 16.1 ms | 41 / 54 ms |
-| Max aggregation slice (budget 2 ms) | 0.54 / 0.61 ms | 0.25 / 0.45 ms | 0.42 / 0.71 ms |
-| Max event-loop pause during attach | 0.76 / 0.79 ms | 0.51 / 0.93 ms | 3.6 / 4.8 ms |
-| Rebuild (tree / compact), wall | 2.5–3.8 ms | 20–24 ms | 198–233 ms |
-| Heap retained after release (settled) | 0.02 / 0.00 MiB | 0.13 / 0.11 MiB | 1.5 / 2.1 MiB |
-| Heap peak delta vs zero-work control | 0.7 vs 0.4 / 1.1 vs 0.9 MiB | 10.3 vs 8.2 / 12.1 vs 9.2 MiB | 56.2 vs 54.9 / 57.2 vs 54.9 MiB |
+| Fixture build (plain objects) | 6.1 / 3.3 ms | 34 / 33 ms | 261 / 314 ms |
+| Host manager load (real append APIs) | 1.6 / 2.0 ms | 17 / 19 ms | 180 / 227 ms |
+| `getEntries()` sync copy (median of 5) | 0.012 / 0.019 ms | 0.121 / 0.257 ms | 1.99 / 2.91 ms |
+| HUD attach: wall (yield-inclusive) | 3.1 / 3.3 ms | 20.9 / 23.1 ms | 202 / 231 ms |
+| HUD attach: net CPU (probe load subtracted) | 3.7 / 6.1 ms | 11.7 / 14.0 ms | 42 / 46 ms |
+| Max aggregation slice (budget 2 ms) | 0.23 / 0.54 ms | 0.25 / 0.45 ms | 0.70 / 0.47 ms |
+| Max event-loop pause during attach | 0.34 / 0.68 ms | 0.59 / 0.92 ms | 5.5 / 4.2 ms |
+| Rebuild (tree / compact), wall | 3–4 ms | 20–24 ms | 198–233 ms |
+| Heap retained after release (settled) | 0.03 / 0.01 MiB | 0.17 / 0.16 MiB | 1.5 / 2.1 MiB |
+| Heap peak delta vs zero-work control | 1.2 vs 1.0 / 1.1 vs 1.3 MiB | 10.8 vs 6.7 / 12.5 vs 8.4 MiB | 56.0 vs 54.9 / 57.3 vs 54.9 MiB |
 
 Reading: slices stay ~0.3–0.7 ms against the unchanged 2 ms budget at every size. At 100k the
 longest attach pause (3.3–6.9 ms) is dominated by the SDK's own O(N) `getEntries()` copy
@@ -172,19 +175,19 @@ follows the same pattern and never returns fully (documented caveat).
 
 Per history size, appending 1 / 32 / 2048 records and reconciling at `turn_end`:
 
-| Added records | Verify wall | Ledger-internal increment | Max pause | New `getEntries` calls |
-| ---: | ---: | ---: | ---: | ---: |
-| +1 (all sizes) | 1.1–1.8 ms | 0.065–0.113 ms | 0.06–0.40 ms | 0 |
-| +32 (all sizes) | 1.4–1.6 ms | 0.065–0.113 ms | 0.06–0.40 ms | 0 |
-| +2048 (all sizes) | 1.2–3.9 ms | 0.32–0.46 ms | 0.75–2.18 ms | 0 |
+| Added records | Ledger-internal increment | Max pause | New `getEntries` calls |
+| ---: | ---: | ---: | ---: |
+| +1 (all sizes) | 0.065–0.084 ms | 0.06–0.30 ms | 0 |
+| +32 (all sizes) | 0.065–0.084 ms | 0.06–0.11 ms | 0 |
+| +2048 (all sizes) | 0.34–0.56 ms | 0.83–2.52 ms | 0 |
 
 Cost tracks the added-record count, not the history size; the 2048-entry walk's single
-synchronous block does 0.32–0.46 ms of ledger-internal work. Its worst measured loop pause
-(2.18 ms, 1k/branched) includes GC of the 2048 freshly appended fixture records plus the
+synchronous block does 0.34–0.56 ms of ledger-internal work. Its worst measured loop pause
+(2.52 ms, 1k/linear) includes GC of the 2048 freshly appended fixture records plus the
 ~1 ms probe noise floor — the ledger's own slice of that block remains inside the 2 ms
 budget, and the idle-probe floor on this host is 0.8–1.1 ms for comparison. The over-cap
 path (2049 appended: walk dropped, exactly one recovery rebuild) costs the same as a fresh
-attach at that size (12.1–12.3 ms at 1k, 208–245 ms at 100k) and heals `failureReason`.
+attach at that size (13 ms at 1k, 207–243 ms at 100k) and heals `failureReason`.
 Catch-up appends landing mid-slice are folded by the baseline's bounded walk (exercised at
 every size). A session switch issued **while the 100k baseline is still slicing** cancels
 synchronously in 16–30 µs, the stale generation never publishes, and the new session's
@@ -203,51 +206,101 @@ was adopted; both effects are documented so the numbers can be reproduced.
 
 `node scripts/usage-ab-run.mjs --pairs=8`: one flag different, separate processes, order
 alternated inside each pair, 2000-entry fake-manager history. Gates unchanged; this table
-is the session mode's marginal cost, not a gate.
+is the session mode's marginal cost, not a gate. After the review round the full-turn
+scenario drains the coalescer's 250 ms publication deadline (`advance(250)`) and **fails
+unless exactly one publication fired per turn** — the original `advance(0)` variant never
+published anything (a 100-turn repro: 0 flushes, one pending job at t=250), so the earlier
+"+1.2 µs including publication" claim was unsupported.
 
 | Metric (mean of 8) | observed | session | Paired delta | Direction |
 | --- | ---: | ---: | ---: | --- |
-| message_end hook p99 | 1.95 µs | 1.61 µs | −0.34 ± 0.24 µs | 0/8 positive (noise; both ≪ 250 µs gate) |
-| tool pair hook p99 | 3.98 µs | 3.20 µs | −0.78 ± 0.57 µs | 1/8 positive (noise) |
-| Bare turn_end + drain | 0.119 µs | 0.465 µs | +0.35 ± 0.08 µs | 8/8 (scheduling + idle verify) |
-| Full turn (append + walk + publish) | 1.21 µs | 2.42 µs | +1.21 ± 0.18 µs | 8/8 |
-| Widget render mean (sess* row) | 11.3 µs | 12.8 µs | +1.49 ± 1.48 µs | 7/8 |
-| Footer render mean | 11.8 µs | 13.3 µs | +1.54 ± 1.22 µs | 7/8 |
-| Cached render means | 0.022 / 0.039 µs | 0.022 / 0.038 µs | ≤ 0.001 µs | noise |
+| message_end hook p99 | 2.02 µs | 1.54 µs | −0.48 ± 0.38 µs | 1/8 positive (noise; both ≪ 250 µs gate) |
+| tool pair hook p99 | 3.56 µs | 3.06 µs | −0.50 ± 0.26 µs | 0/8 positive (noise) |
+| Bare turn_end + zero-delay drain | 0.109 µs | 0.430 µs | +0.32 ± 0.04 µs | 8/8 (scheduling + idle verify) |
+| Ledger verify only (append + walk, no publication) | 1.29 µs | 2.32 µs | +1.03 ± 0.07 µs | 8/8 |
+| Full turn incl. coalesced publication | 7.26 µs | 9.20 µs | +1.94 ± 0.41 µs | 8/8 |
+| Widget render mean (sess* row) | 11.5 µs | 12.5 µs | +1.02 ± 0.28 µs | 8/8 |
+| Footer render mean | 12.1 µs | 12.8 µs | +0.74 ± 0.62 µs | 7/8 |
+| Cached render means | 0.024 / 0.042 µs | 0.023 / 0.042 µs | ≤ 0.001 µs | noise |
 
-The session mode's steady marginal cost is ~+1.2 µs per full turn plus ~+1.5 µs per render
-of the `sess*` row; hooks stay sub-2 µs and cached paths unchanged.
+Structural evidence is collected while the controller and ledger are still live (the
+review also found the old script inspected a disposed ledger): the session side ends with
+21,000 published entries, exactly one `getEntries` call (the baseline), 19,000 `getEntry`
+walk steps, 5,001 flushes/paints for 5,000 turns, zero callback errors and no pending
+clock jobs. The session mode's steady marginal cost is ~+1.0 µs of ledger reconciliation
+plus ~+0.9 µs of publication work per turn, and ~+1.0 µs per render of the `sess*` row;
+hooks stay sub-2 µs and cached paths unchanged.
 
-### Live-TUI streaming / tool / keyboard A/B (20 trials)
+### Live-TUI streaming / tool / keyboard A/B (20 pairs × 2 profiles = 80 trials)
 
-`python3 scripts/pi-stream-ab.py --pairs=10`: the real TUI in a disposable PTY, HUD
-on/off alternated within and across pairs, deterministic in-process provider streaming
-40 deltas × 2 ms. Instrumentation identical on both sides (write→first-output timing from
-the harness).
+`python3 scripts/pi-stream-ab.py --pairs=20`: the real TUI in a disposable PTY, HUD
+on/off alternated within and across pairs, deterministic in-process provider. Two profiles
+are measured and reported separately: **default** (`observed` + `widget`, the shipped
+defaults) and **optin** (`session` + `footer`). After the review round the protocol was
+rebuilt: the reply is `«word-START»` (ONE atomic first delta) + exactly 42 deltas total +
+one atomic `«END»` delta, so first-content and completion detection are unambiguous;
+missing completions, missing tool markers or >25% keyboard timeouts FAIL a trial instead
+of being dropped; keyboard echo is measured idle AND while a 152-delta stream is active
+(8 char-verified keys + 2 backspaces + 2 cursor-left keys per trial); the tool row
+(`read marker.txt`) is detected separately from the follow-up reply; per-key latencies and
+frame timestamps are preserved in the record; and every metric gets true per-pair deltas
+plus a same-side adjacent-pair repeatability envelope. `--self-test` exercises the failure
+paths deterministically (missing prefix/terminator, timeout ratio, interval windows).
 
-| Metric | HUD off | HUD on | Delta |
-| --- | ---: | ---: | ---: |
-| Keyboard echo p50 / p95 | 1338 / 2635 µs | 1119 / 2270 µs | −16% / −14% (noise; if anything faster) |
-| First token, cold process | 55.7 ms | 54.9 ms | −1.5% |
-| First token, warm | 35.4 ms | 35.7 ms | +0.7% |
-| Inter-token gap p50 / p95, warm | 15.78 / 16.66 ms | 15.57 / 16.89 ms | −1.4% / +1.4% (identical cadence) |
-| Full tool turn (read + follow-up) | 19.8 ms | 19.3 ms | −2.9% (noise) |
-| Terminal bytes per tool turn | 2388 B | 2815 B | **+427 B** (one footer publication) |
-| Post-turn publication | — | 148 ms after completion, 456 B | designed coalesced repaint |
+Default profile (observed + widget), paired over 20 pairs:
 
-An earlier draft of this A/B reported a "+450% inter-token p95" stall; that was a metric
-bug, not a regression: the ~150–160 ms quiet period between the last streamed frame and the
-HUD's coalesced (250 ms budget) post-turn publication was being counted as a token gap.
-With gaps restricted to the streaming window the cadences are identical. The HUD's real
-per-turn terminal cost is one ~455-byte footer repaint published ~150 ms after completion
-(`maxFlushMs` stays in single-digit milliseconds; the ledger's verify adds ~1.3 µs).
+| Metric | HUD off (p50) | HUD on (p50) | Paired delta | Noise envelope p90 | Verdict |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Idle keyboard echo p50 / p95 | 1.15 / 2.03 ms | 1.19 / 2.15 ms | −0.03 ± 0.20 ms | 0.42 / 1.93 ms | within noise |
+| First content, cold process | 33.0 ms | 31.4 ms | −1.4 ± 3.2 ms | 4.3 ms | within noise |
+| First content, warm | 18.2 ms | 17.6 ms | −0.4 ± 1.4 ms | 2.3 ms | within noise |
+| Render-frame interval p50 / p95 (warm) | 15.65 / 16.52 ms | 15.67 / 16.47 ms | +0.09 / −0.16 ± 0.4 ms | 0.54 / 0.70 ms | within noise |
+| Stream completion | 110.2 ms | 110.5 ms | +0.1 ± 11.6 ms | 17.7 ms | within noise |
+| Echo while streaming (p50) | 0.73 ms | 0.70 ms | −0.03 ± 0.19 ms | 0.41 ms | within noise (0 failures both sides) |
+| Redraw while streaming (p50) | 0.092 ms | 0.114 ms | +0.017 ± 0.032 ms | 0.060 ms | within noise |
+| Tool row visible / full turn | 19.6 ms | 19.3 ms | −0.05 ± 1.6 ms | 2.4 ms | within noise |
+| Terminal bytes per tool turn | 1851 B | 2086 B | **+235 B (20/20 pairs)** | 0 | real, deterministic |
+| Coalesced post-turn publication | none | 150 ms after completion | — | — | designed repaint |
+
+Opt-in profile (session + footer), paired over 20 pairs:
+
+| Metric | HUD off (p50) | HUD on (p50) | Paired delta | Noise envelope p90 | Verdict |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Idle keyboard echo p50 / p95 | 1.22 / 2.66 ms | 1.06 / 2.03 ms | −0.11 ± 0.22 ms | 0.42 / 1.67 ms | within noise |
+| First content, cold process | 31.1 ms | 31.8 ms | −0.1 ± 3.3 ms | 4.8 ms | within noise |
+| First content, warm | 18.4 ms | 17.8 ms | −0.4 ± 1.1 ms | 2.7 ms | within noise |
+| Render-frame interval p50 / p95 (warm) | 15.66 / 16.68 ms | 15.65 / 16.61 ms | −0.07 / −0.06 ± 0.2–0.4 ms | 0.62 / 0.69 ms | within noise |
+| Stream completion | 111.7 ms | 111.0 ms | −0.7 ± 12.0 ms | 16.9 ms | within noise |
+| Echo while streaming (p50) | 0.71 ms | 0.59 ms | −0.05 ± 0.27 ms | 0.43 ms | within noise (0 failures both sides) |
+| Redraw while streaming (p50) | 0.102 ms | 0.107 ms | +0.010 ± 0.036 ms | 0.061 ms | within noise |
+| Tool row visible / full turn | 19.5 ms | 19.1 ms | −0.17 ± 2.4 ms | 3.3 ms | within noise |
+| Terminal bytes per tool turn | 1851 B | 2036 B | **+185 B (20/20 pairs)** | 0 | real, deterministic |
+| Coalesced post-turn publication | none | 150 ms after completion | — | — | designed repaint |
+
+Notes on semantics: render-frame intervals are the pi-tui frame cadence while content
+streams — terminal frame gaps, not provider token gaps (the provider is deterministic);
+during-stream control-key numbers are next-frame (redraw) latency, printable echoes are
+char-verified; toolVisible and toolTurn coincide under this fixture because the instant
+follow-up reply lands in the same frame batch — the detection is isolated, the provider
+just does not separate them. Every timing metric is inside the measured same-machine
+repeatability envelope on both profiles; the HUD's only deterministic per-turn terminal
+cost is one coalesced footer publication (~185–235 B, ~150 ms after completion; the ledger
+verify itself adds ~+1 µs per the A/B above). Earlier drafts of this A/B had two metric
+bugs found in review: a "+450% inter-token p95 stall" that was actually the coalesced
+publication's quiet period being counted as a token gap, and keyboard timeouts being
+silently discarded. Both are fixed structurally (windowed intervals, failure counting).
 
 ### What remains open
 
 These are synthetic-plus-live-PTY measurements on one Linux host. Still open per
 [VERIFICATION.md](VERIFICATION.md): human dark/light terminal visual acceptance,
 cross-platform matrix, and the default-footer evaluation (explicitly not taken — `widget` +
-`observed` remain the defaults).
+`observed` remain the defaults). From the full live-TUI protocol, the automated A/B covers
+streaming (42-delta and 152-delta replies), during-stream typing/backspace/cursor keys,
+tool dispatch and repaint bytes for both the default and opt-in profiles; the remaining
+live scenarios — resize during an active stream, live compaction mid-A/B, abort/retry
+under measurement and a second concurrent extension's widget — are not covered by this
+record and stay explicitly pending.
 
 ## Real host checks
 

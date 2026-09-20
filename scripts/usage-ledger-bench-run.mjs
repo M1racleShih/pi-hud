@@ -21,7 +21,15 @@ const shapes = (argument("shapes") ?? "linear,branched").split(",");
 const sdkLock = ".tmp/sdk/package-lock.json";
 const lockHash = existsSync(sdkLock) ? createHash("sha256").update(readFileSync(sdkLock)).digest("hex") : null;
 const git = (args) => spawnSync("git", args, { encoding: "utf8" }).stdout.trim();
-const dirtyPaths = git(["status", "--porcelain"]).split("\n").filter(Boolean);
+const dirtyFiles = {};
+for (const line of git(["status", "--porcelain"]).split("\n").filter(Boolean)) {
+  const path = line.slice(3).trim();
+  try {
+    dirtyFiles[path] = createHash("sha256").update(readFileSync(path)).digest("hex");
+  } catch {
+    dirtyFiles[path] = "unreadable";
+  }
+}
 
 const cells = [];
 for (const size of sizes) {
@@ -44,7 +52,7 @@ const record = {
     cpu: cpus()[0]?.model ?? "unknown", cores: cpus().length, totalMemBytes: totalmem(),
     sdkLockSha256: lockHash,
     commit: git(["rev-parse", "HEAD"]),
-    dirtyPathsAtStart: dirtyPaths,
+    dirtyFilesSha256: dirtyFiles,
   },
   methodology: [
     "One child process per (size, shape) with --expose-gc so per-cell heap attribution is not polluted by earlier cells.",

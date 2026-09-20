@@ -2,6 +2,10 @@
 
 Activity display now uses stable working/waiting/ready states on both surfaces. Individual tool names no longer rotate through the activity field; duplicate aggregate errors display removed, category failure counts retained.
 
+## Unreleased — B2b review round: evidence defects fixed, affected records rebuilt
+
+An external review of the B2b delivery reported four P2 evidence defects; each was reproduced, fixed and only the affected evidence rerun (src unchanged): the usage-scope A/B now drains the 250 ms coalesced publication and fails unless exactly one publication fired per turn (the old `advance(0)` variant never published — 100 turns, 0 flushes); the fast-switch host scenario switches on a 100k in-flight baseline with loading-marker byte evidence, switch confirmation and post-switch stale-publication monitoring (the old 10k variant always switched after the ~44 ms baseline had finished); the streaming probe uses atomic first-content/completion markers with exact delta counts (42/152), counts keyboard timeouts with a 25% failure cap instead of dropping them, preserves raw samples and frame timestamps, and its analysis failure paths are self-tested; and the live A/B now delivers 20 pairs × 2 profiles (default `observed`+`widget`, opt-in `session`+`footer`) with typing/backspace/cursor keys during an active stream, isolated tool-row visibility and true paired deltas against a same-side noise envelope. Every regenerated record embeds per-file provenance (commit, SHA-256 of dirty inputs, SDK lock hash). All timing metrics remain within the measured noise envelope; the deterministic per-turn cost is one ~185–235 B coalesced publication.
+
 ## Unreleased — B2b: long-history measurements and real-host acceptance (phase 3 B2b)
 
 **Measurement and acceptance round; defaults unchanged.** All B1 measurement-plan items were executed against the real pinned Pi 0.85.1 SDK, and the raw records are committed under `docs/` (`performance-b2b-ledger.json`, `performance-b2b-usage-ab.json`, `host-acceptance-b2b.json`, `pi-stream-ab-b2b.json`). `widget` + `observed` remain the defaults; no gate was relaxed.

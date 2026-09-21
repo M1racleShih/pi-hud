@@ -86,9 +86,18 @@ def main() -> None:
 
         try:
             fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+            # The default surface is now the footer: the startup mount must install it
+            # with the default pastel field colors and without any redraw resurrecting
+            # the native footer. (The pre-install startup screen legitimately showed
+            # the native footer, so absence is asserted on a fresh repaint window.)
             mounted = wait_for(b"ctx(last)")
             if not colored_context.search(mounted):
                 raise RuntimeError("HUD mounted without the default pastel field colors")
+            fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 99, 0, 0))
+            os.kill(pid, signal.SIGWINCH)
+            owned = wait_for(b"ctx(last)")
+            if native_footer.search(owned):
+                raise RuntimeError("the native footer was rendered after the default footer surface took the slot")
             # Bridge data is displayed only when a real producer publishes it.
             # The notify text is contiguous; styled field segments are not, so the
             # full-preset demo label below is the contiguous row-3 marker.
@@ -108,9 +117,13 @@ def main() -> None:
             recolored = wait_for(b"ctx(last)")
             if not colored_context.search(recolored):
                 raise RuntimeError("pastel palette did not restore field colors")
-            # --- optional footer surface -------------------------------------------------
-            # The surface switch replaces the footer container, so the notify and the redraw
-            # land in the same PTY window; each window is checked for native-footer-only text.
+            # --- surface round-trip under the footer default -------------------------------
+            # Switching to the widget must restore the built-in footer; switching back must
+            # re-take it. Each window is checked for native-footer-only text.
+            os.write(fd, b"/hud surface widget\r")
+            widget_frame = wait_for(b"(auto)")
+            if b"pi-hud surface widget" not in widget_frame or b"ctx(last)" not in widget_frame:
+                raise RuntimeError("the widget switch did not restore the native footer beside the HUD widget")
             os.write(fd, b"/hud surface footer\r")
             footer_frame = wait_for(b"ctx(last)")
             if b"pi-hud surface footer" not in footer_frame:
@@ -156,9 +169,10 @@ def main() -> None:
                 raise RuntimeError("the on command did not reinstall the footer surface")
             if native_footer.search(on):
                 raise RuntimeError("the native footer was still rendered after re-enabling the footer surface")
-            print("PASS: real Pi TUI mounts the HUD widget and footer, shows bridged activity and an "
-                  "independent extension status, switches surface, restores the native footer on "
-                  "surface switch and off, resizes, and switches layout/palette without a model call")
+            print("PASS: real Pi TUI mounts the HUD footer as the default surface, shows bridged activity and an "
+                  "independent extension status, round-trips the widget surface with native-footer "
+                  "restoration, restores the native footer on off, resizes, and switches layout/palette "
+                  "without a model call")
         finally:
             try:
                 os.kill(pid, signal.SIGTERM)

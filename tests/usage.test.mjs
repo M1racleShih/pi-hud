@@ -414,7 +414,7 @@ test("observed stays the default scope and never creates ledger work", () => {
 test("session scope drives the ledger from the controller and renders sess-labelled totals", async () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(1));
-  const f = controllerFixture({ usageManager: manager, config: { usageScope: "session", preset: "full" } });
+  const f = controllerFixture({ usageManager: manager, config: { surface: "widget", usageScope: "session", preset: "full" } });
   f.clock.advance(0); // drain the baseline
   const view = f.controller.ledger.view();
   assert.equal(view.status, "ready");
@@ -440,7 +440,7 @@ test("session scope drives the ledger from the controller and renders sess-label
 test("a toolResult message_end repaints for the updating marker without observed changes", () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(1));
-  const f = controllerFixture({ usageManager: manager, config: { usageScope: "session", preset: "full" } });
+  const f = controllerFixture({ usageManager: manager, config: { surface: "widget", usageScope: "session", preset: "full" } });
   f.clock.advance(0);
   f.clock.advance(250);
   let paints = 0;
@@ -462,7 +462,7 @@ test("a toolResult message_end repaints for the updating marker without observed
 });
 
 test("a host without the read-only entry surface degrades explicitly to observed labels", async () => {
-  const f = controllerFixture({ config: { usageScope: "session", preset: "full" } }); // proxy manager throws on entry access
+  const f = controllerFixture({ config: { surface: "widget", usageScope: "session", preset: "full" } }); // proxy manager throws on entry access
   f.clock.advance(0);
   const diagnostics = f.controller.inspect();
   assert.equal(diagnostics.sessionUsage.status, "unavailable");
@@ -511,7 +511,7 @@ test("scope switching rebuilds from scratch each time; off stops acquisition", a
 test("surface switching and theme changes never reset the session ledger", async () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(1));
-  const f = controllerFixture({ usageManager: manager, config: { usageScope: "session" } });
+  const f = controllerFixture({ usageManager: manager, config: { surface: "widget", usageScope: "session" } });
   f.clock.advance(0);
   const rebuilds = f.controller.ledger.inspect().rebuilds;
   await f.controller.command("surface footer", f.ctx);
@@ -526,7 +526,7 @@ test("surface switching and theme changes never reset the session ledger", async
 test("/hud reset clears observed counters but keeps and re-verifies the session ledger", async () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(2));
-  const f = controllerFixture({ usageManager: manager, config: { usageScope: "session" } });
+  const f = controllerFixture({ usageManager: manager, config: { surface: "widget", usageScope: "session" } });
   f.clock.advance(0);
   f.emit("message_end", { message: assistant() });
   f.clock.advance(250);
@@ -539,7 +539,7 @@ test("/hud reset clears observed counters but keeps and re-verifies the session 
 test("tree and compact events rebuild the ledger through the controller", () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(1));
-  const f = controllerFixture({ usageManager: manager, config: { usageScope: "session" } });
+  const f = controllerFixture({ usageManager: manager, config: { surface: "widget", usageScope: "session" } });
   f.clock.advance(0);
   const rebuilds = f.controller.ledger.inspect().rebuilds;
   f.emit("session_tree");
@@ -556,7 +556,7 @@ test("tree and compact events rebuild the ledger through the controller", () => 
 test("renders perform zero history reads and idle sessions schedule no ledger work", () => {
   const manager = new FakeSessionManager();
   manager.appendMessage(assistantEntry(1));
-  const f = controllerFixture({ usageManager: manager, config: { usageScope: "session" } });
+  const f = controllerFixture({ usageManager: manager, config: { surface: "widget", usageScope: "session" } });
   f.clock.advance(0);
   f.clock.advance(250);
   const calls = { ...manager.calls };

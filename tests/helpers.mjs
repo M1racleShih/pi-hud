@@ -224,3 +224,7 @@ export function controllerFixture(options = {}) {
   emit("session_start");
   return { ...host, clock, controller, emit, manager: options.usageManager ?? null };
 }
+
+/** Pin the widget surface for tests about widget behavior (the default is footer). */
+export const widgetFixture = (config = {}, options = {}) =>
+  controllerFixture({ config: { surface: "widget", ...config }, ...options });

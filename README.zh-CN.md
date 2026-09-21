@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-为 [Pi](https://github.com/earendil-works/pi) 实现的被动、事件驱动 HUD，借鉴 [claude-hud](https://github.com/jarrodwatts/claude-hud) 的信息组织方式，而不是照搬它的 transcript 解析架构。显示模型、上下文快照、有界工具分类活动、已观察到的 token/费用、可选的**全会话用量账本**，以及显式接入的子代理和任务进度。默认仍是编辑器旁的命名 widget；可显式启用 **footer 接管模式**，用它替换 Pi 原生 footer，避免同一份信息重复显示。
+为 [Pi](https://github.com/earendil-works/pi) 实现的被动、事件驱动 HUD，借鉴 [claude-hud](https://github.com/jarrodwatts/claude-hud) 的信息组织方式，而不是照搬它的 transcript 解析架构。显示模型、上下文快照、有界工具分类活动、已观察到的 token/费用、可选的**全会话用量账本**，以及显式接入的子代理和任务进度。默认接管 Pi 原生 footer（经文档化的验收轮次后由所有者批准的切换）；设 `surface: "widget"` 可恢复编辑器旁的命名 widget，与原生 footer 并存。
 
 **零运行时依赖；不监听逐 token 事件；不注入提示词；不发起网络请求。额外 Git 探测默认关闭。** 历史读取仅存在于显式开启的 `usageScope: "session"` 背后，并限制在一个可审计模块内。
 
@@ -17,9 +17,9 @@
 
 `minimal` 一行、`balanced` 两行、`full` 三行。工具开始、结束、失败或收尾都不会改变选定布局的行数，避免额外的纵向跳动。窄终端按优先级省略片段：先保住上下文百分比、稳定的阶段状态，再折叠工具分类。上下文字段会先预留自己的宽度：长模型名只能被截断，不会让高占用警告消失。中文、emoji 和长路径按终端显示列宽（而非码元）测量、截断。全部预览见 [布局预览](docs/preview.txt)。
 
-## 显示位置：widget（默认）与 footer
+## 显示位置：footer（默认）与 widget
 
-`surface` 决定 HUD 画在哪里，默认 `widget`，因此现有安装的行为不变。设为 `footer` 时使用 Pi 0.85.1 的正式 `ctx.ui.setFooter` 槽位替换内置 footer，并且**不再挂载 HUD widget**，从而消除模型、上下文、费用的重复显示：
+`surface` 决定 HUD 画在哪里。默认 `footer`：使用 Pi 0.85.1 的正式 `ctx.ui.setFooter` 槽位替换内置 footer，并且**不再挂载 HUD widget**，从而消除模型、上下文、费用的重复显示。设 `surface: "widget"`（或执行 `/hud surface widget`）可回到被动 widget 模式，原生 footer 原样保留：
 
 ```text
 [Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs

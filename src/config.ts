@@ -56,7 +56,7 @@ export const DEFAULT_CONFIG: Readonly<HudConfig> = Object.freeze({
   version: 1,
   enabled: true,
   preset: "balanced",
-  surface: "widget",
+  surface: "footer",
   placement: "belowEditor",
   language: "en",
   palette: "pastel",

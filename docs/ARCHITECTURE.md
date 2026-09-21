@@ -2,13 +2,13 @@
 
 [README](../README.md) · [Research](RESEARCH.md) · [Performance](PERFORMANCE.md)
 
-## Decision: a passive widget by default, with an opt-in footer surface
+## Decision: the footer surface by default (owner-approved), with the passive widget as the explicit alternative
 
 `index.ts` re-exports a native-ESM implementation. Pi loads this as an extension. The package manifest declares only that extension: no tools, skills, prompt templates, provider hooks, or agent instructions. Module initialization imports small modules but does not read files or create timers. A startup environment kill switch exits before registering events or `/hud`.
 
 The normal factory registers 16 observational lifecycle/event callbacks and one user command. A TUI `session_start` creates `HudController`, whose surface is chosen by `surface`:
 
-- `widget` (default) mounts the named `pi-hud` widget, which coexists with the editor, Pi's built-in footer and other widgets.
+- `widget` mounts the named `pi-hud` widget, which coexists with the editor, Pi's built-in footer and other widgets; select it explicitly with `surface: "widget"`.
 - `footer` calls `ctx.ui.setFooter` from the dedicated `src/footer.ts` boundary and mounts no widget, so the same information is not drawn twice.
 
 `mode === "tui" && hasUI` is required; RPC having UI capability does not make it a terminal. No headless mode calls `setWidget` or `setFooter`.

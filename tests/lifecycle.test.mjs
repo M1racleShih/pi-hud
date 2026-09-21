@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import registerHud, { OBSERVED_EVENTS, BRIDGE_EVENT } from "../src/extension.ts";
 import { Coalescer } from "../src/scheduler.ts";
 import { DEFAULT_CONFIG } from "../src/config.ts";
-import { FakeClock, fakeHost, controllerFixture, assistant } from "./helpers.mjs";
+import { FakeClock, fakeHost, controllerFixture, widgetFixture, assistant } from "./helpers.mjs";
 
 test("factory registers only approved observational events and one slash command", () => {
   const host = fakeHost(); const previous = process.env.PI_HUD_DISABLE;
@@ -38,11 +38,14 @@ test("event handlers are synchronous void observers and never mutate incoming pa
 });
 test("configuration I/O is deferred beyond session_start and never awaited by a core hook", async () => {
   let reads = 0;
+  // DEFAULT_CONFIG now carries the owner-approved footer default: the deferred read
+  // must defer the footer install exactly like it deferred the widget before.
   const f = controllerFixture({ loadOnStart: true, configLoader: async () => { reads++; return { config: DEFAULT_CONFIG, found: false }; } });
-  assert.equal(reads, 0); assert.equal(f.calls.widget, 0);
+  assert.equal(reads, 0); assert.equal(f.calls.widget, 0); assert.equal(f.calls.footerInstalls, 0);
   f.clock.advance(0); assert.equal(reads, 1);
   await Promise.resolve(); await Promise.resolve(); f.clock.advance(0);
-  assert.equal(f.calls.widget, 1); f.emit("session_shutdown");
+  assert.equal(f.calls.footerInstalls, 1); assert.equal(f.calls.widget, 0);
+  f.emit("session_shutdown");
 });
 test("late config completion cannot resurrect a stopped session", async () => {
   let resolve;
@@ -146,7 +149,7 @@ test("/hud palette switches the in-memory palette and rejects unknown values", a
   f.emit("session_shutdown");
 });
 test("palette changes repaint the widget exactly once and keep fixed rows", async () => {
-  const f = controllerFixture();
+  const f = widgetFixture();
   f.clock.advance(0);
   const before = f.calls.paint;
   await f.controller.command("palette mono", f.ctx);
@@ -196,7 +199,7 @@ test("reset, off/on and a new session leave no stale category activity", async (
 });
 
 test("a disposed view cannot render activity from a previous observation scope", async () => {
-  const f = controllerFixture();
+  const f = widgetFixture();
   f.clock.advance(0);
   f.emit("tool_execution_start", { toolCallId: "a", toolName: "bash" });
   f.emit("tool_execution_end", { toolCallId: "a", toolName: "bash" });

@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import registerHud, { HudController } from "../src/extension.ts";
 import { DEFAULT_CONFIG } from "../src/config.ts";
 import { FOOTER_BODY_ROWS, MAX_STATUS_COUNT, MAX_STATUS_ROWS } from "../src/footer.ts";
-import { FakeClock, fakeHost, controllerFixture, assistant, MODEL } from "./helpers.mjs";
+import { FakeClock, fakeHost, controllerFixture, widgetFixture, assistant, MODEL } from "./helpers.mjs";
 
 const footerFixture = (config = {}, options = {}) => controllerFixture({ config: { surface: "footer", ...config }, ...options });
 /** Footer lines are colored by default; text assertions run on stripped output. */
@@ -26,8 +26,18 @@ test("factory registers the session-info event and still one slash command", () 
   } finally { if (previous === undefined) delete process.env.PI_HUD_DISABLE; else process.env.PI_HUD_DISABLE = previous; }
 });
 
-test("widget is the default surface and mounts no footer", () => {
+test("footer is the default surface (owner-approved switch) and mounts no widget", () => {
   const f = controllerFixture();
+  assert.equal(f.controller.config.surface, "footer");
+  assert.equal(f.controller.effectiveSurface(), "footer");
+  assert.ok(f.footer());
+  assert.equal(f.widget(), undefined);
+  assert.equal(f.calls.footerInstalls, 1);
+  f.emit("session_shutdown");
+});
+
+test("an explicit widget surface mounts no footer", () => {
+  const f = widgetFixture();
   assert.equal(f.controller.config.surface, "widget");
   assert.equal(f.controller.effectiveSurface(), "widget");
   assert.ok(f.widget());
@@ -51,7 +61,7 @@ test("footer surface installs only the footer and never the widget", () => {
 });
 
 test("/hud surface switches live between widget and footer", async () => {
-  const f = controllerFixture();
+  const f = widgetFixture();
   await f.controller.command("surface footer", f.ctx);
   assert.equal(f.controller.effectiveSurface(), "footer");
   assert.ok(f.footer());
@@ -392,6 +402,6 @@ test("a configure-time footer surface still falls back silently at startup", () 
   controller.handle("session_start", {}, host.ctx);
   assert.ok(host.widget());
   assert.equal(host.calls.notifications.length, 0, "startup must not emit unsolicited error text");
-  assert.equal(DEFAULT_CONFIG.surface, "widget");
+  assert.equal(DEFAULT_CONFIG.surface, "footer");
   controller.stop();
 });

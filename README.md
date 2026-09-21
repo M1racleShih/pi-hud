@@ -4,7 +4,7 @@ Planned provider quota and API balance support: [implementation plan (Chinese)](
 
 English | [简体中文](README.zh-CN.md)
 
-A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, an **opt-in full-session usage ledger**, and opt-in agent/task progress. The default surface is a named widget next to Pi's built-in footer; an **opt-in footer surface** can replace that footer instead so the same information is not shown twice.
+A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, an **opt-in full-session usage ledger**, and opt-in agent/task progress. The default surface takes over Pi's built-in footer (an owner-approved switch after the acceptance rounds documented in `docs/`); `surface: "widget"` restores the named widget next to the built-in footer instead.
 
 **No runtime dependencies. No token-stream listeners. No prompt injection. No network requests. Git probing is off by default.** History reads exist only behind the opt-in `usageScope: "session"` and are confined to one audited module.
 
@@ -19,9 +19,9 @@ Balanced, 120 columns; synthetic data rendered by the actual renderer, not a scr
 
 `minimal` uses one row, `balanced` two, `full` three. Row counts stay fixed for a preset, including while tools start, finish, fail or settle. Segments are removed by priority on narrow terminals: the context percentage, the stable phase survive first, then tool categories fold away. The context meter keeps its space, so a long model name is clipped before a high-usage warning can disappear. Text is grapheme-aware and width-bounded — Chinese, emoji and long paths are measured in terminal cells, not code units. See [all generated previews](docs/preview.txt).
 
-## Surfaces: widget (default) or footer
+## Surfaces: footer (default) or widget
 
-`surface` selects where the HUD is drawn. The default is `widget`, so nothing changes for an existing installation. `footer` replaces Pi's built-in footer through the official `ctx.ui.setFooter` slot and does **not** mount the HUD widget, which removes the duplicate model/context/cost display:
+`surface` selects where the HUD is drawn. The default is `footer`: it replaces Pi's built-in footer through the official `ctx.ui.setFooter` slot and does **not** mount the HUD widget, which removes the duplicate model/context/cost display. Set `surface: "widget"` (or run `/hud surface widget`) to go back to the passive widget beside the untouched built-in footer:
 
 ```text
 [Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs

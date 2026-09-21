@@ -11,9 +11,9 @@ for (const value of [null, [], "x", 3, true]) {
 for (const value of [{ version: 2 }, { surprise: true }, { enabled: 1 }, { color: "true" }, { preset: "maximum" }, { surface: "statusline" }, { surface: true }, { language: "zh" }, { palette: "rainbow" }, { palette: true }, { placement: "footer" }, { refreshMs: 249 }, { refreshMs: 2001 }, { refreshMs: NaN }, { git: null }, { git: { enabled: 1 } }, { git: { ttlMs: 9999 } }, { git: { timeoutMs: 1001 } }, { git: { shell: true } }]) {
   test(`rejects invalid config ${JSON.stringify(value)}`, () => assert.throws(() => normalizeConfig(value)));
 }
-test("surface defaults to widget and accepts exactly widget and footer", () => {
-  assert.equal(normalizeConfig().surface, "widget");
-  assert.equal(DEFAULT_CONFIG.surface, "widget");
+test("surface defaults to footer (owner-approved switch) and accepts exactly widget and footer", () => {
+  assert.equal(normalizeConfig().surface, "footer");
+  assert.equal(DEFAULT_CONFIG.surface, "footer");
   assert.equal(normalizeConfig({ surface: "widget" }).surface, "widget");
   assert.equal(normalizeConfig({ surface: "footer" }).surface, "footer");
   assert.ok(Object.isFrozen(normalizeConfig({ surface: "footer" })));

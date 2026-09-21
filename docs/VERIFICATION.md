@@ -345,3 +345,18 @@ Harness findings this round (recorded honestly; no production change was needed)
 - **Mid-stream command submission interrupts the stream.** Submitting `/compact` while a reply streams does not queue behind the turn in 0.85.1 — it aborts the in-flight stream and then runs the compaction. The scenario records both the observed behavior and the fallback path if a future host changes it.
 
 Gates after this round: `npm run verify` (244 tests, all performance gates unchanged), `npm run package:check`, `sdk-check.mjs`, `usage-oracle-check.mjs` all green; `src/` is untouched by this round (the tracked changes are the new scenario script, the two test fixtures and documentation).
+
+## Owner-approved default switch: `surface: footer` (2026-09-20)
+
+The owner approved condition 5, and the decision record's two-step recommendation executed step one: `DEFAULT_CONFIG.surface` is now `"footer"`; `usageScope` stays `"observed"` (the default still reads no session history). Step two — a `session` usage-scope default — is deliberately excluded and will be re-evaluated after a usage cycle.
+
+| Check | Result |
+| --- | --- |
+| `src/config.ts` default | `surface: "footer"`; schema default, example config and runtime defaults stay in sync (`npm run check` asserts it). |
+| Tests | 245 pass / 0 fail. The default-surface tests now pin the footer default (deferred startup install, no widget mounted); widget-behavior tests pin `surface: "widget"` explicitly via a `widgetFixture` helper instead of relying on the default. |
+| PTY smoke (restructured) | Startup now expects the footer surface: the default pastel `ctx(last)` renders in the footer, a fresh repaint window contains no native-footer text, `/hud surface widget` restores the built-in footer beside the HUD widget, `/hud surface footer` re-takes the slot, resize and extension-status checks pass. PASS. |
+| RPC smoke | PASS (`/hud` registration, JSON RPC, no HUD UI output). |
+| Live-protocol spot-check | concurrent-widget scenario re-run green on the new default startup path (the suite pins surfaces explicitly). |
+| Docs | Both READMEs, CONFIGURATION and ARCHITECTURE describe the footer default and the `surface: "widget"` escape hatch; the decision record addendum and HANDOFF record the approval. `docs/preview.txt` is unaffected (the preview pins explicit surfaces per section). |
+
+No gate was relaxed; the performance gates are unchanged.

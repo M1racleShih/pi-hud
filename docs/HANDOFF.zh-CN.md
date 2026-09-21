@@ -73,7 +73,7 @@ Pi 内可用 `/hud surface footer`、`/hud surface widget`、`/hud off`、`/hud 
 宿主 SDK 位于被忽略的 .tmp/sdk，不随 Git 同步。需要宿主检查时按 [开发流程](DEVELOPMENT.md) 安装锁定 Pi 0.85.1 SDK，并执行 sdk-check、usage-oracle-check、pi-rpc-smoke、pi-pty-smoke。
 用户级 Pi 配置、provider 凭据、pi-goal 安装和会话状态也不由本仓库同步；不要将这些内容提交到 Git。
 
-## 下一阶段：仅剩条件 5（所有者批准默认切换），或转向额度功能规划
+## 下一阶段：观察一个使用周期后评估第二步（session 默认），或转向额度功能规划
 
 B2b（验收轮）与三轮 review 已完成；后续材料已交付；视觉验收精简执行并转录收紧（见上）。下一步依次是：
 
@@ -96,6 +96,8 @@ B1 契约约束仍然全部有效：
 
 ```text
 先读 docs/HANDOFF.zh-CN.md，核对 git status、当前代码和相关规划。
+默认 surface 已切换为 footer（所有者批准，2026-09-20；usageScope 保持 observed；
+surface: "widget" 可恢复旧行为）。不要重复执行重评条件 1–4 的验收。
 B2b、三轮 review、B2b 后续材料均已交付，不要重做。视觉验收已精简执行并转录收紧
 （docs/VISUAL-ACCEPTANCE-RESULTS.zh-CN.md），所有者已接受当前覆盖度（条件 1 闭合）
 并书面接受字段缺口（条件 2 闭合，见决策记录追加节）。保持 observed 与 widget 默认。

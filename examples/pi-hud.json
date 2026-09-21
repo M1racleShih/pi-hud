@@ -12,6 +12,7 @@
   "ascii": false,
   "showCost": true,
   "showThinking": true,
+  "showSpeed": true,
   "git": {
     "enabled": false,
     "ttlMs": 30000,

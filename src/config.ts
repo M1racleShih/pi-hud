@@ -44,6 +44,8 @@ export interface HudConfig {
   ascii: boolean;
   showCost: boolean;
   showThinking: boolean;
+  /** Show the `spd*` generation-speed field (measurement always runs; see docs/TOKEN-SPEED.zh-CN.md). */
+  showSpeed: boolean;
   git: GitConfig;
 }
 
@@ -66,6 +68,7 @@ export const DEFAULT_CONFIG: Readonly<HudConfig> = Object.freeze({
   ascii: false,
   showCost: true,
   showThinking: true,
+  showSpeed: true,
   git: Object.freeze({ enabled: false, ttlMs: 30_000, timeoutMs: 500 }),
 });
 
@@ -82,7 +85,7 @@ export function normalizeConfig(input: unknown = {}): Readonly<HudConfig> {
   const result = { ...DEFAULT_CONFIG, ...input, git: { ...DEFAULT_CONFIG.git } } as HudConfig & Record<string, unknown>;
   delete result.$schema;
   if (result.version !== 1) throw new Error("Unsupported configuration version");
-  for (const key of ["enabled", "color", "ascii", "showCost", "showThinking"]) {
+  for (const key of ["enabled", "color", "ascii", "showCost", "showThinking", "showSpeed"]) {
     if (typeof result[key] !== "boolean") throw new Error(`${key} must be boolean`);
   }
   for (const [key, values] of [

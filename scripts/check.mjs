@@ -2,16 +2,37 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { OBSERVED_EVENTS } from "../src/extension.ts";
+import { OBSERVED_EVENTS, STREAM_EVENTS } from "../src/extension.ts";
 import { DEFAULT_CONFIG, normalizeConfig } from "../src/config.ts";
 import { renderPreview } from "./preview.mjs";
 
 const manifest = JSON.parse(readFileSync("package.json", "utf8"));
 assert.equal(Object.keys(manifest.dependencies ?? {}).length, 0, "Runtime dependencies are forbidden");
 assert.deepEqual(manifest.pi.extensions, ["./index.ts"]);
-for (const event of ["message_update", "tool_execution_update", "before_agent_start", "context", "input", "tool_call", "tool_result"]) {
+for (const event of ["tool_execution_update", "before_agent_start", "context", "input", "tool_call", "tool_result"]) {
   assert.ok(!OBSERVED_EVENTS.includes(event), `Forbidden core-path listener: ${event}`);
 }
+// `message_update` is the one deliberate high-frequency bridge (docs/TOKEN-SPEED.zh-CN.md):
+// outside OBSERVED_EVENTS, pinned to exactly one stream event, and its handler must fuse
+// after the first sample. The state boundary below keeps the hot path honest.
+assert.deepEqual(STREAM_EVENTS, ["message_update"], "the stream bridge must stay exactly the first-token sample");
+assert.ok(!OBSERVED_EVENTS.includes("message_update"), "message_update must not join the low-frequency event list");
+const STREAM_FILE = "state.ts";
+const STREAM_START = "/* stream-boundary:start */";
+const STREAM_END = "/* stream-boundary:end */";
+const streamFileSource = readFileSync(join("src", STREAM_FILE), "utf8");
+const streamSection = streamFileSource.includes(STREAM_START) && streamFileSource.includes(STREAM_END)
+  ? streamFileSource.split(STREAM_START)[1].split(STREAM_END)[0]
+  : "";
+assert.ok(streamSection.length > 0, `${STREAM_FILE} must contain the stream boundary section`);
+assert.ok(
+  streamSection.includes("if (!this.streamArmed || this.firstTokenAt !== null) return false;"),
+  "the stream boundary must open with the fused early-return guard",
+);
+assert.ok(
+  !/\.partial\b|\.message\b|\.content\b/.test(streamSection),
+  "the stream boundary may only read the delta event's type and delta string",
+);
 const allowedBuiltins = {
   "config.ts": new Set(["node:fs", "node:fs/promises", "node:os", "node:path"]),
   "git.ts": new Set(["node:child_process"]),

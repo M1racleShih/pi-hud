@@ -5,6 +5,10 @@ import type { SessionUsageView } from "./usage.ts";
 export const LIMITS = Object.freeze({ tools: 64, recentIds: 128, agents: 16, tasks: 8, toolCategories: 16 });
 /** Display name of the synthetic bucket that merges tool names beyond the retention cap. */
 export const OTHER_CATEGORY = "other";
+/** Shortest generation window that can be measured honestly (see docs/TOKEN-SPEED.zh-CN.md). */
+export const MIN_SPEED_WINDOW_MS = 50;
+/** Rate above which the display saturates instead of printing an ever-growing number. */
+export const SPEED_DISPLAY_CAP = 999;
 const number = (value: unknown): number =>
   typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.min(value, Number.MAX_SAFE_INTEGER) : 0;
 const add = (a: number, b: number): number => Math.min(Number.MAX_SAFE_INTEGER, a + b);
@@ -88,6 +92,17 @@ export interface HudSnapshot {
    * is zero or the observation has been invalidated by reset, model switch or compaction.
    */
   cacheHit: number | null;
+  /**
+   * Average generation speed of the most recent completed assistant message:
+   * provider-reported `usage.output` divided by the wall-clock window from the first
+   * content-bearing streaming delta to `message_end` (algorithm: docs/TOKEN-SPEED.zh-CN.md).
+   * `null` before the first measurement and after reset or a model switch; a discarded
+   * measurement never overwrites the previous valid value.
+   */
+  speedRate: number | null;
+  /** Exact numerator/denominator of `speedRate`, kept for `/hud status` diagnostics. */
+  speedTokens: number;
+  speedMs: number;
   cost: number;
   usageReports: number;
   costReports: number;
@@ -137,6 +152,11 @@ export class HudState {
   declare cacheRead: number;
   declare cacheWrite: number;
   declare cacheHit: number | null;
+  declare speedRate: number | null;
+  declare speedTokens: number;
+  declare speedMs: number;
+  declare streamArmed: boolean;
+  declare firstTokenAt: number | null;
   declare cost: number;
   declare usageReports: number;
   declare costReports: number;
@@ -172,6 +192,11 @@ export class HudState {
     this.cacheRead = 0;
     this.cacheWrite = 0;
     this.cacheHit = null;
+    this.speedRate = null;
+    this.speedTokens = 0;
+    this.speedMs = 0;
+    this.streamArmed = false;
+    this.firstTokenAt = null;
     this.cost = 0;
     this.usageReports = 0;
     this.costReports = 0;
@@ -186,18 +211,55 @@ export class HudState {
     if (key !== this.modelKey) {
       this.contextTokens = null;
       this.contextAt = null;
-      // A cache-hit rate measured for another model is not applicable to this one.
+      // A cache-hit rate measured for another model is not applicable to this one, and the
+      // same holds for its generation speed, which would otherwise ride along next to the
+      // new model's name.
       this.cacheHit = null;
+      this.speedRate = null;
+      this.speedTokens = 0;
+      this.speedMs = 0;
     }
     this.modelKey = key;
     this.model = safeText(model?.name || model?.id, 80) || "no model";
     this.contextWindow = number(model?.contextWindow);
   }
 
+  /**
+   * Arm (assistant) or disarm (any other role) one speed measurement. A `message_start`
+   * of a non-assistant message while armed means the pairing is already broken: discard
+   * rather than risk pairing a first-token timestamp with the wrong message.
+   */
+  messageStart(message: MessageLike | undefined): boolean {
+    const armed = message?.role === "assistant";
+    const changed = armed !== this.streamArmed || (armed && this.firstTokenAt !== null);
+    this.streamArmed = armed;
+    this.firstTokenAt = null;
+    return changed;
+  }
+
+/* stream-boundary:start */
+  /**
+   * The single high-frequency bridge (see docs/TOKEN-SPEED.zh-CN.md). It records exactly
+   * one timestamp per assistant message - the arrival of the first content-bearing delta
+   * - and then fuses: every further `message_update` of that message leaves through the
+   * first comparison without touching the payload. `*_start` events do not count (their
+   * blocks are empty by contract), non-string or empty deltas do not count, and nothing
+   * from the delta string is ever retained.
+   */
+  messageUpdate(streamEvent: { type?: unknown; delta?: unknown } | undefined, now: number): boolean {
+    if (!this.streamArmed || this.firstTokenAt !== null) return false;
+    if (streamEvent?.type !== "text_delta" && streamEvent?.type !== "thinking_delta" && streamEvent?.type !== "toolcall_delta") return false;
+    if (typeof streamEvent.delta !== "string" || streamEvent.delta.length === 0) return false;
+    this.firstTokenAt = now;
+    return true;
+  }
+/* stream-boundary:end */
+
   messageEnd(message: MessageLike | undefined, now: number) {
-    if (message?.role !== "assistant") return false;
+    const speed = this.settleSpeed(message, now);
+    if (message?.role !== "assistant") return speed;
     const usage = message.usage;
-    if (!object(usage)) return false;
+    if (!object(usage)) return speed;
     // Input, output and both cache counters stay separate: adding the cache counters to
     // `input` again is exactly the double count the native footer avoids.
     const input = number(usage.input);
@@ -236,6 +298,33 @@ export class HudState {
       const promptTokens = input + cacheRead + cacheWrite;
       this.cacheHit = hasCacheData && promptTokens > 0 ? cacheRead / promptTokens : null;
     }
+    return true;
+  }
+  /**
+   * Settle the armed speed measurement (guards G1-G5 in docs/TOKEN-SPEED.zh-CN.md). A
+   * discarded measurement never overwrites the previous valid value, matching the
+   * cache-hit rule for partial observations.
+   */
+  private settleSpeed(message: MessageLike | undefined, now: number): boolean {
+    const armed = this.streamArmed;
+    const firstTokenAt = this.firstTokenAt;
+    this.streamArmed = false;
+    this.firstTokenAt = null;
+    if (message?.role !== "assistant" || !armed || firstTokenAt === null) return false;
+    if (message.stopReason === "error" || message.stopReason === "aborted") return false;
+    const usage = message.usage;
+    if (!object(usage)) return false;
+    const output = number(usage.output);
+    if (output <= 0) return false;
+    // A response finishing after a model switch still counts toward usage, but its speed
+    // belongs to the old model and must not be displayed next to the new selection.
+    const responseKey = `${safeText(message.provider, 64)}:${safeText(message.model, 100)}`;
+    if (message.model && message.provider && responseKey !== this.modelKey) return false;
+    const elapsed = now - firstTokenAt;
+    if (elapsed < MIN_SPEED_WINDOW_MS) return false;
+    this.speedTokens = output;
+    this.speedMs = elapsed;
+    this.speedRate = output / (elapsed / 1_000);
     return true;
   }
 
@@ -402,6 +491,7 @@ export class HudState {
       interrupted: this.interrupted, dropped: this.dropped,
       input: this.input, output: this.output, cacheRead: this.cacheRead, cacheWrite: this.cacheWrite,
       cacheHit: this.cacheHit, cost: this.cost,
+      speedRate: this.speedRate, speedTokens: this.speedTokens, speedMs: this.speedMs,
       usageReports: this.usageReports, costReports: this.costReports,
       compactions: this.compactions, lastTool: this.lastTool,
       runningAgents, agentErrors, agentLabel,

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import registerHud, { OBSERVED_EVENTS, BRIDGE_EVENT } from "../src/extension.ts";
+import registerHud, { OBSERVED_EVENTS, STREAM_EVENTS, BRIDGE_EVENT } from "../src/extension.ts";
 import { Coalescer } from "../src/scheduler.ts";
 import { DEFAULT_CONFIG } from "../src/config.ts";
 import { FakeClock, fakeHost, controllerFixture, widgetFixture, assistant } from "./helpers.mjs";
@@ -10,9 +10,12 @@ test("factory registers only approved observational events and one slash command
   delete process.env.PI_HUD_DISABLE;
   try {
     assert.equal(registerHud(host.pi), undefined);
-    assert.deepEqual([...host.handlers.keys()], [...OBSERVED_EVENTS]);
+    assert.deepEqual([...host.handlers.keys()], [...OBSERVED_EVENTS, ...STREAM_EVENTS]);
     assert.deepEqual([...host.commands.keys()], ["hud"]);
-    for (const name of ["message_update", "tool_execution_update", "tool_call", "tool_result", "context", "input", "before_agent_start"]) assert.equal(host.handlers.has(name), false);
+    // The high-frequency core-path events stay forbidden; message_update is the one
+    // pinned stream bridge (see scripts/check.mjs).
+    for (const name of ["tool_execution_update", "tool_call", "tool_result", "context", "input", "before_agent_start"]) assert.equal(host.handlers.has(name), false);
+    assert.equal(host.handlers.has("message_update"), true, "the first-token bridge is registered");
     assert.equal(host.calls.widget, 0);
   } finally { if (previous === undefined) delete process.env.PI_HUD_DISABLE; else process.env.PI_HUD_DISABLE = previous; }
 });
@@ -214,4 +217,46 @@ test("a disposed view cannot render activity from a previous observation scope",
   assert.notEqual(fresh, old);
   assert.doesNotMatch(fresh.render(120).join("\n"), /bash/);
   f.emit("session_shutdown");
+});
+
+// ---------------------------------------------------------------------------
+// Stream bridge wiring: message_start arms, message_update samples once, no repaint flood
+// ---------------------------------------------------------------------------
+
+test("controller settles a speed sample through the real event path", () => {
+  const f = controllerFixture();
+  f.emit("message_start", { message: { role: "assistant" } });
+  f.clock.advance(1_000);
+  f.emit("message_update", { message: { role: "assistant" }, assistantMessageEvent: { type: "thinking_delta", delta: "推" } });
+  f.clock.advance(4_000);
+  f.emit("message_end", { message: assistant() });
+  assert.equal(f.controller.state.speedRate, 75, "300 reported tokens over the 4s window");
+  assert.equal(f.controller.state.speedTokens, 300);
+  assert.equal(f.controller.state.speedMs, 4_000);
+});
+
+test("a fused message_update never schedules a repaint by itself", () => {
+  const f = controllerFixture();
+  f.emit("message_start", { message: { role: "assistant" } });
+  f.emit("message_update", { assistantMessageEvent: { type: "text_delta", delta: "x" } });
+  f.emit("message_end", { message: assistant() });
+  f.clock.advance(1_000);
+  const before = f.calls.paint;
+  for (let i = 0; i < 500; i++) f.emit("message_update", { assistantMessageEvent: { type: "text_delta", delta: "y" } });
+  f.clock.advance(2_000);
+  assert.equal(f.calls.paint, before, "500 fused deltas caused no extra frame");
+  assert.equal(f.controller.state.firstTokenAt, null, "the epoch was cleared by message_end");
+});
+
+test("session events clear the armed bridge so no late delta can pair with a new session", () => {
+  const f = controllerFixture();
+  f.emit("message_start", { message: { role: "assistant" } });
+  f.emit("message_update", { assistantMessageEvent: { type: "text_delta", delta: "x" } });
+  f.emit("session_shutdown");
+  f.emit("session_start");
+  const state = f.controller.state;
+  assert.ok(state, "a fresh session recreated the state");
+  assert.equal(state.streamArmed, false);
+  assert.equal(state.firstTokenAt, null);
+  assert.equal(state.speedRate, null, "the observation belongs to the previous epoch");
 });

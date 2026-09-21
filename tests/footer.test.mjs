@@ -387,3 +387,24 @@ test("both surfaces keep one working phase across tool churn and settling", () =
     assert.equal(value.errors, 1);
   }
 });
+
+// ---------------------------------------------------------------------------
+// spd* on the footer usage row
+// ---------------------------------------------------------------------------
+
+import { speedField, LABELS } from "../src/render.ts";
+import { EMPTY_IDENTITY } from "../src/footer.ts";
+
+test("the footer usage row shows spd* after cost and folds it before tokens and cost", () => {
+  const state = new HudState("/tmp/project", MODEL, 0);
+  state.messageStart({ role: "assistant" });
+  state.messageUpdate({ type: "text_delta", delta: "H" }, 2_000);
+  state.messageEnd(assistant({ usage: { input: 12_000, cacheRead: 75_000, cacheWrite: 0, output: 3_000, cost: { total: 0.042 } } }), 62_000);
+  const config = normalizeConfig({ preset: "balanced" });
+  const wide = formatFooter(state.snapshot(), config, 120, EMPTY_IDENTITY);
+  assert.match(wide[1].text, /est\* \$0\.042 · spd\* 50\.0 t\/s$/);
+  const narrow = formatFooter(state.snapshot(), config, 58, EMPTY_IDENTITY);
+  assert.ok(!narrow[1].text.includes("spd"), `speed folds before the counters: ${narrow[1].text}`);
+  assert.ok(narrow[1].text.includes("obs*") || narrow[1].text.includes("est*") || narrow[1].text.includes("ctx"), "higher-priority usage fields survive");
+  assert.equal(speedField(state.snapshot(), normalizeConfig({ showSpeed: false }), LABELS.en), null);
+});

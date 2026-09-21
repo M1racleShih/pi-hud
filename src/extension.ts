@@ -18,9 +18,16 @@ export const WIDGET_KEY = "pi-hud";
 export const BRIDGE_EVENT = "pi-hud:update";
 export const OBSERVED_EVENTS: readonly string[] = Object.freeze([
   "session_start", "session_shutdown", "session_info_changed", "agent_start", "agent_end", "agent_settled",
-  "turn_end", "message_end", "tool_execution_start", "tool_execution_end", "session_compact",
+  "turn_end", "message_start", "message_end", "tool_execution_start", "tool_execution_end", "session_compact",
   "session_tree", "model_select", "thinking_level_select", "ui_prompt_start", "ui_prompt_end",
 ]);
+/**
+ * The one deliberate high-frequency listener (docs/TOKEN-SPEED.zh-CN.md): `message_update`
+ * fires per streaming delta, and the handler records a single first-token timestamp per
+ * assistant message before fusing. It must stay the only entry; `scripts/check.mjs`
+ * pins both the list and the fused early-return inside `src/state.ts`'s stream boundary.
+ */
+export const STREAM_EVENTS: readonly string[] = Object.freeze(["message_update"]);
 const sameGit = (a: GitConfig, b: GitConfig) => a.enabled === b.enabled && a.ttlMs === b.ttlMs && a.timeoutMs === b.timeoutMs;
 const MAX_TITLE = 80;
 const MAX_PROVIDER = 64;
@@ -68,6 +75,9 @@ export interface PiEventPayload extends ToolEventLike {
   level?: string;
   /** Payload of `session_info_changed`. */
   name?: string;
+  /** Payload of `message_update`: the per-delta stream event. Only `type` and `delta`
+   *  are ever read (inside the stream boundary), never the partial message. */
+  assistantMessageEvent?: { type?: unknown; delta?: unknown };
 }
 
 export interface ExtensionApi {
@@ -184,6 +194,12 @@ export class HudController {
         case "agent_end": this.state!.phase = "settling"; break;
         case "agent_settled": this.state!.settle(); this.wantGit = true; this.ledger?.requestVerify(); break;
         case "turn_end": this.ledger?.requestVerify(); changed = false; break;
+        case "message_start": changed = this.state!.messageStart(event?.message); break;
+        case "message_update":
+          // High-frequency stream bridge: O(1) per delta, fuses after the first sample, and
+          // returns false for every fused delta so no repaint is ever scheduled from it.
+          changed = this.state!.messageUpdate(event?.assistantMessageEvent, this.now());
+          break;
         case "message_end":
           // Observed counters keep their meaning; the session ledger only marks pending
           // work here and reads the final committed entry at the next reliable boundary.
@@ -577,6 +593,7 @@ export class HudController {
         scope: "since attach/reset", input: this.state?.input ?? 0, output: this.state?.output ?? 0,
         cacheRead: this.state?.cacheRead ?? 0, cacheWrite: this.state?.cacheWrite ?? 0,
         cacheHitRate: this.state?.cacheHit ?? null, cost: this.state?.cost ?? 0,
+        speed: this.state ? { rate: this.state.speedRate, tokens: this.state.speedTokens, ms: this.state.speedMs } : null,
       },
       sessionUsage: this.ledger?.inspect() ?? null,
       coverage: {
@@ -585,6 +602,7 @@ export class HudController {
           : "observed since attach/reset; NOT a full-session ledger (the native footer aggregates every session entry)",
         context: "last observed assistant snapshot, labelled ctx(last); not the host's live context estimate; identical scope in observed and session modes",
         cacheHit: "most recent valid assistant: cacheRead / (input + cacheRead + cacheWrite); ? when unknown; stays observed-scope even in session mode",
+        speed: "spd*: average generation speed of the last completed assistant message = reported usage.output / (first content-bearing delta -> message_end); discarded (keeping the previous value) on error/abort, missing usage, no observed first token, sub-50ms windows or a model mismatch; no live estimate while streaming",
         sessionLedger: this.config.usageScope === "session"
           ? (this.ledger?.view() ? "full-session ledger active; status/rebuild/host-call diagnostics above" : "requested but unavailable; explicitly degraded to observed-labelled data")
           : "inactive; usageScope: session opts in",
@@ -686,6 +704,9 @@ export default function piHud(pi: ExtensionApi): void {
   if (isDisabled(process.env.PI_HUD_DISABLE)) return;
   const controller = new HudController(pi);
   for (const name of OBSERVED_EVENTS) {
+    pi.on(name, (event, ctx) => { controller.handle(name, event, ctx); });
+  }
+  for (const name of STREAM_EVENTS) {
     pi.on(name, (event, ctx) => { controller.handle(name, event, ctx); });
   }
   pi.registerCommand("hud", {

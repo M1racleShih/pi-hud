@@ -310,3 +310,128 @@ test("reset and a late settle cannot revive activity from the previous epoch", (
   s.settle();
   assert.deepEqual(s.snapshot().toolCategories, [], "a late settle must not credit the old epoch");
 });
+
+// ---------------------------------------------------------------------------
+// Token speed: first-token bridge and per-message average (docs/TOKEN-SPEED.zh-CN.md)
+// ---------------------------------------------------------------------------
+
+import { MIN_SPEED_WINDOW_MS } from "../src/state.ts";
+
+/** Drive one assistant message through the exact event protocol. */
+function measured(s, { firstAt = 200, endAt = 10_000, output = 300, ...overrides } = {}) {
+  s.messageStart({ role: "assistant" });
+  if (firstAt !== null) s.messageUpdate({ type: "text_delta", delta: "H" }, firstAt);
+  return s.messageEnd(assistant({ ...overrides, usage: { input: 1_000, output, cacheRead: 2_000, cacheWrite: 400, cost: { total: 0.012 } } }), endAt);
+}
+
+test("speed is the reported output over the first-token-to-end window", () => {
+  const s = state();
+  assert.equal(s.messageUpdate({ type: "text_delta", delta: "x" }, 100), false, "no message_start: ignored");
+  assert.equal(measured(s, { firstAt: 2_000, endAt: 62_000, output: 3_000 }), true);
+  assert.equal(s.speedRate, 50, "3,000 tokens over a 60s window");
+  assert.equal(s.speedTokens, 3_000);
+  assert.equal(s.speedMs, 60_000);
+  assert.equal(s.snapshot().speedRate, 50);
+});
+
+test("the clock starts on the first content delta, never on block opens or empty deltas", () => {
+  for (const [type, delta] of [["text_start", undefined], ["thinking_start", undefined], ["text_delta", ""], ["text_delta", undefined], ["done", undefined], ["error", undefined]]) {
+    const s = state();
+    s.messageStart({ role: "assistant" });
+    assert.equal(s.messageUpdate({ type, delta }, 5_000), false, `${type} is not content`);
+    measured(s, { firstAt: null, endAt: 20_000, output: 100 });
+    assert.equal(s.speedRate, null, `${type} must not become a first token`);
+  }
+  const thinking = state();
+  thinking.messageStart({ role: "assistant" });
+  thinking.messageUpdate({ type: "thinking_delta", delta: "推理" }, 1_000);
+  thinking.messageEnd(assistant(), 6_000);
+  assert.equal(thinking.speedRate, 60, "thinking deltas count as generated tokens");
+
+  const toolcall = state();
+  toolcall.messageStart({ role: "assistant" });
+  toolcall.messageUpdate({ type: "toolcall_delta", delta: "{\"" }, 1_000);
+  toolcall.messageEnd(assistant(), 6_000);
+  assert.equal(toolcall.speedRate, 60, "streamed tool-call parameters count too");
+});
+
+test("the bridge fuses after the first sample and never moves the timestamp", () => {
+  const s = state();
+  s.messageStart({ role: "assistant" });
+  assert.equal(s.messageUpdate({ type: "text_delta", delta: "a" }, 1_000), true);
+  assert.equal(s.messageUpdate({ type: "text_delta", delta: "b" }, 90_000), false, "fused: ignored");
+  assert.equal(s.messageUpdate({ type: "text_delta", delta: "c" }, 95_000), false);
+  s.messageEnd(assistant(), 91_000);
+  assert.equal(s.speedMs, 90_000, "the window still ends at the first sample");
+});
+
+test("guards keep a discarded measurement from overwriting the previous valid value", () => {
+  const guards = {
+    "no first token": (s) => measured(s, { firstAt: null, endAt: 5_000 }),
+    "error stop": (s) => measured(s, { stopReason: "error", endAt: 5_000 }),
+    "aborted stop": (s) => measured(s, { stopReason: "aborted", endAt: 5_000 }),
+    "zero output": (s) => measured(s, { output: 0, endAt: 5_000 }),
+    "short window": (s) => measured(s, { firstAt: 2_000, endAt: 2_000 + MIN_SPEED_WINDOW_MS - 1 }),
+    "model mismatch": (s) => measured(s, { model: "other", endAt: 5_000 }),
+  };
+  for (const [name, run] of Object.entries(guards)) {
+    const s = state();
+    measured(s, { firstAt: 2_000, endAt: 62_000, output: 3_000 });
+    assert.equal(s.speedRate, 50, `${name}: baseline`);
+    run(s);
+    assert.equal(s.speedRate, 50, `${name}: previous value stays`);
+  }
+});
+
+test("missing usage, non-assistant ends and interleaved starts never produce a rate", () => {
+  const s = state();
+  s.messageStart({ role: "assistant" });
+  assert.equal(s.messageEnd({ role: "assistant" }, 5_000), false, "no usage object at all");
+  assert.equal(s.speedRate, null);
+  // A toolResult message_end while armed: protocol says this cannot happen; state disarms.
+  s.messageStart({ role: "assistant" });
+  s.messageUpdate({ type: "text_delta", delta: "x" }, 1_000);
+  s.messageStart({ role: "toolResult" });
+  assert.equal(s.messageEnd(assistant(), 8_000), true, "usage still counts");
+  assert.equal(s.speedRate, null, "the broken pairing published no speed");
+  // Usage-less messages keep the meaning of messageEnd's return value.
+  assert.equal(s.messageEnd({ role: "user" }, 9_000), false);
+});
+
+test("reset and model switch drop the speed observation; compaction keeps it", () => {
+  const byReset = state();
+  measured(byReset, { firstAt: 2_000, endAt: 62_000, output: 3_000 });
+  byReset.reset("/tmp/next", MODEL, 900);
+  assert.equal(byReset.speedRate, null);
+
+  const byModel = state();
+  measured(byModel, { firstAt: 2_000, endAt: 62_000, output: 3_000 });
+  byModel.setModel({ ...MODEL, id: "switched", contextWindow: 100_000 });
+  assert.equal(byModel.speedRate, null, "another model's speed is not the new model's");
+  byModel.setModel(MODEL);
+  assert.equal(byModel.speedRate, null, "switching back does not resurrect the old sample");
+
+  const byCompaction = state();
+  measured(byCompaction, { firstAt: 2_000, endAt: 62_000, output: 3_000 });
+  byCompaction.compact();
+  assert.equal(byCompaction.speedRate, 50, "compaction changes the prompt, not the generation speed");
+});
+
+test("each assistant message is measured independently; the display shows the newest", () => {
+  const s = state();
+  measured(s, { firstAt: 2_000, endAt: 62_000, output: 3_000 });
+  measured(s, { firstAt: 70_000, endAt: 130_000, output: 1_500 });
+  assert.equal(s.speedRate, 25, "the latest message replaces the previous sample");
+});
+
+test("malformed stream events cannot arm, throw or fuse", () => {
+  const s = state();
+  s.messageStart({ role: "assistant" });
+  for (const bad of [undefined, {}, { type: 7 }, { type: "text_delta" }, { type: "text_delta", delta: 5 }]) {
+    assert.equal(s.messageUpdate(bad, 1_000), false);
+  }
+  assert.equal(s.firstTokenAt, null, "nothing fused");
+  s.messageUpdate({ type: "thinking_delta", delta: "ok" }, 1_500);
+  s.messageEnd(assistant(), 61_500);
+  assert.equal(s.speedRate, 5);
+});

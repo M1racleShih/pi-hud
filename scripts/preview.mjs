@@ -16,7 +16,11 @@ import { PASTEL_DARK, PASTEL_LIGHT, THEME_ROLES, HUD_ROLES } from "../src/palett
 export const fixtureState = (overrides = {}) => {
   const state = new HudState("/workspace/pi-hud", { id: "example-model", name: overrides.modelName ?? "Example Model", provider: "demo", contextWindow: 200_000 }, 0);
   state.thinking = "high";
-  state.messageEnd({ role: "assistant", stopReason: "stop", usage: { input: 12_000, cacheRead: 75_000, cacheWrite: 0, output: 3_000, cost: { total: 0.042 } } }, 1);
+  // One measured assistant message: first token 2s in, end at 62s, 3_000 reported output
+  // tokens -> an honest spd* sample of 50.0 t/s (docs/TOKEN-SPEED.zh-CN.md).
+  state.messageStart({ role: "assistant" });
+  state.messageUpdate({ type: "text_delta", delta: "H" }, 2_000);
+  state.messageEnd({ role: "assistant", model: "example-model", provider: "demo", stopReason: "stop", usage: { input: 12_000, cacheRead: 75_000, cacheWrite: 0, output: 3_000, cost: { total: 0.042 } } }, 62_000);
   const complete = (name, count, options = {}) => {
     for (let index = 0; index < count; index++) {
       state.startTool({ toolCallId: `${name}-${index}`, toolName: name, args: options.path ? { path: options.path } : undefined });
@@ -81,7 +85,9 @@ export function renderPreview() {
     'Fixture: model "Example Model" + thinking "high"; project "pi-hud"; branch "main*";',
     "context 45% (90k/200k); running tool edit state.ts; bounded categories",
     "bash ✓14 !1, edit ✓3, write ✓2, read ✓1 folded into +1; interrupted bash ~1;",
-    'cost $0.042; observed usage obs* ↑12k ↓3.0k R75k CH86.2%; bridge agent 1 and tasks 3/7 "Build Pi HUD".',
+    'cost $0.042; observed usage obs* ↑12k ↓3.0k R75k CH86.2%; generation speed spd* 50.0 t/s',
+    '(one measured message: 3,000 provider-reported tokens over a 60s first-token-to-end window);',
+    'bridge agent 1 and tasks 3/7 "Build Pi HUD".',
     "The footer surface adds cached identity (cwd, provider, session title) and the host Git branch;",
     "widget rows are unchanged in count (minimal 1 / balanced 2 / full 3).",
     "Separators are · in Unicode mode and | in ASCII mode.",

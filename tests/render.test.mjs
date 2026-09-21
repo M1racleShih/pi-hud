@@ -620,3 +620,43 @@ test("completed tool targets are absent from every preset and language", () => {
     }
   }
 });
+
+// ---------------------------------------------------------------------------
+// spd* field: layout, caveats, folding
+// ---------------------------------------------------------------------------
+
+import { speedField, LABELS } from "../src/render.ts";
+
+const speedSnapshot = (rate = 42.34) => {
+  const snap = snapshot();
+  snap.speedRate = rate;
+  snap.speedTokens = 3_000;
+  snap.speedMs = 70_000;
+  return snap;
+};
+
+test("spd* renders one decimal with the unit and hides when unknown or disabled", () => {
+  const config = normalizeConfig({});
+  assert.match(speedField(speedSnapshot(), config, LABELS.en).text, /^spd\* 42\.3 t\/s$/);
+  const zh = speedField(speedSnapshot(), normalizeConfig({ language: "zh-CN" }), LABELS["zh-CN"]);
+  assert.match(zh.text, /^速度\* 42\.3 tok\/s$/);
+  assert.equal(speedField(speedSnapshot(1000), config, LABELS.en).text, "spd* >999 t/s");
+  assert.equal(speedField({ ...speedSnapshot(), speedRate: null }, config, LABELS.en), null);
+  assert.equal(speedField(speedSnapshot(), normalizeConfig({ showSpeed: false }), LABELS.en), null);
+});
+
+test("the full widget row carries spd* behind the usage counters and folds it first", () => {
+  const state = new HudState("/tmp/x", { ...MODEL, name: "Test" }, 0);
+  state.messageEnd(assistant(), 1);
+  state.speedRate = 42.3;
+  const snap = state.snapshot();
+  const config = normalizeConfig({ preset: "full" });
+  const wide = formatHud(snap, config, 120).at(-1).text;
+  assert.match(wide, /obs\* .* · spd\* 42\.3 t\/s$/);
+  // Priority 28 < 30 (obs counters): at a narrow width the speed sample folds first.
+  const narrow = formatHud(snap, config, 46).at(-1).text;
+  assert.ok(!narrow.includes("spd"), `speed must fold before usage counters: ${narrow}`);
+  assert.ok(narrow.includes("obs*"), "usage counters outlive the speed sample");
+  // No measurement yet: no placeholder anywhere at any width.
+  for (const width of WIDTHS) assert.ok(!formatHud(snapshot(), config, width).at(-1).text.includes("spd"));
+});

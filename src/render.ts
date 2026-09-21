@@ -2,6 +2,7 @@ import { clip, compactNumber, visibleWidth } from "./text.ts";
 import { createStyler } from "./palette.ts";
 import type { HudRole, HudStyler, HudThemeLike } from "./palette.ts";
 import type { HudConfig, HudLanguage } from "./config.ts";
+import { SPEED_DISPLAY_CAP } from "./state.ts";
 import type { HudSnapshot, ToolCategory, ToolOutcome } from "./state.ts";
 import type { SessionUsageView } from "./usage.ts";
 
@@ -17,13 +18,15 @@ export interface HudWords {
   usage: string;
   /** Label for the optional full-session ledger totals (`usageScope: "session"`). */
   session: string;
+  /** Label for the last completed assistant message's average generation speed (`spd*`). */
+  speed: string;
   stopped: string;
   other: string;
 }
 
 export const LABELS: Record<HudLanguage, HudWords> = {
-  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", session: "sess*", stopped: "interrupted", other: "other" },
-  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", session: "全会话*", stopped: "已中断", other: "其他" },
+  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", session: "sess*", speed: "spd*", stopped: "interrupted", other: "other" },
+  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", session: "全会话*", speed: "速度*", stopped: "已中断", other: "其他" },
 };
 
 /** Fixed layout bounds: a row can never grow past these counts, whatever the state. */
@@ -319,6 +322,19 @@ export function bridgeFields(snapshot: HudSnapshot, config: HudConfig, width: nu
   ];
 }
 
+/**
+ * Average generation speed of the last completed assistant message (docs/TOKEN-SPEED.zh-CN.md).
+ * The `spd*` label carries the same caveat style as `obs*`/`est*`: a one-message sample over
+ * the generation window only (first content-bearing delta to message_end, provider-reported
+ * tokens). Priority 28 drops it before the usage counters (30) and cost (60) on narrow rows.
+ */
+export function speedField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
+  if (!config.showSpeed || snapshot.speedRate === null) return null;
+  const unit = config.language === "zh-CN" ? "tok/s" : "t/s";
+  const value = snapshot.speedRate > SPEED_DISPLAY_CAP ? `>${SPEED_DISPLAY_CAP}` : snapshot.speedRate.toFixed(1);
+  return field(28, [seg("label", `${words.speed} `), seg("body", `${value} ${unit}`)]);
+}
+
 /** Zero compactions or zero observed usage stay hidden instead of padding the row. */
 export function compactionField(snapshot: HudSnapshot, words: HudWords): HudField | null {
   if (!snapshot.compactions) return null;
@@ -402,6 +418,7 @@ export function formatHud(snapshot: HudSnapshot, config: HudConfig, rawWidth: nu
       ...bridgeFields(snapshot, config, width, words, agents, tasks),
       compactionField(snapshot, words),
       tokensField(snapshot, config, words),
+      speedField(snapshot, config, words),
     ], width, separator, config.ascii)));
   }
   return rows;

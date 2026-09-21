@@ -69,3 +69,9 @@ test("read-only symlink configuration supports a synced configuration repository
     assert.equal((await readConfigFile(link)).config.preset, "minimal");
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test("showSpeed is a boolean defaulting to true and validated like the other toggles", () => {
+  assert.equal(normalizeConfig().showSpeed, true);
+  assert.equal(normalizeConfig({ showSpeed: false }).showSpeed, false);
+  assert.throws(() => normalizeConfig({ showSpeed: "yes" }), /showSpeed must be boolean/);
+});

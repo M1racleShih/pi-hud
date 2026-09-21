@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { OBSERVED_EVENTS, STREAM_EVENTS } from "../src/extension.ts";
@@ -81,18 +81,59 @@ assert.ok(
   "the history boundary must wrap the read-only entry reads",
 );
 const forbiddenBase = /\b(?:execSync|execFileSync|spawnSync|readFileSync|writeFileSync|setInterval|fetch)\s*(?:\?\.\s*)?\(|\.\s*(?:getBranch|getContextUsage|registerTool|sendMessage|sendUserMessage|appendEntry|setEditorComponent|onTerminalInput)\s*(?:\?\.\s*)?\(|\bconsole\s*\./;
+// Same set without `fetch`: the transport module is audited separately below, where the
+// boundary section pins where fetch may be called.
+const forbiddenBaseNoFetch = /\b(?:execSync|execFileSync|spawnSync|readFileSync|writeFileSync|setInterval)\s*(?:\?\.\s*)?\(|\.\s*(?:getBranch|getContextUsage|registerTool|sendMessage|sendUserMessage|appendEntry|setEditorComponent|onTerminalInput)\s*(?:\?\.\s*)?\(|\bconsole\s*\./;
 const forbiddenSurface = /\.\s*setFooter\s*(?:\?\.\s*)?\(/;
 const forbiddenHistory = /\.\s*(?:getEntries|getEntry|getLeafId|getSessionId)\s*(?:\?\.\s*)?\(/;
-for (const file of readdirSync("src").filter((file) => file.endsWith(".ts"))) {
-  const source = readFileSync(join("src", file), "utf8");
-  assert.ok(!forbiddenBase.test(source), `Forbidden hot-path API or direct output in ${file}`);
+// The opt-in quota feature adds exactly one network module. `fetch` stays forbidden in
+// every other source file and outside the marked transport boundary, so the render
+// and hot-path limits are unchanged (docs/PROVIDER-LIMITS-PLAN.zh-CN.md §7).
+const TRANSPORT_FILE = "quota/transport.ts";
+const TRANSPORT_START = "/* transport-boundary:start */";
+const TRANSPORT_END = "/* transport-boundary:end */";
+const countFetchCalls = (source) => (source.match(/\bfetch\s*(?:\?\.\s*)?\(/g) ?? []).length;
+const transportSource = existsSync(join("src", TRANSPORT_FILE)) ? readFileSync(join("src", TRANSPORT_FILE), "utf8") : "";
+const transportSection = transportSource.includes(TRANSPORT_START) && transportSource.includes(TRANSPORT_END)
+  ? transportSource.split(TRANSPORT_START)[1].split(TRANSPORT_END)[0]
+  : "";
+if (transportSource) {
+  assert.ok(transportSection.includes("fetch"), `${TRANSPORT_FILE} must own the fetch boundary`);
+  assert.equal(
+    countFetchCalls(transportSource), countFetchCalls(transportSection),
+    "fetch may only be called inside the marked transport boundary section",
+  );
+}
+/** Recursive `src/**` scan: every TypeScript file under src, at any depth. */
+const listSourceFiles = (directory = "src") => {
+  const entries = readdirSync(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...listSourceFiles(path));
+    else if (entry.isFile() && entry.name.endsWith(".ts")) files.push(path);
+  }
+  return files;
+};
+for (const filePath of listSourceFiles()) {
+  const file = filePath.slice("src/".length).split(sep).join("/");
+  const source = readFileSync(filePath, "utf8");
+  const forbidden = file === TRANSPORT_FILE ? forbiddenBaseNoFetch : forbiddenBase;
+  assert.ok(!forbidden.test(source), `Forbidden hot-path API or direct output in ${file}`);
   if (file !== SURFACE_FILE) assert.ok(!forbiddenSurface.test(source), `setFooter is only allowed in the ${SURFACE_FILE} surface boundary`);
   if (file !== HISTORY_FILE) assert.ok(!forbiddenHistory.test(source), `read-only entry APIs are only allowed in the ${HISTORY_FILE} history boundary`);
+  if (file !== TRANSPORT_FILE && countFetchCalls(source) > 0) assert.ok(false, `fetch is only allowed inside the ${TRANSPORT_FILE} transport boundary`);
   for (const match of source.matchAll(/from\s+["'](node:[^"']+)["']/g)) {
     assert.ok(allowedBuiltins[file]?.has(match[1]), `Unexpected builtin import ${match[1]} in ${file}`);
   }
-  const result = spawnSync(process.execPath, ["--check", join("src", file)], { encoding: "utf8" });
+  const result = spawnSync(process.execPath, ["--check", filePath], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
+}
+if (transportSource) {
+  // The quota service and adapters must stay data-only: no node builtin imports at all.
+  for (const file of ["quota/service.ts", "quota/types.ts", "quota/identity.ts", "quota/adapters/zai.ts", "quota/transport.ts"]) {
+    assert.ok(existsSync(join("src", file)), `Expected quota module ${file}`);
+  }
 }
 assert.ok(readFileSync("README.md", "utf8").includes("README.zh-CN.md"));
 assert.ok(readFileSync("README.zh-CN.md", "utf8").includes("README.md"));

@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-09-21T14:03:34+0800",
+  "passed": true,
+  "checks": [
+    {
+      "check": "quota marker with enabled-but-unmatched profile",
+      "passed": true
+    },
+    {
+      "check": "mid-stream rows within width with quota on",
+      "passed": true,
+      "offender": null
+    },
+    {
+      "check": "stream completes with quota on",
+      "passed": true
+    },
+    {
+      "check": "/hud quota off acknowledged mid-stream",
+      "passed": true
+    },
+    {
+      "check": "stream completes after quota off",
+      "passed": true
+    },
+    {
+      "check": "/hud quota on restores the marker",
+      "passed": true
+    },
+    {
+      "check": "/hud quotas answers with quota on",
+      "passed": true
+    },
+    {
+      "check": "narrow 42-col HUD rows stay within width",
+      "passed": true,
+      "offender": null
+    },
+    {
+      "check": "quota marker folds away on narrow rows",
+      "passed": true
+    }
+  ],
+  "note": "fixture provider (no network); quota profile intentionally unmatched so the check exercises the enabled-quota rendering and lifecycle without live credentials; the networked path is covered by docs/quota-live-e2e.json"
+}

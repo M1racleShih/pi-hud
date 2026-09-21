@@ -1,0 +1,41 @@
+{
+  "recordedAt": "2026-09-21",
+  "purpose": "Real-account GLM quota E2E evidence (phase 1 slice): HUD extension end-to-end against the live personal credential, plus a same-minute raw read-only API query for cross-checking. The console-side comparison basis is docs/GLM-PLAN-SCOPES.zh-CN.md §6-7 (2026-09-19, percentages matched the personal console).",
+  "environment": {
+    "piSdk": "0.85.1 (isolated .tmp/sdk)",
+    "host": "real Pi TUI (PTY), --no-extensions, model zai-coding-cn/glm-4.7",
+    "credentialSource": "user-level auth.json (zai-coding-cn api_key), resolved by the host at query time; never printed or stored by the HUD",
+    "queryEndpoint": "GET https://open.bigmodel.cn/api/monitor/usage/quota/limit (read-only; no model requests)"
+  },
+  "personalLegacy": {
+    "e2e": {
+      "launch": "node dist/bundle/cli.js --no-session --no-extensions --model zai-coding-cn/glm-4.7 -e index.ts (PTY 140x40)",
+      "hudRow": "[GLM-4.7] · high · zai-coding-cn · <tmp cwd> · GLM Personal · 5h 100% · wk 67%",
+      "hudQuotasStatus": "ready",
+      "hudQuotasBuckets": [
+        { "id": "TOKENS_LIMIT:3:5", "usedPercent": 0, "remainingPercent": 100, "resetAt": null },
+        { "id": "TOKENS_LIMIT:6:1", "usedPercent": 33, "remainingPercent": 67, "resetAtIso": "2026-09-25T03:03:33.998Z" },
+        { "id": "TIME_LIMIT:5:1", "usedPercent": 1, "remainingPercent": 99, "remaining": 999, "limit": 1000, "resetAtIso": "2026-10-17T03:03:33.984Z" }
+      ],
+      "planLabel": "pro",
+      "commandsVerified": [ "/hud quota off (ack + tasks cancelled)", "/hud quota on (ack)", "/hud quota refresh (ack + loading marker)" ],
+      "credentialLeakCheck": "no key material appears in the captured PTY output or /hud quotas JSON"
+    },
+    "rawSameMinuteQuery": {
+      "httpStatus": 200,
+      "code": 200,
+      "success": true,
+      "level": "pro",
+      "limits": [
+        { "type": "TOKENS_LIMIT", "unit": 3, "number": 5, "percentage": 0, "usage": null, "currentValue": null, "remaining": null, "nextResetTime": null },
+        { "type": "TOKENS_LIMIT", "unit": 6, "number": 1, "percentage": 33, "usage": null, "currentValue": null, "remaining": null, "nextResetTime": 1790305413998 },
+        { "type": "TIME_LIMIT", "unit": 5, "number": 1, "percentage": 1, "usage": 1000, "currentValue": 1, "remaining": 999, "nextResetTime": 1792206213984 }
+      ],
+      "crossCheck": "HUD row and /hud quotas match the raw response exactly: 0% used -> 5h 100% remaining, 33% used -> wk 67% remaining, tools 999/1000 remaining, reset timestamps identical; the null 5h reset stays unknown instead of being guessed"
+    }
+  },
+  "team": {
+    "status": "live E2E pending the account's organization/project values (deliberately not stored by the research round); the verified team request shape, real team query record and console comparison live in docs/GLM-PLAN-SCOPES.zh-CN.md §7-8 (2026-09-19, type=2 + bigmodel-organization/bigmodel-project, remaining kept as the server value with the 876/877 discrepancy documented)",
+    "runtimeCoverage": "team path covered by dependency-injected tests: type=2 URL and scope headers, host-header scope completion, scope conflict stop, needs-scope refusal, no personal fallback, identity isolation from the personal profile"
+  }
+}

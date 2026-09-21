@@ -12,6 +12,9 @@ import { GitProbe } from "./git.ts";
 import type { GitProbeLike, GitStatus } from "./git.ts";
 import { SessionUsageLedger } from "./usage.ts";
 import type { SessionManagerLike } from "./usage.ts";
+import { QuotaService } from "./quota/service.ts";
+import type { QuotaAuthResolver } from "./quota/service.ts";
+import type { QuotaFetchLike } from "./quota/transport.ts";
 import { displayPath, safeText } from "./text.ts";
 
 export const WIDGET_KEY = "pi-hud";
@@ -67,6 +70,14 @@ export interface PiContext {
   };
   /** Some hosts expose the name directly; also read only at lifecycle boundaries. */
   getSessionName?(): string | undefined;
+  /** Host model registry, used only by the opt-in quota feature to resolve the current
+   *  provider's request auth in a background task (never in render or per-token paths). */
+  modelRegistry?: {
+    getApiKeyAndHeaders?(model: unknown): Promise<
+      | { ok: true; apiKey?: string; headers?: Record<string, string | null>; baseUrl?: string; env?: Record<string, string> }
+      | { ok: false; error: string }
+    >;
+  };
 }
 
 export interface PiEventPayload extends ToolEventLike {
@@ -96,6 +107,9 @@ export interface HudControllerOptions {
   config?: unknown;
   gitFactory?: (config: GitConfig) => GitProbeLike;
   loadOnStart?: boolean;
+  /** Injectable quota dependencies for deterministic tests (docs/PROVIDER-LIMITS-PLAN.zh-CN.md §D). */
+  quotaFetch?: QuotaFetchLike;
+  quotaAuthResolver?: QuotaAuthResolver;
 }
 
 /** Exported for deterministic tests; normal users load the default extension factory. */
@@ -124,6 +138,9 @@ export class HudController {
   declare footerReleases: number;
   declare git: GitProbeLike | null;
   declare ledger: SessionUsageLedger | null;
+  declare quota: QuotaService | null;
+  /** Raw current model object; only the opt-in quota feature reads it (in background). */
+  declare quotaModel: unknown;
   declare unsubscribe: (() => void) | null;
   declare configTimer: TimerHandle | null;
   declare expiryTimer: TimerHandle | null;
@@ -164,6 +181,8 @@ export class HudController {
     this.footerReleases = 0;
     this.git = null;
     this.ledger = null;
+    this.quota = null;
+    this.quotaModel = null;
     this.unsubscribe = null;
     this.configTimer = null;
     this.expiryTimer = null;
@@ -192,7 +211,7 @@ export class HudController {
       switch (name) {
         case "agent_start": this.state!.phase = "working"; this.git?.cancel(); break;
         case "agent_end": this.state!.phase = "settling"; break;
-        case "agent_settled": this.state!.settle(); this.wantGit = true; this.ledger?.requestVerify(); break;
+        case "agent_settled": this.state!.settle(); this.wantGit = true; this.ledger?.requestVerify(); this.quota?.notify("settled"); break;
         case "turn_end": this.ledger?.requestVerify(); changed = false; break;
         case "message_start": changed = this.state!.messageStart(event?.message); break;
         case "message_update":
@@ -217,6 +236,8 @@ export class HudController {
           this.state!.setModel(event?.model ?? ctx.model);
           this.state!.thinking = safeText(ctx.thinkingLevel, 16);
           this.identity.provider = safeText((event?.model ?? ctx.model)?.provider, MAX_PROVIDER);
+          this.quotaModel = event?.model ?? ctx.model;
+          this.quota?.onModel(this.quotaModelRef());
           break;
         case "thinking_level_select": this.state!.thinking = safeText(event?.level ?? ctx.thinkingLevel, 16); break;
         case "ui_prompt_start": this.state!.waiting = true; break;
@@ -258,6 +279,8 @@ export class HudController {
       onPublish: () => this.request(),
     });
     if (this.config.usageScope === "session") this.ledger.restart(this.readUsageManager(ctx), "session-start");
+    this.quotaModel = ctx.model;
+    this.ensureQuotaService();
     if (this.pi.events?.on) {
       this.unsubscribe = this.pi.events.on(BRIDGE_EVENT, (payload) => {
         if (!this.enabled) return;
@@ -295,6 +318,42 @@ export class HudController {
   readUsageManager(ctx?: PiContext): SessionManagerLike | null {
     const manager = ctx?.sessionManager;
     return manager && typeof manager === "object" ? manager : null;
+  }
+
+  /** Bounded provider/id reference for the quota service (no payload retention). */
+  quotaModelRef(): { provider: string; id: string } | null {
+    const model = this.quotaModel as ModelLike | null | undefined;
+    const provider = safeText(model?.provider, 64);
+    const id = safeText(model?.id, 160);
+    return provider ? { provider, id } : null;
+  }
+
+  /** Host auth resolution for the opt-in quota feature. The raw key exists only
+   *  inside the service's request scope; failures degrade to `needs-auth`. */
+  quotaAuthResolver(): QuotaAuthResolver {
+    return async () => {
+      const registry = this.ctx?.modelRegistry;
+      const model = this.quotaModel;
+      if (!registry || typeof registry.getApiKeyAndHeaders !== "function" || !model) return null;
+      try {
+        const resolved = await registry.getApiKeyAndHeaders(model);
+        if (!resolved || resolved.ok !== true) return null;
+        return { apiKey: resolved.apiKey, headers: resolved.headers, baseUrl: resolved.baseUrl };
+      } catch { return null; }
+    };
+  }
+
+  /** Create the opt-in quota service lazily: with `quota.enabled: false` (the
+   *  default) no service, timer, credential parse or network task ever exists. */
+  ensureQuotaService() {
+    if (!this.config.quota.enabled || !this.enabled || this.quota) return;
+    this.quota = new QuotaService({
+      now: this.now, setTimer: this.setTimer, clearTimer: this.clearTimer,
+      fetch: this.options.quotaFetch, resolveAuth: this.options.quotaAuthResolver ?? this.quotaAuthResolver(),
+      onPublish: () => this.request(),
+    });
+    this.quota.configure(this.config.quota);
+    this.quota.onModel(this.quotaModelRef());
   }
 
   request() {
@@ -447,8 +506,14 @@ export class HudController {
     }
     if (!this.config.enabled) {
       this.ledger?.deactivate();
+      this.quota?.cancelTasks();
       this.scheduler?.cancel(); this.clearExpiry(); this.releaseFooter(); this.detachWidget();
       return;
+    }
+    this.ensureQuotaService();
+    if (this.quota) {
+      this.quota.configure(this.config.quota);
+      this.quota.onModel(this.quotaModelRef());
     }
     if (!previous.enabled) this.resetEpoch();
     // Scope transitions rebuild the session ledger from scratch: an observed gap is never
@@ -495,6 +560,8 @@ export class HudController {
     this.state!.phase = this.ctx!.isIdle() ? "idle" : "working";
     // A disabled HUD ignores model_select, so re-read the cheap identity fields here.
     this.identity.provider = safeText(this.ctx!.model?.provider, MAX_PROVIDER);
+    this.quotaModel = this.ctx!.model;
+    this.quota?.onModel(this.quotaModelRef());
     this.wantGit = true;
   }
 
@@ -509,6 +576,8 @@ export class HudController {
       const snapshot = this.state!.snapshot();
       // The published ledger view is attached here, never re-read during render.
       if (this.config.usageScope === "session") snapshot.sessionUsage = this.ledger?.view() ?? null;
+      // The published quota view is attached here; the opt-in feature is off by default.
+      if (this.config.quota.enabled && this.quota) snapshot.quota = this.quota.view();
       this.view?.publish(snapshot, this.config);
       this.footer?.publish(snapshot, this.config, this.identity);
       this.scheduleExpiry();
@@ -532,7 +601,7 @@ export class HudController {
   }
 
   scheduleExpiry() {
-    const next = this.state!.nextExpiry();
+    const next = Math.min(this.state!.nextExpiry(), this.quota?.nextExpiry() ?? Infinity);
     if (next === this.expiryAt) return;
     this.clearExpiry();
     if (!Number.isFinite(next)) return;
@@ -571,6 +640,16 @@ export class HudController {
       palette: this.config.palette, color: this.config.color, ascii: this.config.ascii,
       configurationPath: this.configurationPath, configurationError: this.configurationError,
       refreshMs: this.config.refreshMs, gitEnabled: this.config.git.enabled,
+      quota: this.quota && this.config.quota.enabled
+        ? {
+          enabled: true, profiles: this.config.quota.profiles.length,
+          status: this.quota.view()?.status ?? "idle",
+          currentProfileId: this.quota.view()?.profileId ?? null,
+          cacheIdentities: this.quota.entries.size,
+          tasks: { inflight: this.quota.inflight, queued: this.quota.queue.length },
+          counters: { ...this.quota.counters },
+        }
+        : { enabled: false, profiles: this.config.quota.profiles.length },
       observedEvents: [...OBSERVED_EVENTS],
       countersSince: this.state?.since ?? null,
       flushes: this.flushes, maxFlushMs: this.maxFlushMs,
@@ -622,6 +701,20 @@ export class HudController {
       const [command = "", value] = input;
       if (command === "status") { this.notify(JSON.stringify(this.inspect(), null, 2)); return; }
       if (command === "reload") { await this.reloadConfig(true); return; }
+      if (command === "quotas") {
+        const detail = this.quota && this.config.quota.enabled
+          ? this.quota.inspect()
+          : { enabled: false, profiles: this.config.quota.profiles.length, reason: "quota support is disabled; enable with /hud quota on" };
+        this.notify(JSON.stringify(detail, null, 2));
+        return;
+      }
+      if (command === "quota" && value === "refresh") {
+        const result = this.quota && this.config.quota.enabled
+          ? this.quota.refreshManual()
+          : { ok: false, message: "quota support is disabled; enable with /hud quota on" };
+        this.notify(`pi-hud quota refresh: ${result.message}`);
+        return;
+      }
       if (command === "reset") {
         this.resetEpoch();
         // The session ledger keeps its definition (not since-reset); a cheap reconciliation
@@ -647,13 +740,16 @@ export class HudController {
         next = { ...this.config, language: value as HudConfig["language"] };
       } else if (command === "git" && ["on", "off"].includes(value as string)) {
         next = { ...this.config, git: { ...this.config.git, enabled: value === "on" } };
+      } else if (command === "quota" && ["on", "off"].includes(value as string)) {
+        // In-memory only; `/hud quota off` cancels quota tasks immediately.
+        next = { ...this.config, quota: { ...this.config.quota, enabled: value === "on" } };
       } else if (command === "palette" && ["pastel", "theme", "mono"].includes(value as string)) {
         next = { ...this.config, palette: value as HudConfig["palette"] };
       } else if (command === "placement" && ["aboveEditor", "belowEditor"].includes(value as string)) {
         next = { ...this.config, placement: value as HudConfig["placement"] };
       }
       if (!next) {
-        this.notify("/hud on|off|toggle · surface widget|footer · scope observed|session · preset minimal|balanced|full · palette pastel|theme|mono · lang en|zh-CN · git on|off · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
+        this.notify("/hud on|off|toggle · surface widget|footer · scope observed|session · preset minimal|balanced|full · palette pastel|theme|mono · lang en|zh-CN · git on|off · quota on|off|refresh · quotas · placement aboveEditor|belowEditor · reload · refresh · reset · status\nChanges are in-memory. Edit pi-hud.json for persistence.");
         return;
       }
       // A pending startup load must not overwrite an explicit command.
@@ -669,6 +765,10 @@ export class HudController {
         this.notify(this.surfaceFallback
           ? `pi-hud surface ${value}: ${this.surfaceFallback}`
           : `pi-hud surface ${value} (${this.effectiveSurface()}, in-memory)`);
+        return;
+      }
+      if (command === "quota") {
+        this.notify(`pi-hud quota ${value} (in-memory${value === "off" ? "; quota tasks cancelled" : ""})`);
         return;
       }
       this.notify(`pi-hud ${command}${value ? ` ${value}` : ""} (in-memory)`);
@@ -688,6 +788,9 @@ export class HudController {
     this.git = null;
     this.ledger?.dispose();
     this.ledger = null;
+    this.quota?.dispose();
+    this.quota = null;
+    this.quotaModel = null;
     try { this.unsubscribe?.(); } catch { this.callbackErrors++; }
     this.unsubscribe = null;
     // Release our own surfaces in order: footer ownership first, then the widget.

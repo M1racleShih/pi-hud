@@ -1,12 +1,12 @@
 # pi-hud
 
-Planned provider quota and API balance support: [implementation plan (Chinese)](docs/PROVIDER-LIMITS-PLAN.zh-CN.md). This is a proposal, not a feature available in the current release.
+Planned provider quota and API balance support: [implementation plan (Chinese)](docs/PROVIDER-LIMITS-PLAN.zh-CN.md). The first slice is **implemented and default-off**: `quota.enabled` turns on GLM personal/team plan queries (see [Quota support](#provider-quota-support-experimental-default-off)).
 
 English | [简体中文](README.zh-CN.md)
 
-A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, an **opt-in full-session usage ledger**, and opt-in agent/task progress. The default surface takes over Pi's built-in footer (an owner-approved switch after the acceptance rounds documented in `docs/`); `surface: "widget"` restores the named widget next to the built-in footer instead.
+A passive, event-driven HUD extension for [Pi](https://github.com/earendil-works/pi), inspired by [claude-hud](https://github.com/jarrodwatts/claude-hud). It shows model/context snapshots, bounded tool-category activity, observed token/cost counters, an **opt-in full-session usage ledger**, opt-in agent/task progress, and an **opt-in, default-off provider quota row**. The default surface takes over Pi's built-in footer (an owner-approved switch after the acceptance rounds documented in `docs/`); `surface: "widget"` restores the named widget next to the built-in footer instead.
 
-**No runtime dependencies. No prompt injection. No network requests. Git probing is off by default.** The only token-stream listener is a pinned bridge that samples **one first-token timestamp per assistant message** to power the `spd*` generation-speed field (algorithm and cost bounds: [docs/TOKEN-SPEED.zh-CN.md](docs/TOKEN-SPEED.zh-CN.md)); every further delta is ignored by an O(1) fused guard. History reads exist only behind the opt-in `usageScope: "session"` and are confined to one audited module.
+**No runtime dependencies. No prompt injection. No network requests while the quota feature is off (the default). Git probing is off by default.** The only token-stream listener is a pinned bridge that samples **one first-token timestamp per assistant message** to power the `spd*` generation-speed field (algorithm and cost bounds: [docs/TOKEN-SPEED.zh-CN.md](docs/TOKEN-SPEED.zh-CN.md)); every further delta is ignored by an O(1) fused guard. History reads exist only behind the opt-in `usageScope: "session"` and are confined to one audited module. Network reads exist only behind the opt-in quota feature and are confined to one audited transport module.
 
 ## Preview
 
@@ -57,6 +57,22 @@ Ownership rules: `/hud off` restores the built-in footer while the HUD still own
 - **Tool categories are bounded.** Completed work is counted per tool name, for example `bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1`. Success (`✓`), failure (`!`) and interruption (`~`) are counted separately. Starting a tool is not a completion. At most 16 tool names are retained; every further name shares one `other` record that is stored separately from tool names, so the ledger cannot grow with the number of distinct tools and a real tool literally named `other` keeps its own counters. Only the three most active categories are displayed, with a `+N` marker for the rest.
 - **Agents and tasks require the bridge.** Without valid bridge data there is no empty placeholder: the fixed row retains available usage information (or stays blank). No adapter for a specific subagent, `/goal` or todo plugin is bundled.
 
+## Provider quota support (experimental, default off)
+
+`quota.enabled: true` adds a plan-remaining row for providers with a verified read-only quota API. The first slice implements **GLM (Z.ai / BigModel) domestic plans** with the two account-verified query modes:
+
+```text
+[glm-4.7] · high · zai-coding-cn · ~/project · GLM Personal · 5h 100% · wk 67% · ctx(last) ...
+```
+
+- The row is labelled by the **plan identity** (`GLM Personal` / `GLM Team`, localized), so plan remaining is always visually distinct from the context meter `ctx(last)`. It shows the 5-hour and weekly windows (server-provided percentages, complement shown as remaining); the tools pool, exact numbers, reset times and issue details live in `/hud quotas`.
+- **Verification basis:** both query modes were verified against real accounts and compared with the provider console during the research round (`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8); a live end-to-end run of this implementation against the personal credential is recorded in `docs/quota-live-e2e.json` (HUD output cross-checked against a same-minute raw query). The team live E2E reuses the research records; the unverified candidates — `queryMode: "personal"` (type=1) and `region: "global"` — are configuration-diagnostic only and never send a request (`needs-verification`). A team failure never falls back to a personal query.
+- **Safety:** queries are fixed-origin HTTPS GETs (`https://open.bigmodel.cn`), 5 s timeout, 256 KiB body cap, redirects refused, no cookies, no model-request probing; credentials come from Pi's own provider auth at query time and are never stored in the HUD's config or cache (only an opaque fingerprint); diagnostics are redacted (no tokens, headers or raw responses).
+- **Scheduling:** event-driven only (enable, provider/identity switch, `agent_settled`, manual refresh); the 5-minute TTL never triggers network by itself; manual refresh honors a ≥30 s cooldown and server Retry-After; at most 2 concurrent queries with one per identity; off/shutdown/identity switches discard late results via generation tokens.
+- **Commands:** `/hud quota on|off` (in-memory; off cancels tasks immediately), `/hud quota refresh`, `/hud quotas` (cache state, sources, times and the exact reason a profile is unavailable). Multi-profile matches show `ambiguous-profile` instead of picking by list order. MiniMax/Codex/Gemini/DeepSeek/SiliconFlow adapter names are accepted in configuration for forward compatibility but report `unsupported-adapter` without any request.
+
+Configuration lives in the same `pi-hud.json` (`quota.profiles`, ≤16; organization/project values are account context — keep them out of shared repositories). See [configuration reference](docs/CONFIGURATION.md) and [the plan](docs/PROVIDER-LIMITS-PLAN.zh-CN.md) (Chinese) for the full contract.
+
 ## Install
 
 Target host: **Pi 0.85.1**, package `@earendil-works/pi-coding-agent`, with **Node.js 22.19.0 or newer**. The integration was source-reviewed against that release. Older `@mariozechner` releases are not claimed compatible.
@@ -89,6 +105,9 @@ To remove a registered local package, use Pi's package management (`pi remove /a
 | `/hud lang en` or `/hud lang zh-CN` | Switch display labels. Command help remains English. |
 | `/hud placement aboveEditor\|belowEditor` | Move only the named HUD widget. |
 | `/hud git on` or `/hud git off` | Opt in/out of an additional, bounded, tracked-files-only Git probe. |
+| `/hud quota on` or `/hud quota off` | Enable/disable the opt-in provider quota feature in memory; `off` cancels quota tasks immediately. |
+| `/hud quota refresh` | Refresh the current profile's quota; honors the ≥30 s cooldown and server Retry-After. |
+| `/hud quotas` | Show the configured profiles, cache state, sources, update times and unavailability reasons (no credentials). |
 | `/hud reload` | Asynchronously reread the configuration file. |
 | `/hud refresh` | Request a display/idle Git refresh; it does not bypass Git cooldown. |
 | `/hud reset` | Reset observation counters, context snapshot, and bridge state. |
@@ -105,7 +124,8 @@ Use one alternative, not a literal `|`, in commands. Changes are in-memory and a
   "palette": "pastel",
   "usageScope": "observed",
   "refreshMs": 250,
-  "git": { "enabled": false }
+  "git": { "enabled": false },
+  "quota": { "enabled": false, "profiles": [] }
 }
 ```
 
@@ -157,7 +177,7 @@ native lifecycle/tool/final-message events
                                    -> requestRender only when lines change
 ```
 
-There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. `getEntries()`/`getEntry()`/`getLeafId()` may be called only by the optional session usage ledger (`src/usage.ts`) inside its marked history boundary, and only in cancelable background tasks scheduled from lifecycle events — never in render or per-token paths; `scripts/check.mjs` fails the build if any other file calls them. `ctx.ui.setFooter` is called only from the dedicated footer surface module (`src/footer.ts`), behind a capability check and a `tui`-mode guard; the same check enforces that boundary. A row is a bounded list of semantic segments (at most 12 fields and 40 segments); the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, a status change or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
+There are no `message_update`/`tool_execution_update` listeners, `getBranch()`/`getContextUsage()` calls, synchronous filesystem/child-process calls, shell commands, recurring idle polling, editor/input hooks, LLM tools, message modifications, or session writes. `getEntries()`/`getEntry()`/`getLeafId()` may be called only by the optional session usage ledger (`src/usage.ts`) inside its marked history boundary, and only in cancelable background tasks scheduled from lifecycle events — never in render or per-token paths; `scripts/check.mjs` fails the build if any other file calls them (the scan covers `src/**` recursively). `ctx.ui.setFooter` is called only from the dedicated footer surface module (`src/footer.ts`), behind a capability check and a `tui`-mode guard; the same check enforces that boundary. `fetch` is called only from the quota transport module (`src/quota/transport.ts`) inside its marked boundary — the default-off quota feature is the only network capability of this extension. A row is a bounded list of semantic segments (at most 12 fields and 40 segments); the final ANSI lines are cached and reused by stream-driven host renders unless width, published state, a status change or a theme invalidation changes. Headless/RPC modes allocate no HUD timers, read no HUD configuration, and attach no UI.
 
 A startup file read is deferred and asynchronous. A bridge record may schedule one bounded expiration timer. The optional Git subprocess has a timeout, output cap, single-flight gate, cooldown, cancellation, and stale-result protection; “asynchronous” does **not** mean it is free of CPU/I/O contention.
 

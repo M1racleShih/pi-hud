@@ -1,10 +1,12 @@
 # pi-hud
 
+额度功能第一阶段已实现且默认关闭：`quota.enabled` 开启 GLM 个人/团队套餐查询（见[提供商额度支持](#提供商额度支持实验性默认关闭)）。完整方案见 [Provider 额度方案](docs/PROVIDER-LIMITS-PLAN.zh-CN.md) 与 [GLM 作用域调研](docs/GLM-PLAN-SCOPES.zh-CN.md)。
+
 [English](README.md) | 简体中文
 
-为 [Pi](https://github.com/earendil-works/pi) 实现的被动、事件驱动 HUD，借鉴 [claude-hud](https://github.com/jarrodwatts/claude-hud) 的信息组织方式，而不是照搬它的 transcript 解析架构。显示模型、上下文快照、有界工具分类活动、已观察到的 token/费用、可选的**全会话用量账本**，以及显式接入的子代理和任务进度。默认接管 Pi 原生 footer（经文档化的验收轮次后由所有者批准的切换）；设 `surface: "widget"` 可恢复编辑器旁的命名 widget，与原生 footer 并存。
+为 [Pi](https://github.com/earendil-works/pi) 实现的被动、事件驱动 HUD，借鉴 [claude-hud](https://github.com/jarrodwatts/claude-hud) 的信息组织方式，而不是照搬它的 transcript 解析架构。显示模型、上下文快照、有界工具分类活动、已观察到的 token/费用、可选的**全会话用量账本**、显式接入的子代理和任务进度，以及可选、默认关闭的**提供商套餐额度行**。默认接管 Pi 原生 footer（经文档化的验收轮次后由所有者批准的切换）；设 `surface: "widget"` 可恢复编辑器旁的命名 widget，与原生 footer 并存。
 
-**零运行时依赖；不注入提示词；不发起网络请求。额外 Git 探测默认关闭。** 唯一的 token 流监听是一个被钉死的桥接：每条 assistant 消息只采样**一个首 token 时间戳**，用于 `速度*` 生成速率字段（算法与成本分析见 [docs/TOKEN-SPEED.zh-CN.md](docs/TOKEN-SPEED.zh-CN.md)）；之后的每个 delta 都被 O(1) 熔断守卫直接忽略。历史读取仅存在于显式开启的 `usageScope: "session"` 背后，并限制在一个可审计模块内。
+**零运行时依赖；不注入提示词；额度功能关闭时（默认）不发起任何网络请求。额外 Git 探测默认关闭。** 唯一的 token 流监听是一个被钉死的桥接：每条 assistant 消息只采样**一个首 token 时间戳**，用于 `速度*` 生成速率字段（算法与成本分析见 [docs/TOKEN-SPEED.zh-CN.md](docs/TOKEN-SPEED.zh-CN.md)）；之后的每个 delta 都被 O(1) 熔断守卫直接忽略。历史读取仅存在于显式开启的 `usageScope: "session"` 背后，并限制在一个可审计模块内；网络读取仅存在于显式开启的额度功能背后，并限制在一个可审计的传输模块内。
 
 ## 预览
 
@@ -55,6 +57,22 @@ ctx(last) ██░░░░░░░░ 45% 90k/200k · 全会话* ↻ ↑61k �
 - **工具分类有界。** 按工具名分别计数，例如 `bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1`。成功（`✓`）、失败（`!`）、中断（`~`）分开计数；开始不算完成。最多保留 16 个工具名分类，超出的名称合并到一条与工具名分开存放的 `other` 记录，因此账本不会随工具种类增长，真正名为 `other` 的工具也仍保留自己的计数。界面只展示活动量最高的三个分类，其余用 `+N` 标记。
 - **代理和任务必须来自桥接数据。** 没有有效桥接数据时不显示空占位：固定行保留可用的用量信息（没有内容时保持空白）。不内置针对某个 subagent、`/goal` 或 todo 插件的专用适配。
 
+## 提供商额度支持（实验性，默认关闭）
+
+`quota.enabled: true` 为具备已验证只读额度接口的提供商增加套餐剩余行。首切片实现 **GLM（Z.ai / 智谱）国内站**的两个经账号验证的查询模式：
+
+```text
+[glm-4.7] · high · zai-coding-cn · ~/project · GLM 个人 · 5h 100% · 周 67% · 上下文(上次) ...
+```
+
+- 该行以**套餐身份**标注（`GLM 个人` / `GLM Team`），与上下文占用 `上下文(上次)` 明确区分；显示 5 小时与周窗口（服务端百分比的补数作为剩余），工具池、精确数量、重置时间与故障详情放在 `/hud quotas`。
+- **验证基础**：两个查询模式在调研轮已用真实账号验证并与控制台对照（`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8）；本实现对个人凭据的实时端到端记录见 `docs/quota-live-e2e.json`（HUD 输出与同分钟原始查询交叉核对）。团队实时 E2E 按所有者决定沿用调研记录；未验证候选 —— `queryMode: "personal"`（type=1）与 `region: "global"` —— 仅保留配置诊断，不发送请求（`needs-verification`）。团队失败不回退个人查询。
+- **安全边界**：固定源 HTTPS GET（`https://open.bigmodel.cn`）、5 秒超时、256 KiB 响应上限、拒绝一切重定向、不读 cookie、不发模型请求探测；凭据在查询时由 Pi 自己的 provider 认证解析，不写入 HUD 配置或缓存（仅保留不可逆指纹）；诊断全部脱敏（无 token、headers、原始响应）。
+- **调度**：仅事件驱动（首次启用、provider/身份切换、`agent_settled`、手动刷新）；5 分钟 TTL 到期不主动联网；手动刷新遵守 ≥30 秒冷却与服务端 Retry-After；全局 ≤2 并发、每身份单飞；关闭、退出、身份切换后用 generation token 丢弃晚到结果。
+- **命令**：`/hud quota on|off`（内存生效，off 立即取消任务）、`/hud quota refresh`、`/hud quotas`（缓存状态、来源、时间与不可用原因，不含凭据）。多个 profile 匹配当前模型时显示 `ambiguous-profile`，不按列表顺序选择。MiniMax/Codex/Gemini/DeepSeek/硅基流动的适配器名仅为前向兼容保留，查询时报告 `unsupported-adapter` 且不触网。
+
+配置仍在同一个 `pi-hud.json`（`quota.profiles`，上限 16；组织/项目属于账号上下文，不要提交到共享仓库）。完整契约见[配置说明](docs/CONFIGURATION.md)与[额度方案](docs/PROVIDER-LIMITS-PLAN.zh-CN.md)。
+
 ## 安装
 
 目标版本：**Pi 0.85.1**，包名 `@earendil-works/pi-coding-agent`，**Node.js ≥ 22.19.0**。接口已按该发布版源码核对；不宣称兼容旧版 `@mariozechner` 包。
@@ -87,6 +105,9 @@ pi -e /absolute/path/to/pi-hud/index.ts
 | `/hud lang en`、`/hud lang zh-CN` | 切换 HUD 标签语言；命令帮助仍为英文。 |
 | `/hud placement aboveEditor\|belowEditor` | 只移动 pi-hud 自己的 widget。 |
 | `/hud git on`、`/hud git off` | 开关有界、仅检查 tracked 文件的额外 Git 探测。 |
+| `/hud quota on`、`/hud quota off` | 内存中开关可选的提供商额度功能；`off` 立即取消额度任务。 |
+| `/hud quota refresh` | 刷新当前 profile 的额度；遵守 ≥30 秒冷却与服务端 Retry-After。 |
+| `/hud quotas` | 显示已配置 profile、缓存状态、来源、更新时间与不可用原因（不含凭据）。 |
 | `/hud reload` | 异步重读配置。 |
 | `/hud refresh` | 请求刷新；不会跳过 Git 冷却期。 |
 | `/hud reset` | 清空观察计数、上下文快照和桥接状态。 |
@@ -103,7 +124,8 @@ pi -e /absolute/path/to/pi-hud/index.ts
   "palette": "pastel",
   "usageScope": "observed",
   "refreshMs": 250,
-  "git": { "enabled": false }
+  "git": { "enabled": false },
+  "quota": { "enabled": false, "profiles": [] }
 }
 ```
 
@@ -158,7 +180,7 @@ pi-hud 的路径是：
   → 小型快照 → 缓存的 widget / footer 行 → 只有行变了才 requestRender
 ```
 
-不监听 `message_update`、`tool_execution_update`；不调用 `getBranch()`、`getContextUsage()`；不做同步文件/进程操作；不轮询空闲状态；不接管输入或编辑器。`getEntries()`、`getEntry()`、`getLeafId()` 只允许可选的全会话账本模块（`src/usage.ts`）在其标记的历史边界内调用，且只能来自生命周期事件调度的可取消后台任务，绝不在 render 或逐 token 路径；其他源文件一旦调用会被 `scripts/check.mjs` 直接判失败。`ctx.ui.setFooter` 只在专门的 footer 模块（`src/footer.ts`）里调用，带能力检测和 `tui` 模式判断，同一检查也强制该边界。不注册 LLM 工具、不改消息、不写会话。每行由有界的语义片段组成（字段 ≤ 12、片段 ≤ 40）；最终 ANSI 行会被缓存，宿主随模型流重绘时，只要宽度、已发布状态、状态变化和主题失效均未变化就复用同一数组。RPC、JSON、print 模式不创建 HUD 定时器、不读 HUD 配置、不挂 UI。
+不监听 `message_update`、`tool_execution_update`；不调用 `getBranch()`、`getContextUsage()`；不做同步文件/进程操作；不轮询空闲状态；不接管输入或编辑器。`getEntries()`、`getEntry()`、`getLeafId()` 只允许可选的全会话账本模块（`src/usage.ts`）在其标记的历史边界内调用，且只能来自生命周期事件调度的可取消后台任务，绝不在 render 或逐 token 路径；`scripts/check.mjs` 递归扫描 `src/**`，其他源文件一旦调用即判失败。`ctx.ui.setFooter` 只在专门的 footer 模块（`src/footer.ts`）里调用，带能力检测和 `tui` 模式判断，同一检查也强制该边界。`fetch` 只在额度传输模块（`src/quota/transport.ts`）的标记边界内调用 —— 默认关闭的额度功能是本扩展唯一的网络能力。不注册 LLM 工具、不改消息、不写会话。每行由有界的语义片段组成（字段 ≤ 12、片段 ≤ 40）；最终 ANSI 行会被缓存，宿主随模型流重绘时，只要宽度、已发布状态、状态变化和主题失效均未变化就复用同一数组。RPC、JSON、print 模式不创建 HUD 定时器、不读 HUD 配置、不挂 UI。
 
 启动配置读取异步延后；桥接活动最多使用一个过期定时器；可选 Git 具备超时、输出上限、单飞、冷却、取消与过期结果隔离。异步 Git 仍可能争用 CPU 或磁盘，不能把“异步”等同于“没有成本”。
 

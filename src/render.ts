@@ -5,6 +5,7 @@ import type { HudConfig, HudLanguage } from "./config.ts";
 import { SPEED_DISPLAY_CAP } from "./state.ts";
 import type { HudSnapshot, ToolCategory, ToolOutcome } from "./state.ts";
 import type { SessionUsageView } from "./usage.ts";
+import type { QuotaHudView } from "./quota/service.ts";
 
 export interface HudWords {
   context: string;
@@ -22,11 +23,19 @@ export interface HudWords {
   speed: string;
   stopped: string;
   other: string;
+  /** Label of the opt-in provider-plan quota row (distinct from context usage). */
+  quotaPlan: string;
+  /** "no quota source configured" marker. */
+  quotaUnconfigured: string;
+  /** Weekly window suffix (the 5-hour window stays `5h`). */
+  quotaWeek: string;
+  /** Stale-snapshot marker. */
+  quotaStale: string;
 }
 
 export const LABELS: Record<HudLanguage, HudWords> = {
-  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", session: "sess*", speed: "spd*", stopped: "interrupted", other: "other" },
-  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", session: "全会话*", speed: "速度*", stopped: "已中断", other: "其他" },
+  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", session: "sess*", speed: "spd*", stopped: "interrupted", other: "other", quotaPlan: "plan", quotaUnconfigured: "no quota source", quotaWeek: "wk", quotaStale: "stale" },
+  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", session: "全会话*", speed: "速度*", stopped: "已中断", other: "其他", quotaPlan: "套餐", quotaUnconfigured: "未配置额度来源", quotaWeek: "周", quotaStale: "过期" },
 };
 
 /** Fixed layout bounds: a row can never grow past these counts, whatever the state. */
@@ -184,6 +193,7 @@ function identityFields(snapshot: HudSnapshot, config: HudConfig, width: number,
     field(85, [seg("path", clip(snapshot.project, projectBudget, config.ascii))]),
     gitField(snapshot, config),
     context,
+    quotaField(snapshot.quota, config, LABELS[config.language]),
   ];
 }
 
@@ -339,6 +349,69 @@ export function speedField(snapshot: HudSnapshot, config: HudConfig, words: HudW
 export function compactionField(snapshot: HudSnapshot, words: HudWords): HudField | null {
   if (!snapshot.compactions) return null;
   return field(35, [seg("label", `${words.compact} `), seg("body", String(snapshot.compactions))]);
+}
+
+/** Localized plan identity shown next to the quota numbers (GLM 个人 / GLM Team). */
+export function quotaPlanLabel(planKey: string, language: HudLanguage): string {
+  if (planKey === "zai:personal") return language === "zh-CN" ? "GLM 个人" : "GLM Personal";
+  if (planKey === "zai:team") return language === "zh-CN" ? "GLM 团队" : "GLM Team";
+  const clean = planKey.replace(/[^a-zA-Z0-9:_-]/g, "").slice(0, 24);
+  return clean || "plan";
+}
+
+const quotaWindowText = (bucket: { unit: string | null; number: number }, words: HudWords): string => {
+  if (bucket.unit === "hour") return `${bucket.number || "?"}h`;
+  if (bucket.unit === "week") return bucket.number === 1 ? words.quotaWeek : `${bucket.number}${words.quotaWeek}`;
+  if (bucket.unit === "month") return String(bucket.number || "?");
+  return "?";
+};
+
+/**
+ * The opt-in provider-plan quota field (docs/PROVIDER-LIMITS-PLAN.zh-CN.md §6).
+ * Plan remaining is labelled by the plan identity (for example `GLM 个人`) and shows
+ * remaining percentages per window, which keeps it explicitly distinct from the
+ * context-usage meter (`ctx(last)`). Detail buckets, exact numbers, reset times and
+ * issues belong to `/hud quotas`; this row stays bounded: plan identity plus at most
+ * the 5-hour and weekly windows, a stale marker, or a compact issue code. Priority 70
+ * drops the whole field before the path/context on narrow rows; the unconfigured and
+ * ambiguity markers use even lower priorities (20/25) so they disappear first.
+ */
+export function quotaField(quota: QuotaHudView | null, config: HudConfig, words: HudWords): HudField | null {
+  if (!quota) return null;
+  const language = config.language;
+  if (quota.status === "unconfigured") {
+    return field(20, [seg("label", `${words.quotaPlan} ${words.quotaUnconfigured}`)]);
+  }
+  if (quota.status === "ambiguous-profile") {
+    return field(25, [seg("label", `${words.quotaPlan} `), seg("warning", "ambiguous-profile")]);
+  }
+  const plan = quotaPlanLabel(quota.planKey, language);
+  const numberSegments = (buckets: QuotaHudView["buckets"]): HudSegment[] => {
+    const segments: HudSegment[] = [];
+    for (const bucket of buckets) {
+      segments.push(seg("separator", config.ascii ? " | " : " · "));
+      const percent = bucket.remainingPercent === undefined ? "?" : `${Math.round(bucket.remainingPercent)}%`;
+      segments.push(seg("body", `${quotaWindowText(bucket, words)} ${percent}`));
+    }
+    return segments;
+  };
+  if (quota.status === "issue" && quota.issue) {
+    if (!quota.buckets.length) {
+      return field(70, [seg("label", `${plan} `), seg("warning", `!${quota.issue.code}`)]);
+    }
+    // Transient failures keep the (possibly expired) last values visible with the issue
+    // code beside them (§10); auth/scope failures hide the values entirely.
+    const segments: HudSegment[] = [seg("label", plan), ...numberSegments(quota.buckets)];
+    if (quota.stale) segments.push(seg("warning", ` ${words.quotaStale}`));
+    segments.push(seg("warning", ` !${quota.issue.code}`));
+    return field(70, segments);
+  }
+  if (quota.status === "loading" || quota.status === "idle" || quota.buckets.length === 0) {
+    return field(70, [seg("label", `${plan} `), seg("body", quota.status === "loading" ? "?" : "…")]);
+  }
+  const segments: HudSegment[] = [seg("label", plan), ...numberSegments(quota.buckets)];
+  if (quota.stale) segments.push(seg("warning", ` ${words.quotaStale}`));
+  return field(70, segments);
 }
 
 /**

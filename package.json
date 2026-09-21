@@ -1,7 +1,7 @@
 {
   "name": "pi-hud",
   "version": "0.1.0",
-  "description": "An event-driven, bounded-cost HUD extension for Pi. No polling, animation or runtime dependencies; the only stream listener samples one first-token timestamp per message.",
+  "description": "An event-driven, bounded-cost HUD extension for Pi. No polling, animation or runtime dependencies; the only stream listener samples one first-token timestamp per message. Optional, default-off provider quota support (GLM first slice) adds one audited read-only query path.",
   "type": "module",
   "license": "MIT",
   "engines": {

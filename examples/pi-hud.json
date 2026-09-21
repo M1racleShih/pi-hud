@@ -17,5 +17,11 @@
     "enabled": false,
     "ttlMs": 30000,
     "timeoutMs": 500
+  },
+  "quota": {
+    "enabled": false,
+    "ttlMs": 300000,
+    "timeoutMs": 5000,
+    "profiles": []
   }
 }

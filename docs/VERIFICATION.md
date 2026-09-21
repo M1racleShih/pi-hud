@@ -360,3 +360,22 @@ The owner approved condition 5, and the decision record's two-step recommendatio
 | Docs | Both READMEs, CONFIGURATION and ARCHITECTURE describe the footer default and the `surface: "widget"` escape hatch; the decision record addendum and HANDOFF record the approval. `docs/preview.txt` is unaffected (the preview pins explicit surfaces per section). |
 
 No gate was relaxed; the performance gates are unchanged.
+
+## Provider quota phase A: shared base + GLM first slice (2026-09-21)
+
+Design: [PROVIDER-LIMITS-PLAN.zh-CN.md](PROVIDER-LIMITS-PLAN.zh-CN.md) (§9 config contract, §10 parse/cache contract), GLM contract: [GLM-PLAN-SCOPES.zh-CN.md](GLM-PLAN-SCOPES.zh-CN.md) §9. **Default off; no gate was relaxed.**
+
+| Check | Status and scope |
+| --- | --- |
+| Regression suite | **306 tests pass / 0 fail** (46 new quota tests: §9 synthetic fixtures incl. the 876/877 remaining trap, percentage/window/units mapping, business/empty/protocol failures, 401/403/429 with Retry-After, timeout, redirects, oversized/streamed bodies, late-result discard, concurrency cap + queue, cancellation and lifecycle residue, LRU/32-bucket truncation, manual cooldown, config validation incl. keep-previous-on-reject, HUD rendering in both languages with fixed row counts and narrow-drop priorities). All network/clock/auth surfaces are injected; no test touches a live account. |
+| `npm run verify` | PASS: recursive `src/**` boundary scan (fetch confined to the marked `src/quota/transport.ts` boundary; surface/history/stream limits unchanged), schema/example/defaults in sync, preview unchanged, 306 tests, performance gates unchanged (`hookP99≤250µs`, uncached render p99 ≤5ms, cached means ≤5µs). |
+| `npm run package:check` | PASS: 54 files packed, offline production install, packed entry import. Zero npm runtime dependencies kept. |
+| Pinned SDK contract (`sdk-check`) | PASS against Pi 0.85.1, now including the quota surface: `ctx.modelRegistry.getApiKeyAndHeaders` results flow into the quota host-auth shape, and the `QuotaService` public surface type-checks against the real SDK context types. |
+| RPC smoke | PASS unchanged. |
+| PTY smoke | PASS unchanged (default footer path). |
+| Live-protocol suite | **5/5 green** (resize/compact/abort/concurrent-widget with the new source tree). |
+| Real-TUI quota on/off streaming | **10/10 checks green** ([quota-tui-stream.json](quota-tui-stream.json)): quota marker with an enabled-but-unmatched profile, mid-stream typing, rows within width, `/hud quota off` mid-stream (ack + marker gone + stream completes), `/hud quota on` restore, `/hud quotas` output, narrow 42-col folding. Fixture provider (zero network); the networked path is covered below. |
+| Real-account personal E2E | **Green** ([quota-live-e2e.json](quota-live-e2e.json)): real Pi TUI + real `zai-coding-cn` credential (resolved by the host, never printed), HUD row `GLM Personal · 5h 100% · wk 67%`, `/hud quotas` JSON matching a **same-minute raw read-only query** exactly (0%→100%, 33%→67%, tools 999/1000, identical reset timestamps, the null 5h reset kept unknown). on/off/refresh commands verified live; no credential material in any captured output. |
+| Team live E2E | **Deliberately deferred to the research records** (owner decision): the verified team request shape, real team query and console comparison are [GLM-PLAN-SCOPES.zh-CN.md §7–8](GLM-PLAN-SCOPES.zh-CN.md) (2026-09-19); organization/project values were intentionally never persisted. The implemented team path is covered by the injected test set (type=2 URL + scope headers, host-header completion, conflict/needs-scope refusals, no personal fallback, identity isolation). |
+
+Explicitly **not verified** in this slice (kept out of any support claim): `queryMode: "personal"` (type=1), `region: "global"` (international site), other member/permission roles or multi-organization setups, and the MiniMax/Codex/Gemini/DeepSeek/SiliconFlow adapters (interface only; `unsupported-adapter` without requests).

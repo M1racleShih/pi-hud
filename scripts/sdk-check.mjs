@@ -17,6 +17,8 @@ import { HUD_ROLES, THEME_ROLES } from "../../src/palette.ts";
 import type { FooterDataLike, HudFooterComponent, HudIdentity } from "../../src/footer.ts";
 import type { SessionEntryLike, SessionManagerLike } from "../../src/usage.ts";
 import { SessionUsageLedger } from "../../src/usage.ts";
+import { QuotaService } from "../../src/quota/service.ts";
+import type { QuotaHostAuth } from "../../src/quota/types.ts";
 declare const pi: ExtensionAPI;
 // Every HUD role token must stay assignable to Pi's ThemeColor union.
 const themeTokens: ThemeColor[] = HUD_ROLES.map((role) => THEME_ROLES[role]);
@@ -104,6 +106,28 @@ void entryType; void entryParent; void entryUsage; void tokenFields;
 const unsubscribe: () => void = pi.events.on("pi-hud:update", (_data: unknown) => {});
 pi.events.emit("pi-hud:update", { version: 1 });
 pi.registerCommand("hud-contract", { description: "contract only", handler: async (_args, ctx) => { terminalContext(ctx); } });
+// Phase quota A: the opt-in quota service resolves credentials through the pinned
+// SDK's model registry. The structural types must accept the real surfaces, and a
+// resolved request auth must flow into the quota host-auth shape without secrets.
+declare const registry: ExtensionContext["modelRegistry"];
+const quotaAuth = async (model: ExtensionContext["model"]): Promise<QuotaHostAuth | null> => {
+  if (!model) return null;
+  const resolved = await registry.getApiKeyAndHeaders(model);
+  if (!resolved.ok) return null;
+  return { apiKey: resolved.apiKey, headers: resolved.headers, baseUrl: resolved.baseUrl };
+};
+const quotaService: QuotaService = new QuotaService({ resolveAuth: () => quotaAuth(hostModel) });
+declare const hostModel: NonNullable<ExtensionContext["model"]>;
+quotaService.configure({ enabled: true, ttlMs: 300_000, timeoutMs: 5_000, profiles: [] });
+quotaService.onModel({ provider: hostModel.provider, id: hostModel.id });
+quotaService.notify("settled");
+quotaService.refreshManual();
+const quotaView: ReturnType<QuotaService["view"]> = quotaService.view();
+const quotaExpiry: number = quotaService.nextExpiry();
+const quotaInspect: Record<string, unknown> = quotaService.inspect();
+quotaService.cancelTasks();
+quotaService.dispose();
+void quotaView; void quotaExpiry; void quotaInspect;
 `);
 copyFileSync("examples/bridge-demo.ts", join(root, "bridge-demo.ts"));
 copyFileSync("examples/status-demo.ts", join(root, "status-demo.ts"));

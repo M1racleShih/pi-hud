@@ -25,9 +25,44 @@ Resolution order: absolute `PI_HUD_CONFIG`; otherwise `pi-hud.json` beneath abso
 | `git.enabled` | `false` | boolean |
 | `git.ttlMs` | `30000` | integer 10000–600000 |
 | `git.timeoutMs` | `500` | integer 100–1000 |
+| `quota.enabled` | `false` | boolean; the opt-in provider quota feature (see below). With `false` (default) no credentials are parsed, no network or subprocess tasks exist and nothing is rendered |
+| `quota.ttlMs` | `300000` | integer 30000–3600000; cache lifetime. Expiry never triggers network access — the next qualifying event refreshes |
+| `quota.timeoutMs` | `5000` | integer 1000–30000; per-request HTTP timeout |
+| `quota.profiles` | `[]` | array, at most 16 quota identity profiles (see below) |
 | `$schema` | absent | optional string for editor tooling; ignored at runtime |
 
-Fields may be omitted; defaults fill them. There are no Full/Minimal presets that secretly enable extra I/O: all presets change rendering only. `git.enabled` must always be opted into separately.
+Fields may be omitted; defaults fill them. There are no Full/Minimal presets that secretly enable extra I/O: all presets change rendering only. `git.enabled` and `quota.enabled` must always be opted into separately.
+
+### Quota profiles
+
+Each profile binds one quota identity to an exact Pi provider. Only `zai` (GLM, region `cn`) is implemented; the other adapter names load for forward compatibility and report `unsupported-adapter` at query time without any request. Credentials are never part of the configuration: the key is resolved from the provider's own auth at query time.
+
+```json
+{
+  "version": 1,
+  "quota": {
+    "enabled": true,
+    "profiles": [
+      { "id": "glm-personal", "providerId": "zai-coding-cn", "adapter": "zai", "source": "pi", "region": "cn", "plan": "personal", "queryMode": "personal-legacy" },
+      { "id": "glm-team", "providerId": "zai-coding-cn-team", "adapter": "zai", "source": "pi", "region": "cn", "plan": "team", "queryMode": "team", "organizationId": "<your-organization-id>", "projectId": "<your-project-id>" }
+    ]  }
+}
+```
+
+| Field | Rules |
+| --- | --- |
+| `id` | 1–64 characters, unique, no control characters; the profile alias used by diagnostics |
+| `providerId` | exact Pi provider id (never matched by prefix) |
+| `adapter` | one of `zai`, `minimax`, `codex`, `gemini-cli`, `deepseek`, `siliconflow` |
+| `source` | `pi`, or `codex-app-server` for the `codex` adapter |
+| `enabled` | optional boolean, default `true`; disabled profiles never match or conflict |
+| `region` | required for `zai`/`minimax` (`cn` or `global`); `global` is unverified for GLM and reports `needs-verification` without requests |
+| `plan` / `queryMode` | required for `zai`; verified combinations: `personal`+`personal-legacy`, `team`+`team`; the `personal` (type=1) candidate is unverified and reports `needs-verification` without requests |
+| `organizationId` / `projectId` | optional account context (1–128 characters, no control characters); a team profile without a complete scope reports `needs-scope` before any request; values conflicting with host-resolved headers report `scope-conflict` |
+| `modelIds` | optional exact model ids (1–16) narrowing the profile inside its provider |
+| `origin` | optional; must equal the adapter's fixed origin for the region (`https://open.bigmodel.cn` for GLM `cn`) |
+
+Unknown fields, duplicate ids, invalid combinations and wrong types reject the whole configuration load; the previous valid configuration stays active. Multiple enabled profiles matching the current model show `ambiguous-profile` instead of picking by list order. `/hud quota on|off|refresh` and `/hud quotas` change or inspect this in memory only.
 
 `surface` defaults to `footer` (the owner-approved switch; see DEFAULT-FOOTER-DECISION.zh-CN.md): the HUD replaces Pi's built-in footer. `widget` restores the passive named widget above/below the editor with Pi's built-in footer untouched. `footer` uses the official `ctx.ui.setFooter` slot, mounts no widget, and shows the identity/usage/status rows the built-in footer used to show. `placement` only affects the widget. If the host does not provide `ui.setFooter`, `footer` falls back to the widget and `/hud status` records the reason; startup never emits unsolicited error text for that fallback. `/hud surface footer` is also the documented way to re-claim the slot after another extension replaced the HUD footer.
 

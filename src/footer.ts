@@ -17,7 +17,7 @@
  * place, so nothing smaller than a value comparison can detect a change.
  */
 import { clip, safeText, visibleWidth } from "./text.ts";
-import { LABELS, activityField, agentsField, assembleRow, bridgeFields, compactionField, contextField, costField, field, hudSegment, speedField, tasksField, tokensField, toolCategoriesField } from "./render.ts";
+import { LABELS, activityField, agentsField, assembleRow, bridgeFields, compactionField, contextField, costField, field, hudSegment, quotaField, speedField, tasksField, tokensField, toolCategoriesField } from "./render.ts";
 import type { HudField, HudRow, HudSegment, HudWords, WidgetTui } from "./render.ts";
 import { createStyler } from "./palette.ts";
 import type { HudStyler, HudThemeLike } from "./palette.ts";
@@ -139,6 +139,7 @@ function identityRowFields(snapshot: HudSnapshot, config: HudConfig, width: numb
     cwdField(identity, config, width),
     branchField(identity, config),
     titleField(identity, config, width),
+    quotaField(snapshot.quota, config, LABELS[config.language]),
   ];
 }
 

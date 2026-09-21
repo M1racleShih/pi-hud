@@ -162,6 +162,7 @@ export function fakeHost(mode = "tui", options = {}) {
   const ctx = {
     mode, hasUI: ["tui", "rpc"].includes(mode), cwd: "/tmp/my-project",
     model: MODEL, thinkingLevel: "high", ui, isIdle: () => idle,
+    modelRegistry: options.modelRegistry,
     getContextUsage: () => { throw new Error("History/context scans forbidden"); },
     // Only the session name is readable by default; every other history access fails the
     // test. Fixtures that exercise the session ledger pass a FakeSessionManager instead.

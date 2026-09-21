@@ -1,6 +1,7 @@
 import { baseName, safeText } from "./text.ts";
 import type { GitStatus } from "./git.ts";
 import type { SessionUsageView } from "./usage.ts";
+import type { QuotaHudView } from "./quota/service.ts";
 
 export const LIMITS = Object.freeze({ tools: 64, recentIds: 128, agents: 16, tasks: 8, toolCategories: 16 });
 /** Display name of the synthetic bucket that merges tool names beyond the retention cap. */
@@ -117,6 +118,9 @@ export interface HudSnapshot {
   taskSources: number;
   toolCategories: ToolCategory[];
   git: GitStatus | null;
+  /** Published provider-quota row view, attached by the controller only while the
+   *  opt-in quota feature is enabled (`config.quota.enabled`). `null` renders nothing. */
+  quota: QuotaHudView | null;
   /**
    * Published full-session ledger view. Attached by the controller in `usageScope:
    * "session"`; `null` keeps the observed rendering (including the explicit degradation
@@ -498,6 +502,7 @@ export class HudState {
       taskTotal, taskDone, taskLabel, taskSources: this.tasks.size,
       toolCategories,
       git: this.git,
+      quota: null,
       sessionUsage: null,
     };
   }

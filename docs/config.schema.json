@@ -111,6 +111,103 @@
         "timeoutMs": 500
       }
     },
+    "quota": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional provider quota support. Default off: with enabled=false no credentials are parsed and no network/subprocess tasks exist. Credentials are never stored here; the host resolves the current provider key at query time. Only the zai adapter (GLM personal-legacy and team query modes, region cn) is implemented; other adapter names are accepted for configuration diagnostics and report unsupported-adapter without any request.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "ttlMs": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 3600000,
+          "default": 300000,
+          "description": "Cache lifetime. Expiry never triggers network access; the next event refreshes."
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 30000,
+          "default": 5000,
+          "description": "Per-request HTTP timeout."
+        },
+        "profiles": {
+          "type": "array",
+          "maxItems": 16,
+          "default": [],
+          "description": "Quota identities. Organization/project values are account context, not credentials; keep them out of shared/repo configurations.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "providerId", "adapter", "source"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "providerId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "Exact Pi provider id; never matched by prefix."
+              },
+              "adapter": {
+                "enum": ["zai", "minimax", "codex", "gemini-cli", "deepseek", "siliconflow"]
+              },
+              "source": {
+                "enum": ["pi", "codex-app-server"]
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "region": {
+                "enum": ["cn", "global"],
+                "description": "Required for zai/minimax. global stays unverified for GLM and reports needs-verification without requests."
+              },
+              "plan": {
+                "enum": ["personal", "team"]
+              },
+              "queryMode": {
+                "enum": ["personal-legacy", "personal", "team"],
+                "description": "personal-legacy and team are account-verified; personal (type=1) stays needs-verification until independently verified."
+              },
+              "organizationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "projectId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "modelIds": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 16,
+                "items": { "type": "string", "minLength": 1, "maxLength": 160 },
+                "description": "Optional exact model ids narrowing this profile within the provider."
+              },
+              "origin": {
+                "type": "string",
+                "description": "Optional constraint that must equal the adapter's fixed origin (zai cn: https://open.bigmodel.cn)."
+              }
+            }
+          }
+        }
+      },
+      "default": {
+        "enabled": false,
+        "ttlMs": 300000,
+        "timeoutMs": 5000,
+        "profiles": []
+      }
+    },
     "$schema": {
       "type": "string"
     }

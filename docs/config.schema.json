@@ -114,7 +114,7 @@
     "quota": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Optional provider quota support. Default off: with enabled=false no credentials are parsed and no network/subprocess tasks exist. Credentials are never stored here; the host resolves the current provider key at query time. Only the zai adapter (GLM personal-legacy and team query modes, region cn) is implemented; other adapter names are accepted for configuration diagnostics and report unsupported-adapter without any request.",
+      "description": "Optional provider quota support. Default off: with enabled=false no credentials are parsed and no network/subprocess tasks exist. Credentials are never stored here; the host resolves the current provider key at query time. Implemented adapters: zai (GLM personal-legacy and team query modes, region cn), deepseek and siliconflow (official balance endpoints, Bearer auth). Other adapter names are accepted for configuration diagnostics and report unsupported-adapter without any request. Balance adapters refuse a provider whose resolved base URL is a different origin (needs-verification); relay keys are never sent to the official hosts.",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -195,7 +195,7 @@
               },
               "origin": {
                 "type": "string",
-                "description": "Optional constraint that must equal the adapter's fixed origin (zai cn: https://open.bigmodel.cn)."
+                "description": "Optional constraint that must equal the adapter's fixed origin (zai cn: https://open.bigmodel.cn; deepseek: https://api.deepseek.com; siliconflow: https://api.siliconflow.cn)."
               }
             }
           }

@@ -4,6 +4,8 @@ import type { FileHandle } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { ZAI_ORIGINS } from "./quota/adapters/zai.ts";
+import { DEEPSEEK_QUOTA_ORIGIN } from "./quota/adapters/deepseek.ts";
+import { SILICONFLOW_QUOTA_ORIGIN } from "./quota/adapters/siliconflow.ts";
 
 export const CONFIG_LIMIT = 32 * 1024;
 
@@ -124,6 +126,16 @@ const QUOTA_ADAPTERS: readonly QuotaAdapterName[] = ["zai", "minimax", "codex", 
 const QUOTA_REGIONAL: readonly QuotaAdapterName[] = ["zai", "minimax"];
 /** Verified plan/queryMode combinations (docs/GLM-PLAN-SCOPES.zh-CN.md §2/§9). */
 const ZAI_MODES: readonly [QuotaPlanName, QuotaQueryMode][] = [["personal", "personal-legacy"], ["personal", "personal"], ["team", "team"]];
+/** Adapter-fixed https origins per plan §9: the optional `origin` field must equal
+ *  the adapter's fixed domain (never an arbitrary query URL). Regional adapters
+ *  (zai/minimax) choose by region; balance adapters have one fixed origin each. */
+export function quotaOriginForAdapter(adapter: QuotaAdapterName, region?: string): string | null {
+  if (adapter === "zai" || adapter === "minimax") return ZAI_ORIGINS[region === "global" ? "global" : "cn"] ?? null;
+  if (adapter === "deepseek") return DEEPSEEK_QUOTA_ORIGIN;
+  if (adapter === "siliconflow") return SILICONFLOW_QUOTA_ORIGIN;
+  return null;
+}
+
 const cleanId = (value: unknown, max: number): string | null => {
   if (typeof value !== "string" || value.length < 1 || value.length > max) return null;
   return /[\u0000-\u001f\u007f]/.test(value) ? null : value;
@@ -196,13 +208,15 @@ export function normalizeQuotaProfile(input: unknown): Readonly<QuotaProfile> {
     profile.modelIds = Object.freeze(modelIds);
   }
   if (input.origin !== undefined) {
-    if (adapter !== "zai") throw new Error(`quota profile ${id}: origin is only valid for the zai adapter`);
     const origin = normalizeQuotaOrigin(input.origin);
     if (!origin) throw new Error(`quota profile ${id}: origin must be an https URL like https://open.bigmodel.cn`);
     // §9: the origin must match the adapter's fixed domain table exactly (per region).
-    const tableOrigin = ZAI_ORIGINS[input.region === "global" ? "global" : "cn"];
+    const tableOrigin = quotaOriginForAdapter(adapter, input.region);
+    if (tableOrigin === null) {
+      throw new Error(`quota profile ${id}: origin is not a valid field for adapter ${adapter}`);
+    }
     if (origin !== tableOrigin) {
-      throw new Error(`quota profile ${id}: origin must be ${tableOrigin} for region ${input.region === "global" ? "global" : "cn"}`);
+      throw new Error(`quota profile ${id}: origin must be ${tableOrigin} for adapter ${adapter}`);
     }
     profile.origin = origin;
   }

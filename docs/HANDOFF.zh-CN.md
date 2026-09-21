@@ -75,7 +75,7 @@ Pi 内可用 `/hud surface footer`、`/hud surface widget`、`/hud off`、`/hud 
 
 ## 下一阶段：观察一个使用周期后评估第二步（session 默认），或继续额度后续阶段
 
-额度功能第一阶段 A 已于 2026-09-21 实现并交付：公共额度基础（src/quota/{types,identity,service,transport}.ts）+ GLM 国内个人/团队两 profile（adapters/zai.ts），默认关闭（quota.enabled false 时无认证解析/网络/子进程/额外渲染），306 项测试全绿、门禁未放宽。证据：[VERIFICATION](VERIFICATION.md) 额度章节、[quota-live-e2e.json](quota-live-e2e.json)（个人真实账号 E2E 与同分钟原始查询交叉核对；团队实时 E2E 按所有者决定沿用调研记录）、[quota-tui-stream.json](quota-tui-stream.json)（真实 TUI 开关与流式交互 10 项检查）。未验证项（不得宣称）：GLM type=1 新个人模式、国际站、其他成员/多组织角色；MiniMax/Codex/Gemini/DeepSeek/硅基流动仅留接口（unsupported-adapter，不触网）。后续额度顺序：其余五类适配器逐项完成阶段 A–D → 六类整体验收，见 [额度方案](PROVIDER-LIMITS-PLAN.zh-CN.md) 与 [GLM 作用域](GLM-PLAN-SCOPES.zh-CN.md)。
+额度功能第一阶段 A 已于 2026-09-21 实现并交付：公共额度基础（src/quota/{types,identity,service,transport}.ts）+ GLM 国内个人/团队两 profile（adapters/zai.ts），默认关闭，306 项测试全绿、门禁未放宽。第二切片（同日）：DeepSeek / 硅基流动余额适配器（adapters/deepseek.ts、siliconflow.ts + 共享 helpers adapters/http.ts）按官方文档契约实现，含中转防护与十进制原值语义，324 项测试全绿；**真实账号 E2E 待完成**（需官方 API key；所有者环境 deepseek key 为空、dgx-deepseek 为中转会被正确拒绝，无 siliconflow provider）——完成前不得宣称账号验证，详见 VERIFICATION 额度章节 slice 2。后续额度顺序：DeepSeek/硅基流动真实 E2E → MiniMax → Codex/Gemini → 六类整体验收，见 [额度方案](PROVIDER-LIMITS-PLAN.zh-CN.md) 与 [GLM 作用域](GLM-PLAN-SCOPES.zh-CN.md)。
 
 B2b（验收轮）与三轮 review 已完成；后续材料已交付；视觉验收精简执行并转录收紧（见上）。下一步依次是：
 

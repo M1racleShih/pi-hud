@@ -1,6 +1,6 @@
 # Provider 套餐额度与 API 余额方案
 
-状态：阶段 A 首切片已实现（2026-09-21：公共额度基础 + GLM 国内个人/团队两 profile，默认关闭；证据见 [VERIFICATION](VERIFICATION.md) 的额度章节与 [quota-live-e2e.json](quota-live-e2e.json)、[quota-tui-stream.json](quota-tui-stream.json)）。其余五类适配器仍为设计态。调研日期：2026-09-19。目标宿主：Pi 0.85.1。
+状态：阶段 A 首切片与 API 余额切片已实现（2026-09-21：公共额度基础 + GLM 国内个人/团队两 profile，默认关闭；2026-09-21 第二切片：DeepSeek / 硅基流动余额适配器，按官方文档契约实现、真实账号 E2E 待完成。证据见 [VERIFICATION](VERIFICATION.md) 的额度章节与 [quota-live-e2e.json](quota-live-e2e.json)、[quota-tui-stream.json](quota-tui-stream.json)）。MiniMax / Codex / Gemini 仍为设计态。调研日期：2026-09-19。目标宿主：Pi 0.85.1。
 
 本文件确定首版范围、接入方式和验收标准；除已标注实现的切片外，不代表当前版本已具备这些能力。已核对本地源码、Pi SDK 类型、官方文档及部分官方客户端源码；已对当前 GLM 个人和团队凭据分别完成真实只读查询，并与对应控制台截图对照；其他服务尚未完成账号验证。上游 main 分支链接是调研依据，实施时必须记录实际版本或 commit，并保存脱敏响应样本。
 
@@ -58,6 +58,8 @@ Pi 的 Codex OAuth 与本机 Codex 登录可能属于不同账号。能验证身
 ### API 余额
 
 [DeepSeek 文档](https://api-docs.deepseek.com/zh-cn/api/get-user-balance/) 提供余额查询；[硅基流动文档](https://siliconflow.readme.io/reference/user-info) 提供用户余额信息。均通过对应 provider 的 API key 认证，保留服务端币种与金额语义。金额采用十进制字符串或明确精度的表示，避免浮点累加与重复加总充值、赠金、总额。
+
+**实现状态（2026-09-21 第二切片）**：两个适配器已按官方契约实现（DeepSeek `GET /user/balance`，响应含 `is_available` 与 `balance_infos[]`（currency/total/granted/topped_up，官方枚举 CNY/USD）；硅基流动 `GET /v1/user/info`，`code=20000 && status=true` 包裹，`data.balance/chargeBalance/totalBalance` 三个字段含义按官方 openapi 示例算术（0.88+88.00=88.88）归一化为赠送/充值/总额，响应无币种字段，按文档计费币种固定 CNY——此推断待真实账号核对）。共同约束：金额保留服务端原文，不从分项加总总额；零/负值为合法服务端值；中转防护——provider 解析出的 baseUrl 源与官方源不一致时拒绝（needs-verification），中转密钥不发官方域名。**真实账号只读 E2E 尚未执行**（需所有者提供两家的有效 API key，或在完成度表中保持待实测状态，不得据 mock 宣称账号验证完成）。
 
 后续 [OpenRouter credits](https://openrouter.ai/docs/api/api-reference/credits/get-remaining-credits) 与 [key 信息](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key) 分别映射账户余额和 key 限额，不合并为一个余额值。
 
@@ -141,13 +143,13 @@ Pi 的 Codex OAuth 与本机 Codex 登录可能属于不同账号。能验证身
 | `/hud quotas` | 查看已配置身份的缓存、来源、时间和不可用原因；不默认遍历查询所有账号 |
 | `/hud quota refresh` | 查询当前身份，遵守冷却与退避 |
 
-HUD 默认只显示当前 provider。保持 minimal/balanced/full 固定 1/2/3 行；窄屏裁剪低优先级信息，详细桶列表放在命令输出。套餐剩余和上下文占用使用不同标签；金额保留币种。示例数值为合成数据：
+HUD 默认只显示当前 provider。保持 minimal/balanced/full 固定 1/2/3 行；窄屏裁剪低优先级信息，详细桶列表放在命令输出。套餐剩余和上下文占用使用不同标签；金额保留币种（已实现格式：服务身份标签 + 币种符号/ISO 码 + 服务端原值，ASCII 模式用 ISO 码）。示例数值为合成数据：
 
 ```text
 Z.ai 套餐 · 5h 剩余 72% · 周剩余 41%
 Codex 套餐 · 剩余 64% · 16:30 重置
 Gemini Pro 配额 · 剩余 82% · 09:00 重置
-DeepSeek 余额 ¥128.50
+DeepSeek · ¥128.50
 额度快照已过期 · 12 分钟前更新
 ```
 
@@ -249,11 +251,13 @@ GLM 团队可从宿主已解析 headers 取得 scope，也可由 profile 补齐�
 
 | 项目 | 当前状态 | 后续交付 |
 | --- | --- | --- |
-| GLM 国内个人旧查询 | API 成功并与控制台对照 | 身份绑定、解析器、UI 与回归测试 |
-| GLM 国内团队查询 | API 成功并与控制台对照 | 独立 scope/profile、积分展示与缓存隔离 |
+| GLM 国内个人旧查询 | API 成功并与控制台对照；适配器已实现 | 后续仅维护 |
+| GLM 国内团队查询 | API 成功并与控制台对照；适配器已实现 | 后续仅维护 |
 | GLM 新个人 type=1 / 国际站 | 待相应账号验证 | 独立契约与证据，未完成前明确不可用 |
-| MiniMax、Codex、Gemini、DeepSeek、硅基流动 | 已有文档或源码接入依据，未完成本项目账号实测 | 逐项完成阶段 A–D |
-| 公共查询框架及配置 | 本文件确定设计，尚未编码 | schema、宿主契约、限流缓存、取消及诊断 |
-| 真实 HUD 体验 | 尚未验收 | 固定行数、切换与流式交互 A/B |
+| DeepSeek 余额 | 适配器已按官方文档契约实现（含中转防护） | 真实账号只读 E2E 与脱敏样本；未完成前标注待实测 |
+| 硅基流动余额 | 适配器已按官方 openapi 契约实现（字段含义推断 + CNY 待核对） | 真实账号只读 E2E 核对三字段含义与币种；未完成前标注待实测 |
+| MiniMax、Codex、Gemini | 已有文档或源码接入依据，未完成本项目账号实测 | 逐项完成阶段 A–D |
+| 公共查询框架及配置 | 已实现（含共享 HTTP 映射/十进制金额校验，src/quota/adapters/http.ts） | 随新适配器扩展 |
+| 真实 HUD 体验 | GLM 切片已验收（quota-tui-stream.json）；余额切片待真实账号后补 | 余额切片固定行数、切换与流式交互 A/B |
 
 方案完成不等于功能完成。实现 PR 应按最终声明的服务、认证方式、区域和套餐模式列出证据；未验证部分保持显式状态，禁止以某个账号的一次成功覆盖所有套餐。

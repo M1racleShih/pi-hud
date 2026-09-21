@@ -9,6 +9,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeConfig, normalizeQuota } from "../src/config.ts";
 import { zaiParse, zaiPrepare, parseRetryAfter, ZAI_QUOTA_ORIGIN } from "../src/quota/adapters/zai.ts";
+import { deepseekParse, deepseekPrepare, DEEPSEEK_QUOTA_ORIGIN } from "../src/quota/adapters/deepseek.ts";
+import { siliconflowParse, siliconflowPrepare, SILICONFLOW_QUOTA_ORIGIN } from "../src/quota/adapters/siliconflow.ts";
+import { decimalText, currencyCode, bearerAuthorization } from "../src/quota/adapters/http.ts";
 import { quotaFetch, globalQuotaFetch, boundedBody } from "../src/quota/transport.ts";
 import { matchProfiles, reconcileScope, credentialTag, originOfBaseUrl } from "../src/quota/identity.ts";
 import { QuotaService, QUOTA_LIMITS } from "../src/quota/service.ts";
@@ -812,7 +815,7 @@ test("agent_settled and model_select are the only recurring triggers; auth resol
 
 const quotaView = (overrides = {}) => ({
   status: "ready", profileId: "glm-personal", planKey: "zai:personal", issue: null,
-  stale: false, updatedAt: 1_000, truncated: false,
+  stale: false, updatedAt: 1_000, truncated: false, balance: null,
   buckets: [
     { unit: "hour", number: 5, remainingPercent: 87, resetAt: 1893456000000 },
     { unit: "week", number: 1, remainingPercent: 64, resetAt: 1893542400000 },
@@ -943,4 +946,341 @@ test("normalizeConfig round-trips quota defaults and deep-freezes profiles", () 
   const again = normalizeConfig(config);
   assert.deepEqual(again.quota.profiles[0], config.quota.profiles[0]);
   assert.equal(normalizeConfig().quota.enabled, false);
+});
+
+// ---------------------------------------------------------------------------
+// DeepSeek / SiliconFlow balance adapters (API 余额; official contracts, synthetic samples)
+// ---------------------------------------------------------------------------
+
+/** Official DeepSeek sample shape (api-docs.deepseek.com get-user-balance). */
+const deepseekBody = JSON.stringify({
+  is_available: true,
+  balance_infos: [
+    { currency: "CNY", total_balance: "110.00", granted_balance: "10.00", topped_up_balance: "100.00" },
+  ],
+});
+
+/** Official SiliconFlow sample shape (openapi.yaml /user/info examples). */
+const siliconflowBody = JSON.stringify({
+  code: 20000, message: "OK", status: true,
+  data: {
+    id: "userid", name: "username", image: "https://img.example/a.png", email: "u@example.com",
+    isAdmin: false, balance: "0.88", status: "normal", introduction: "", role: "user",
+    chargeBalance: "88.00", totalBalance: "88.88",
+  },
+});
+
+const deepseekProfile = { id: "ds-balance", providerId: "deepseek", adapter: "deepseek", source: "pi" };
+const siliconflowProfile = { id: "sf-balance", providerId: "siliconflow", adapter: "siliconflow", source: "pi" };
+
+test("deepseekParse maps the documented sample: exact amounts kept, never re-summed", () => {
+  const result = deepseekParse(200, noHeaders, deepseekBody, { now: 0 });
+  assert.equal(result.kind, "snapshot");
+  const snapshot = result.snapshot;
+  assert.equal(snapshot.buckets.length, 0);
+  assert.equal(snapshot.planLabel, "");
+  assert.deepEqual(snapshot.balances, [
+    { amountText: "110.00", currency: "CNY", scope: "account" },
+    { amountText: "10.00", currency: "CNY", scope: "granted" },
+    { amountText: "100.00", currency: "CNY", scope: "topped-up" },
+  ]);
+  assert.equal(snapshot.partial, false);
+  assert.equal(snapshot.truncated, false);
+  // The total stays the server text; granted+topped-up are never added up into it.
+  assert.notEqual(snapshot.balances[0].amountText, String(10 + 100));
+});
+
+test("deepseekParse keeps zero, negative and USD amounts as legal server values", () => {
+  const body = JSON.stringify({
+    is_available: false,
+    balance_infos: [
+      { currency: "USD", total_balance: "-1.20", granted_balance: "0.00", topped_up_balance: "-1.20" },
+    ],
+  });
+  const result = deepseekParse(200, noHeaders, body, { now: 0 });
+  assert.equal(result.kind, "snapshot");
+  assert.deepEqual(result.balances === undefined ? result.snapshot.balances : [], [
+    { amountText: "-1.20", currency: "USD", scope: "account" },
+    { amountText: "0.00", currency: "USD", scope: "granted" },
+    { amountText: "-1.20", currency: "USD", scope: "topped-up" },
+  ]);
+});
+
+test("deepseekParse: invalid items are skipped or partial; totals are never recomputed from parts", () => {
+  // Total invalid but parts valid: the main balance stays absent (never 10+100), parts kept.
+  const partialBody = JSON.stringify({
+    is_available: true,
+    balance_infos: [{ currency: "CNY", total_balance: "1,100.00", granted_balance: "10.00", topped_up_balance: "100.00" }],
+  });
+  const partial = deepseekParse(200, noHeaders, partialBody, { now: 0 });
+  assert.equal(partial.kind, "snapshot");
+  assert.equal(partial.snapshot.balances.find((item) => item.scope === "account"), undefined);
+  assert.equal(partial.snapshot.balances.length, 2);
+  assert.equal(partial.snapshot.partial, true);
+  // An invalid currency skips the whole item.
+  const badCurrency = deepseekParse(200, noHeaders, JSON.stringify({
+    balance_infos: [{ currency: "元", total_balance: "1.00" }],
+  }), { now: 0 });
+  assert.equal(badCurrency.kind, "issue");
+  assert.equal(badCurrency.issue.code, "protocol-error");
+  // Lowercase currency is normalized.
+  const lower = deepseekParse(200, noHeaders, JSON.stringify({
+    balance_infos: [{ currency: "cny", total_balance: "5.00" }],
+  }), { now: 0 });
+  assert.equal(lower.kind, "snapshot");
+  assert.equal(lower.snapshot.balances[0].currency, "CNY");
+});
+
+test("deepseekParse rejects empty or malformed payloads without inventing values", () => {
+  const empty = deepseekParse(200, noHeaders, JSON.stringify({ is_available: true, balance_infos: [] }), { now: 0 });
+  assert.equal(empty.issue.code, "no-data");
+  const missing = deepseekParse(200, noHeaders, JSON.stringify({ is_available: true }), { now: 0 });
+  assert.equal(missing.issue.code, "no-data");
+  const array = deepseekParse(200, noHeaders, JSON.stringify([{ currency: "CNY" }]), { now: 0 });
+  assert.equal(array.issue.code, "protocol-error");
+  const invalid = deepseekParse(200, noHeaders, "not-json", { now: 0 });
+  assert.equal(invalid.issue.code, "protocol-error");
+});
+
+test("deepseekParse maps HTTP status per §10 and parses Retry-After", () => {
+  assert.equal(deepseekParse(401, noHeaders, "", { now: 0 }).issue.code, "needs-auth");
+  assert.equal(deepseekParse(403, noHeaders, "", { now: 0 }).issue.code, "forbidden");
+  const limited = deepseekParse(429, { get: (name) => name === "retry-after" ? "2" : null }, "", { now: 1_000 });
+  assert.equal(limited.issue.code, "rate-limited");
+  assert.equal(limited.issue.retryAt, 3_000);
+  const noHeader = deepseekParse(429, noHeaders, "", { now: 1_000 });
+  assert.equal(noHeader.issue.retryAt, 31_000);
+  assert.equal(deepseekParse(500, noHeaders, "", { now: 0 }).issue.code, "http-error");
+});
+
+test("deepseekPrepare builds the Bearer request and refuses missing keys or foreign origins", () => {
+  const ok = deepseekPrepare({ profile: deepseekProfile, auth: { apiKey: "sk-synth" } });
+  assert.equal(ok.kind, "request");
+  assert.equal(ok.url, `${DEEPSEEK_QUOTA_ORIGIN}/user/balance`);
+  assert.equal(ok.headers.Authorization, "Bearer sk-synth");
+  assert.equal(ok.headers.Accept, "application/json");
+  // An already-prefixed key is never doubled.
+  assert.equal(deepseekPrepare({ profile: deepseekProfile, auth: { apiKey: "Bearer sk-synth" } }).headers.Authorization, "Bearer sk-synth");
+  assert.equal(deepseekPrepare({ profile: deepseekProfile, auth: { apiKey: "bearer sk-synth" } }).headers.Authorization, "bearer sk-synth");
+  assert.equal(deepseekPrepare({ profile: deepseekProfile, auth: null }).issue.code, "needs-auth");
+  assert.equal(deepseekPrepare({ profile: deepseekProfile, auth: { apiKey: "" } }).issue.code, "needs-auth");
+  assert.equal(deepseekPrepare({ profile: { ...deepseekProfile, origin: "https://evil.example.com" }, auth: { apiKey: "sk" } }).issue.code, "needs-verification");
+  // The official base URL (with any path) passes the guard.
+  const official = deepseekPrepare({ profile: deepseekProfile, auth: { apiKey: "sk", baseUrl: "https://api.deepseek.com/v1" } });
+  assert.equal(official.kind, "request");
+});
+
+test("deepseekPrepare refuses relay providers: the relay key never reaches the official host", () => {
+  const relay = deepseekPrepare({ profile: { ...deepseekProfile, providerId: "dgx-relay" }, auth: { apiKey: "relay-key", baseUrl: "https://newapi.qpanda.cn/v1" } });
+  assert.equal(relay.issue.code, "needs-verification");
+  // Plain http or unparsable base URLs are treated as unverified too, never skipped.
+  assert.equal(deepseekPrepare({ profile: deepseekProfile, auth: { apiKey: "k", baseUrl: "http://api.deepseek.com/v1" } }).issue.code, "needs-verification");
+  assert.equal(deepseekPrepare({ profile: deepseekProfile, auth: { apiKey: "k", baseUrl: "::bad::" } }).issue.code, "needs-verification");
+  // An absent base URL (host did not provide one) still allows the fixed-origin query.
+  assert.equal(deepseekPrepare({ profile: deepseekProfile, auth: { apiKey: "k" } }).kind, "request");
+});
+
+test("siliconflowParse maps the official example in CNY, parts never re-summed", () => {
+  const result = siliconflowParse(200, noHeaders, siliconflowBody, { now: 0 });
+  assert.equal(result.kind, "snapshot");
+  assert.deepEqual(result.snapshot.balances, [
+    { amountText: "88.88", currency: "CNY", scope: "account" },
+    { amountText: "0.88", currency: "CNY", scope: "granted" },
+    { amountText: "88.00", currency: "CNY", scope: "topped-up" },
+  ]);
+  assert.equal(result.snapshot.buckets.length, 0);
+  assert.equal(result.snapshot.partial, false);
+  // 0.88 + 88.00 equals 88.88 here, but the total is the server text, not a sum.
+  assert.equal(result.snapshot.balances[0].amountText, "88.88");
+});
+
+test("siliconflowParse rejects business-envelope failures without echoing the message", () => {
+  const wrongCode = siliconflowParse(200, noHeaders, JSON.stringify({ code: 20001, message: "secret reason", status: true, data: {} }), { now: 0 });
+  assert.equal(wrongCode.issue.code, "business-error");
+  assert.ok(!wrongCode.issue.detail.includes("secret"));
+  const statusFalse = siliconflowParse(200, noHeaders, JSON.stringify({ code: 20000, message: "OK", status: false, data: {} }), { now: 0 });
+  assert.equal(statusFalse.issue.code, "business-error");
+  const missingEnvelope = siliconflowParse(200, noHeaders, JSON.stringify({ data: { totalBalance: "1.00" } }), { now: 0 });
+  assert.equal(missingEnvelope.issue.code, "business-error");
+});
+
+test("siliconflowParse: missing data is no-data; present-but-invalid amounts are protocol errors", () => {
+  const missing = siliconflowParse(200, noHeaders, JSON.stringify({ code: 20000, status: true }), { now: 0 });
+  assert.equal(missing.issue.code, "no-data");
+  const noFields = siliconflowParse(200, noHeaders, JSON.stringify({ code: 20000, status: true, data: { id: "u" } }), { now: 0 });
+  assert.equal(noFields.issue.code, "no-data");
+  const invalid = siliconflowParse(200, noHeaders, JSON.stringify({ code: 20000, status: true, data: { totalBalance: "8.8.8" } }), { now: 0 });
+  assert.equal(invalid.issue.code, "protocol-error");
+  // A valid part with an invalid total keeps the part and marks the snapshot partial.
+  const partial = siliconflowParse(200, noHeaders, JSON.stringify({ code: 20000, status: true, data: { totalBalance: "x", chargeBalance: "3.00" } }), { now: 0 });
+  assert.equal(partial.kind, "snapshot");
+  assert.deepEqual(partial.snapshot.balances, [{ amountText: "3.00", currency: "CNY", scope: "topped-up" }]);
+  assert.equal(partial.snapshot.partial, true);
+  // HTTP mapping is the shared §10 table.
+  assert.equal(siliconflowParse(401, noHeaders, "", { now: 0 }).issue.code, "needs-auth");
+  assert.equal(siliconflowParse(429, noHeaders, "", { now: 1_000 }).issue.retryAt, 31_000);
+});
+
+test("siliconflowPrepare builds the Bearer request and applies the same relay guard", () => {
+  const ok = siliconflowPrepare({ profile: siliconflowProfile, auth: { apiKey: "sk-synth" } });
+  assert.equal(ok.kind, "request");
+  assert.equal(ok.url, `${SILICONFLOW_QUOTA_ORIGIN}/v1/user/info`);
+  assert.equal(ok.headers.Authorization, "Bearer sk-synth");
+  assert.equal(siliconflowPrepare({ profile: siliconflowProfile, auth: null }).issue.code, "needs-auth");
+  assert.equal(siliconflowPrepare({ profile: siliconflowProfile, auth: { apiKey: "k", baseUrl: "https://relay.example.com/v1" } }).issue.code, "needs-verification");
+  const official = siliconflowPrepare({ profile: siliconflowProfile, auth: { apiKey: "k", baseUrl: "https://api.siliconflow.cn/v1" } });
+  assert.equal(official.kind, "request");
+});
+
+test("shared http helpers: bounded exact-text amounts, currency codes, Bearer prefix", () => {
+  assert.equal(decimalText("110.00"), "110.00");
+  assert.equal(decimalText(" -0.5 "), "-0.5");
+  assert.equal(decimalText("0"), "0");
+  assert.equal(decimalText("1e5"), null);
+  assert.equal(decimalText("1,100.00"), null);
+  assert.equal(decimalText(1.5), null);
+  assert.equal(decimalText("Infinity"), null);
+  assert.equal(decimalText(".".repeat(40)), null);
+  assert.equal(decimalText("0.".repeat(1) + "123456789"), null);
+  assert.equal(currencyCode("cny"), "CNY");
+  assert.equal(currencyCode("USD"), "USD");
+  assert.equal(currencyCode("CNY元"), null);
+  assert.equal(currencyCode(1), null);
+  assert.equal(bearerAuthorization("sk-1"), "Bearer sk-1");
+  assert.equal(bearerAuthorization("Bearer sk-1"), "Bearer sk-1");
+  assert.equal(bearerAuthorization("bearer sk-1"), "bearer sk-1");
+});
+
+test("deepseek end-to-end: Bearer request, HUD balance row, cache, TTL and details", async () => {
+  const fixture = quotaFixture({
+    config: quotaConfig({}, [deepseekProfile]),
+    fetchLike: (() => {
+      const fake = new FakeFetch();
+      fake.queue.push(jsonResponse(deepseekBody));
+      return fake;
+    })(),
+    model: { provider: "deepseek", id: "deepseek-v4-pro", name: "DeepSeek V4 Pro" },
+  });
+  await settle(fixture);
+  const request = fixture.fakeFetch.calls[0];
+  assert.equal(request.url, "https://api.deepseek.com/user/balance");
+  assert.equal(request.authorization, "Bearer key-synth");
+  const view = fixture.controller.quota.view();
+  assert.equal(view.status, "ready");
+  assert.equal(view.planKey, "deepseek");
+  assert.deepEqual(view.balance, { amountText: "110.00", currency: "CNY", scope: "account" });
+  assert.equal(view.buckets.length, 0);
+  // Cached within TTL: no second request on the next trigger.
+  fixture.controller.quota.notify("settled");
+  await settle(fixture);
+  assert.equal(fixture.requestCount(), 1);
+  // TTL expiry only marks stale; the next event-driven check refreshes.
+  fixture.clock.advance(300_001);
+  fixture.fakeFetch.queue.push(jsonResponse(deepseekBody));
+  fixture.controller.quota.notify("settled");
+  await settle(fixture);
+  assert.equal(fixture.requestCount(), 2);
+  // Details carry the granted/topped-up parts.
+  const details = fixture.controller.quota.inspect();
+  const cached = details.profileList[0].cache.lastSuccess;
+  assert.deepEqual(cached.balances.map((item) => `${item.scope}:${item.amountText}`), ["account:110.00", "granted:10.00", "topped-up:100.00"]);
+});
+
+test("siliconflow end-to-end: business failure keeps the last values; 401 hides them", async () => {
+  const fake = new FakeFetch();
+  fake.queue.push(jsonResponse(siliconflowBody));
+  fake.queue.push(jsonResponse(JSON.stringify({ code: 20001, message: "x", status: true, data: null })));
+  fake.queue.push(jsonResponse("", 401));
+  const fixture = quotaFixture({
+    config: quotaConfig({}, [siliconflowProfile]),
+    fetchLike: fake,
+    model: { provider: "siliconflow", id: "Qwen/Qwen3-235B-A22B", name: "Qwen3 235B" },
+  });
+  await settle(fixture);
+  let view = fixture.controller.quota.view();
+  assert.equal(view.status, "ready");
+  assert.deepEqual(view.balance, { amountText: "88.88", currency: "CNY", scope: "account" });
+  // A business failure keeps the old snapshot visible (stale), never zeroes it.
+  fixture.clock.advance(300_001);
+  fixture.controller.quota.notify("settled");
+  await settle(fixture);
+  view = fixture.controller.quota.view();
+  assert.equal(view.status, "issue");
+  assert.deepEqual(view.balance, { amountText: "88.88", currency: "CNY", scope: "account" });
+  assert.equal(view.issue.code, "business-error");
+  // 401 hides the values as currently valid (§10) without deleting the history.
+  fixture.clock.advance(300_001);
+  fixture.controller.quota.notify("settled");
+  await settle(fixture);
+  view = fixture.controller.quota.view();
+  assert.equal(view.status, "issue");
+  assert.equal(view.issue.code, "needs-auth");
+  assert.equal(view.balance, null);
+  const details = fixture.controller.quota.inspect().profileList[0].cache.lastSuccess;
+  assert.equal(details.balances[0].amountText, "88.88");
+});
+
+test("relay-bound profiles never query: needs-verification without any request", async () => {
+  const fixture = quotaFixture({
+    config: quotaConfig({}, [{ ...deepseekProfile, providerId: "dgx-deepseek" }]),
+    auth: { ok: true, apiKey: "relay-key", baseUrl: "https://newapi.qpanda.cn/v1" },
+    model: { provider: "dgx-deepseek", id: "deepseek-v4-pro", name: "DeepSeek (relay)" },
+  });
+  await settle(fixture);
+  assert.equal(fixture.requestCount(), 0);
+  const view = fixture.controller.quota.view();
+  assert.equal(view.status, "issue");
+  assert.equal(view.issue.code, "needs-verification");
+});
+
+test("balance rows render with exact currency text in both languages and ASCII", () => {
+  const balanceView = (overrides = {}) => quotaView({ planKey: "deepseek", buckets: [], balance: { amountText: "110.00", currency: "CNY", scope: "account" }, ...overrides });
+  const en = quotaField(balanceView(), normalize({ language: "en" }), LABELS.en);
+  assert.equal(en.text, "DeepSeek · ¥110.00");
+  const zh = quotaField(balanceView({ planKey: "siliconflow" }), normalize({ language: "zh-CN" }), LABELS["zh-CN"]);
+  assert.equal(zh.text, "硅基流动 · ¥110.00");
+  const ascii = quotaField(balanceView(), normalize({ ascii: true }), LABELS.en);
+  assert.equal(ascii.text, "DeepSeek | CNY 110.00");
+  const usd = quotaField(balanceView({ balance: { amountText: "88.88", currency: "USD", scope: "account" } }), normalize(), LABELS.en);
+  assert.equal(usd.text, "DeepSeek · $88.88");
+  const negative = quotaField(balanceView({ balance: { amountText: "-1.20", currency: "CNY", scope: "account" } }), normalize(), LABELS.en);
+  assert.equal(negative.text, "DeepSeek · -¥1.20");
+  const other = quotaField(balanceView({ balance: { amountText: "5.00", currency: "EUR", scope: "account" } }), normalize(), LABELS.en);
+  assert.equal(other.text, "DeepSeek · EUR 5.00");
+  // Stale and transient-issue states keep the amount visible.
+  assert.match(quotaField(balanceView({ stale: true }), normalize(), LABELS.en).text, /stale/);
+  const transient = quotaField(balanceView({ status: "issue", issue: { code: "rate-limited", detail: "" }, stale: true }), normalize(), LABELS.en);
+  assert.match(transient.text, /¥110\.00/);
+  assert.match(transient.text, /!rate-limited/);
+  // Loading and no-value states stay bounded.
+  assert.equal(quotaField(balanceView({ status: "loading", balance: null }), normalize(), LABELS.en).text, "DeepSeek ?");
+  assert.equal(quotaField(balanceView({ balance: null }), normalize(), LABELS.en).text, "DeepSeek …");
+});
+
+test("balance plan labels cover the two API adapters in both languages", () => {
+  assert.equal(quotaPlanLabel("deepseek", "zh-CN"), "DeepSeek");
+  assert.equal(quotaPlanLabel("deepseek", "en"), "DeepSeek");
+  assert.equal(quotaPlanLabel("siliconflow", "zh-CN"), "硅基流动");
+  assert.equal(quotaPlanLabel("siliconflow", "en"), "SiliconFlow");
+});
+
+test("quota config accepts the balance adapters and rejects their invalid fields", () => {
+  const deepseek = normalizeQuota({ enabled: true, profiles: [deepseekProfile] });
+  assert.equal(deepseek.profiles[0].adapter, "deepseek");
+  assert.equal(deepseek.profiles[0].region, undefined);
+  const withOrigin = normalizeQuota({ profiles: [{ ...deepseekProfile, origin: "https://api.deepseek.com/" }] });
+  assert.equal(withOrigin.profiles[0].origin, "https://api.deepseek.com");
+  const siliconflow = normalizeQuota({ profiles: [{ ...siliconflowProfile, origin: "https://api.siliconflow.cn" }] });
+  assert.equal(siliconflow.profiles[0].origin, "https://api.siliconflow.cn");
+  // Balance adapters reject plan/queryMode, scope and region.
+  assert.throws(() => normalizeQuota({ profiles: [{ ...deepseekProfile, plan: "personal" }] }), /only valid for the zai adapter/);
+  assert.throws(() => normalizeQuota({ profiles: [{ ...deepseekProfile, queryMode: "team" }] }), /only valid for the zai adapter/);
+  assert.throws(() => normalizeQuota({ profiles: [{ ...deepseekProfile, organizationId: "o" }] }), /only valid for the zai adapter/);
+  assert.throws(() => normalizeQuota({ profiles: [{ ...deepseekProfile, projectId: "p" }] }), /only valid for the zai adapter/);
+  assert.throws(() => normalizeQuota({ profiles: [{ ...siliconflowProfile, region: "cn" }] }), /not a valid field for adapter/);
+  // The origin must equal the adapter's fixed domain exactly.
+  assert.throws(() => normalizeQuota({ profiles: [{ ...deepseekProfile, origin: "https://api.siliconflow.cn" }] }), /origin must be/);
+  assert.throws(() => normalizeQuota({ profiles: [{ ...siliconflowProfile, origin: "https://api.deepseek.com" }] }), /origin must be/);
+  // codex-app-server stays bound to the codex adapter.
+  assert.throws(() => normalizeQuota({ profiles: [{ ...deepseekProfile, source: "codex-app-server" }] }), /source/);
 });

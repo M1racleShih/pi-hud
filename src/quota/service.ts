@@ -32,7 +32,44 @@ import type { QuotaHostAuth, QuotaIdentity, QuotaIssue, QuotaIssueCode, QuotaSna
 import { QUOTA_ISSUE_HIDES_VALUES, quotaIdentityKey } from "./types.ts";
 import { quotaFetch, globalQuotaFetch } from "./transport.ts";
 import type { QuotaFetchLike, QuotaTransportResult } from "./transport.ts";
-import { zaiParse, zaiPrepare } from "./adapters/zai.ts";
+import { zaiParse, zaiPrepare, ZAI_ORIGINS } from "./adapters/zai.ts";
+import { deepseekParse, deepseekPrepare, DEEPSEEK_QUOTA_ORIGIN } from "./adapters/deepseek.ts";
+import { siliconflowParse, siliconflowPrepare, SILICONFLOW_QUOTA_ORIGIN } from "./adapters/siliconflow.ts";
+
+/** The implemented adapter registry. Structural prepare/parse shapes keep every
+ *  adapter data-only; a name outside this table reports `unsupported-adapter`
+ *  without any request (the remaining plan adapters stay diagnostics-only). */
+interface QuotaAdapterImpl {
+  usesScope: boolean;
+  originFor: (profile: QuotaProfile) => string;
+  prepare: (input: { profile: QuotaProfile; auth: QuotaHostAuth | null; scope: { organizationId: string | null; projectId: string | null; conflict: boolean } }) =>
+    { kind: "request"; url: string; headers: Record<string, string> } | { kind: "issue"; issue: QuotaIssue };
+  parse: (status: number, headers: { get(name: string): string | null } | null, body: string, context: { now: number }) =>
+    { kind: "snapshot"; snapshot: import("./types.ts").QuotaSnapshotData } | { kind: "issue"; issue: QuotaIssue };
+}
+
+const NO_SCOPE = Object.freeze({ organizationId: null, projectId: null, conflict: false });
+
+const ADAPTERS: Readonly<Record<string, QuotaAdapterImpl>> = Object.freeze({
+  zai: {
+    usesScope: true,
+    originFor: (profile) => ZAI_ORIGINS[profile.region ?? "cn"] ?? ZAI_ORIGINS.cn,
+    prepare: zaiPrepare,
+    parse: zaiParse,
+  },
+  deepseek: {
+    usesScope: false,
+    originFor: () => DEEPSEEK_QUOTA_ORIGIN,
+    prepare: deepseekPrepare,
+    parse: deepseekParse,
+  },
+  siliconflow: {
+    usesScope: false,
+    originFor: () => SILICONFLOW_QUOTA_ORIGIN,
+    prepare: siliconflowPrepare,
+    parse: siliconflowParse,
+  },
+});
 
 export const QUOTA_LIMITS = Object.freeze({
   maxIdentities: 16,
@@ -87,6 +124,8 @@ export interface QuotaHudView {
   updatedAt: number | null;
   /** Display buckets: at most the hour and week windows, hour first. */
   buckets: Array<{ unit: "hour" | "week" | "month" | null; number: number; remainingPercent?: number; resetAt?: number }>;
+  /** Main account balance (API adapters): the `account`-scope item, never re-summed. */
+  balance: { amountText: string; currency: string; scope: string } | null;
   truncated: boolean;
 }
 
@@ -233,7 +272,8 @@ export class QuotaService {
         return;
       }
       const profile = matches[0];
-      if (profile.adapter !== "zai") {
+      const impl = ADAPTERS[profile.adapter];
+      if (!impl) {
         this.modelStatus = { kind: "unsupported", adapter: profile.adapter };
         this.publishCurrent();
         return;
@@ -253,8 +293,8 @@ export class QuotaService {
         this.counters.discarded++;
         return;
       }
-      const scope = reconcileScope(profile, auth, profile.queryMode ?? "");
-      const origin = profile.origin ?? zaiOriginFor(profile);
+      const scope = impl.usesScope ? reconcileScope(profile, auth, profile.queryMode ?? "") : NO_SCOPE;
+      const origin = profile.origin ?? impl.originFor(profile);
       const identity = buildIdentity(profile, origin, scope, auth);
       const key = quotaIdentityKey(identity);
       if (key !== this.currentKey) {
@@ -310,7 +350,9 @@ export class QuotaService {
     scope: { organizationId: string | null; projectId: string | null; conflict: boolean },
     origin: string, entry: QuotaEntry, key: string, generation: number,
   ): Promise<void> {
-    const prepared = zaiPrepare({ profile, auth, scope });
+    const impl = ADAPTERS[profile.adapter];
+    if (!impl) return;
+    const prepared = impl.prepare({ profile, auth, scope });
     if (prepared.kind === "issue") {
       this.finishIssue(entry, prepared.issue);
       return;
@@ -342,7 +384,7 @@ export class QuotaService {
       return;
     }
     const parsed = result.kind === "response"
-      ? zaiParse(result.status, result.headers, result.body, { now: this.now() })
+      ? impl.parse(result.status, result.headers, result.body, { now: this.now() })
       : transportIssue(result);
     if (parsed.kind === "issue") {
       this.finishIssue(entry, parsed.issue);
@@ -414,22 +456,22 @@ export class QuotaService {
     if (!this.enabled || !this.config) return null;
     const status = this.modelStatus;
     if (status.kind === "unconfigured") {
-      return { status: "unconfigured", profileId: "", planKey: "", issue: null, stale: false, updatedAt: null, buckets: [], truncated: false };
+      return { status: "unconfigured", profileId: "", planKey: "", issue: null, stale: false, updatedAt: null, buckets: [], balance: null, truncated: false };
     }
     if (status.kind === "ambiguous") {
       return {
-        status: "ambiguous-profile", profileId: "", planKey: "", stale: false, updatedAt: null, buckets: [], truncated: false,
+        status: "ambiguous-profile", profileId: "", planKey: "", stale: false, updatedAt: null, buckets: [], balance: null, truncated: false,
         issue: { code: "ambiguous-profile", detail: `${status.count} profiles match the current model` },
       };
     }
     if (status.kind === "unsupported") {
       return {
-        status: "issue", profileId: "", planKey: "", stale: false, updatedAt: null, buckets: [], truncated: false,
+        status: "issue", profileId: "", planKey: "", stale: false, updatedAt: null, buckets: [], balance: null, truncated: false,
         issue: { code: "unsupported-adapter", detail: `adapter ${status.adapter} is not implemented` },
       };
     }
     const entry = this.currentKey !== null ? this.entries.get(this.currentKey) : undefined;
-    if (!entry) return { status: "idle", profileId: "", planKey: "", issue: null, stale: false, updatedAt: null, buckets: [], truncated: false };
+    if (!entry) return { status: "idle", profileId: "", planKey: "", issue: null, stale: false, updatedAt: null, buckets: [], balance: null, truncated: false };
     const now = this.now();
     const snapshot = entry.lastSuccess;
     const hides = entry.issue !== null && QUOTA_ISSUE_HIDES_VALUES.includes(entry.issue.code);
@@ -441,6 +483,7 @@ export class QuotaService {
     else viewStatus = "idle";
     const issue = entry.issue ? { code: entry.issue.code, detail: entry.issue.detail } : null;
     const buckets: QuotaHudView["buckets"] = [];
+    let balance: QuotaHudView["balance"] = null;
     if (snapshot && !hides) {
       // Fixed order: the 5-hour window first, then the weekly window (§9). The tools
       // pool and every further bucket stay in the `/hud quotas` details.
@@ -450,6 +493,11 @@ export class QuotaService {
           buckets.push({ unit, number: bucket.window?.number ?? 0, remainingPercent: bucket.remainingPercent, resetAt: bucket.resetAt });
         }
       }
+      // Balance adapters: the row shows only the account-scope total; granted and
+      // topped-up parts stay in `/hud quotas` (never re-summed here).
+      const items = snapshot.balances ?? [];
+      balance = items.find((item) => item.scope === "account") ?? items[0] ?? null;
+      if (balance) balance = { amountText: balance.amountText, currency: balance.currency, scope: balance.scope };
     }
     return {
       status: viewStatus,
@@ -459,6 +507,7 @@ export class QuotaService {
       stale: stale || entry.lifecycle === "stale",
       updatedAt: snapshot?.fetchedAt ?? null,
       buckets,
+      balance,
       truncated: snapshot?.truncated ?? false,
     };
   }
@@ -494,7 +543,7 @@ export class QuotaService {
         queryMode: profile.queryMode ?? null,
         organizationConfigured: profile.organizationId !== undefined,
         projectConfigured: profile.projectId !== undefined,
-        origin: profile.origin ?? zaiOriginFor(profile),
+        origin: profile.origin ?? (ADAPTERS[profile.adapter]?.originFor(profile) ?? ""),
         status: entry
           ? entry.issue ? entry.issue.code : entry.lifecycle
           : this.model && profile.enabled !== false && profile.providerId === this.model.provider &&
@@ -514,6 +563,9 @@ export class QuotaService {
                 expiresAt: snapshot.expiresAt,
                 stale: snapshot.expiresAt <= this.now(),
                 planLabel: snapshot.planLabel,
+                balances: snapshot.balances
+                  ? snapshot.balances.map((item) => ({ amountText: item.amountText, currency: item.currency, scope: item.scope }))
+                  : null,
                 buckets: snapshot.buckets.map((bucket) => ({
                   id: bucket.id, kind: bucket.kind,
                   window: bucket.window ? `${bucket.window.number}${bucket.window.unit}` : null,
@@ -565,7 +617,5 @@ const transportIssue = (result: QuotaTransportResult): { kind: "issue"; issue: Q
   }
 };
 
-const zaiOriginFor = (profile: QuotaProfile): string =>
-  profile.adapter === "zai" ? (profile.region === "global" ? "https://api.z.ai" : "https://open.bigmodel.cn") : "";
-
-const planKeyFromIdentity = (identity: QuotaIdentity): string => `${identity.adapter}:${identity.plan}`;
+const planKeyFromIdentity = (identity: QuotaIdentity): string =>
+  identity.plan ? `${identity.adapter}:${identity.plan}` : identity.adapter;

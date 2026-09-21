@@ -131,7 +131,7 @@ for (const filePath of listSourceFiles()) {
 }
 if (transportSource) {
   // The quota service and adapters must stay data-only: no node builtin imports at all.
-  for (const file of ["quota/service.ts", "quota/types.ts", "quota/identity.ts", "quota/adapters/zai.ts", "quota/transport.ts"]) {
+  for (const file of ["quota/service.ts", "quota/types.ts", "quota/identity.ts", "quota/adapters/zai.ts", "quota/adapters/deepseek.ts", "quota/adapters/siliconflow.ts", "quota/adapters/http.ts", "quota/transport.ts"]) {
     assert.ok(existsSync(join("src", file)), `Expected quota module ${file}`);
   }
 }

@@ -23,8 +23,11 @@
 import { safeText } from "../../text.ts";
 import type { QuotaProfile } from "../../config.ts";
 import type {
-  QuotaBucket, QuotaHeadersLike, QuotaHostAuth, QuotaIssue, QuotaIssueCode, QuotaMeterKind, QuotaSnapshotData, QuotaWindow, QuotaWindowUnit,
+  QuotaBucket, QuotaHeadersLike, QuotaHostAuth, QuotaIssue, QuotaMeterKind, QuotaSnapshotData, QuotaWindow, QuotaWindowUnit,
 } from "../types.ts";
+import { adapterIssue, httpStatusIssue, isObject, parseJsonPayload } from "./http.ts";
+
+export { parseRetryAfter } from "./http.ts";
 
 /** Verified domestic origin. The international site is a separate, unverified scope. */
 export const ZAI_QUOTA_ORIGIN = "https://open.bigmodel.cn";
@@ -51,8 +54,9 @@ export type ZaiParseResult =
   | { kind: "snapshot"; snapshot: QuotaSnapshotData }
   | { kind: "issue"; issue: QuotaIssue };
 
-const issue = (code: QuotaIssueCode, retryable: boolean, detail = "", retryAt: number | null = null): { kind: "issue"; issue: QuotaIssue } =>
-  ({ kind: "issue", issue: { code, retryable, retryAt, detail: safeText(detail, 64) } });
+// Shared constructor from ./http.ts (bounded sanitized detail); the alias keeps the
+// call sites below reading as adapter-local decisions.
+const issue = adapterIssue;
 
 /** Build the verified request, or refuse with a structured issue before any network. */
 export function zaiPrepare(input: ZaiPrepareInput): ZaiPrepareResult {
@@ -121,28 +125,17 @@ const METER_KINDS: Readonly<Record<string, QuotaMeterKind>> = Object.freeze({
 const totalFor = (kind: QuotaMeterKind, value: unknown): number | undefined =>
   (kind === "credits" || kind === "tools") ? finite(value) : undefined;
 
-const object = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
+const object = isObject;
 
 export const ZAI_MAX_BUCKETS = 32;
 
 /** Normalize one verified response. HTTP-level and transport failures are handled
  *  by the caller; this function owns the business and mapping semantics. */
 export function zaiParse(status: number, headers: QuotaHeadersLike | null, body: string, context: ZaiParseContext): ZaiParseResult {
-  if (status === 401) return issue("needs-auth", false, "HTTP 401");
-  if (status === 403) return issue("forbidden", false, "HTTP 403");
-  if (status === 429) {
-    const retryAfterMs = parseRetryAfter(headers?.get("retry-after") ?? null, context.now);
-    return issue("rate-limited", true, "HTTP 429", context.now + (retryAfterMs ?? 30_000));
-  }
-  if (status < 200 || status >= 300) return issue("http-error", true, `HTTP ${status}`);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(body.length > 512 * 1024 ? "" : body);
-  } catch {
-    return issue("protocol-error", true, "invalid JSON");
-  }
-  if (!object(parsed)) return issue("protocol-error", true, "unexpected payload");
+  const httpIssue = httpStatusIssue(status, headers, context.now);
+  if (httpIssue !== null) return httpIssue;
+  const parsed = parseJsonPayload(body);
+  if (!isObject(parsed)) return issue("protocol-error", true, "invalid JSON");
   const data = parsed.data;
   if (parsed.success !== true || parsed.code !== 200) {
     // Business failure: sanitized classification only; `data` is never published.
@@ -202,18 +195,4 @@ export function zaiParse(status: number, headers: QuotaHeadersLike | null, body:
     partial: ignored > 0 || truncated,
   };
   return { kind: "snapshot", snapshot };
-}
-
-/** Parse a `Retry-After` header (delay-seconds or HTTP-date) into a millisecond
- *  delay; the caller applies the capped backoff. */
-export function parseRetryAfter(value: string | null, now: number): number | null {
-  if (typeof value !== "string" || value.length === 0 || value.length > 64) return null;
-  const trimmed = value.trim();
-  if (/^\d{1,10}$/.test(trimmed)) {
-    const seconds = Number.parseInt(trimmed, 10);
-    return seconds * 1_000;
-  }
-  const date = Date.parse(trimmed);
-  if (Number.isFinite(date)) return Math.max(0, date - now);
-  return null;
 }

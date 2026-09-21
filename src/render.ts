@@ -351,13 +351,28 @@ export function compactionField(snapshot: HudSnapshot, words: HudWords): HudFiel
   return field(35, [seg("label", `${words.compact} `), seg("body", String(snapshot.compactions))]);
 }
 
-/** Localized plan identity shown next to the quota numbers (GLM 个人 / GLM Team). */
+/** Localized plan identity shown next to the quota numbers (GLM 个人 / GLM Team).
+ *  Balance adapters show their service brand; both stay distinct from ctx(last). */
 export function quotaPlanLabel(planKey: string, language: HudLanguage): string {
   if (planKey === "zai:personal") return language === "zh-CN" ? "GLM 个人" : "GLM Personal";
   if (planKey === "zai:team") return language === "zh-CN" ? "GLM 团队" : "GLM Team";
+  if (planKey === "deepseek") return "DeepSeek";
+  if (planKey === "siliconflow") return language === "zh-CN" ? "硅基流动" : "SiliconFlow";
   const clean = planKey.replace(/[^a-zA-Z0-9:_-]/g, "").slice(0, 24);
   return clean || "plan";
 }
+
+/** Currency + exact server amount text. The digits are never reformatted; only the
+ *  sign moves before the symbol. ASCII mode (and unmapped codes) use the ISO code
+ *  so no row ever depends on non-ASCII symbols. */
+const balanceText = (amountText: string, currency: string, ascii: boolean): string => {
+  const negative = amountText.startsWith("-");
+  const magnitude = negative ? amountText.slice(1) : amountText;
+  const sign = negative ? "-" : "";
+  if (ascii || (currency !== "CNY" && currency !== "USD")) return `${sign}${currency} ${magnitude}`;
+  const symbol = currency === "CNY" ? "¥" : "$";
+  return `${sign}${symbol}${magnitude}`;
+};
 
 const quotaWindowText = (bucket: { unit: string | null; number: number }, words: HudWords): string => {
   if (bucket.unit === "hour") return `${bucket.number || "?"}h`;
@@ -369,10 +384,12 @@ const quotaWindowText = (bucket: { unit: string | null; number: number }, words:
 /**
  * The opt-in provider-plan quota field (docs/PROVIDER-LIMITS-PLAN.zh-CN.md §6).
  * Plan remaining is labelled by the plan identity (for example `GLM 个人`) and shows
- * remaining percentages per window, which keeps it explicitly distinct from the
+ * remaining percentages per window, or — for balance adapters — the exact server
+ * amount with its currency, which keeps it explicitly distinct from the
  * context-usage meter (`ctx(last)`). Detail buckets, exact numbers, reset times and
  * issues belong to `/hud quotas`; this row stays bounded: plan identity plus at most
- * the 5-hour and weekly windows, a stale marker, or a compact issue code. Priority 70
+ * the 5-hour and weekly windows (or one balance), a stale marker, or a compact issue
+ * code. Priority 70
  * drops the whole field before the path/context on narrow rows; the unconfigured and
  * ambiguity markers use even lower priorities (20/25) so they disappear first.
  */
@@ -386,30 +403,37 @@ export function quotaField(quota: QuotaHudView | null, config: HudConfig, words:
     return field(25, [seg("label", `${words.quotaPlan} `), seg("warning", "ambiguous-profile")]);
   }
   const plan = quotaPlanLabel(quota.planKey, language);
-  const numberSegments = (buckets: QuotaHudView["buckets"]): HudSegment[] => {
+  // Balance adapters (DeepSeek/SiliconFlow) have no windows; their row is the plan
+  // identity plus the exact server amount with its currency.
+  const hasValues = quota.buckets.length > 0 || quota.balance !== null;
+  const valueSegments = (): HudSegment[] => {
     const segments: HudSegment[] = [];
-    for (const bucket of buckets) {
+    for (const bucket of quota.buckets) {
       segments.push(seg("separator", config.ascii ? " | " : " · "));
       const percent = bucket.remainingPercent === undefined ? "?" : `${Math.round(bucket.remainingPercent)}%`;
       segments.push(seg("body", `${quotaWindowText(bucket, words)} ${percent}`));
     }
+    if (quota.balance) {
+      segments.push(seg("separator", config.ascii ? " | " : " · "));
+      segments.push(seg("body", balanceText(quota.balance.amountText, quota.balance.currency, config.ascii)));
+    }
     return segments;
   };
   if (quota.status === "issue" && quota.issue) {
-    if (!quota.buckets.length) {
+    if (!hasValues) {
       return field(70, [seg("label", `${plan} `), seg("warning", `!${quota.issue.code}`)]);
     }
     // Transient failures keep the (possibly expired) last values visible with the issue
     // code beside them (§10); auth/scope failures hide the values entirely.
-    const segments: HudSegment[] = [seg("label", plan), ...numberSegments(quota.buckets)];
+    const segments: HudSegment[] = [seg("label", plan), ...valueSegments()];
     if (quota.stale) segments.push(seg("warning", ` ${words.quotaStale}`));
     segments.push(seg("warning", ` !${quota.issue.code}`));
     return field(70, segments);
   }
-  if (quota.status === "loading" || quota.status === "idle" || quota.buckets.length === 0) {
+  if (quota.status === "loading" || quota.status === "idle" || !hasValues) {
     return field(70, [seg("label", `${plan} `), seg("body", quota.status === "loading" ? "?" : "…")]);
   }
-  const segments: HudSegment[] = [seg("label", plan), ...numberSegments(quota.buckets)];
+  const segments: HudSegment[] = [seg("label", plan), ...valueSegments()];
   if (quota.stale) segments.push(seg("warning", ` ${words.quotaStale}`));
   return field(70, segments);
 }

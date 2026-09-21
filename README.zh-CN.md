@@ -59,17 +59,25 @@ ctx(last) ██░░░░░░░░ 45% 90k/200k · 全会话* ↻ ↑61k �
 
 ## 提供商额度支持（实验性，默认关闭）
 
-`quota.enabled: true` 为具备已验证只读额度接口的提供商增加套餐剩余行。首切片实现 **GLM（Z.ai / 智谱）国内站**的两个经账号验证的查询模式：
+`quota.enabled: true` 为具备已验证只读额度接口的提供商增加额度行。已实现两类适配器：
+
+- **GLM（Z.ai / 智谱）国内站套餐** —— 两个经账号验证的查询模式：
 
 ```text
 [glm-4.7] · high · zai-coding-cn · ~/project · GLM 个人 · 5h 100% · 周 67% · 上下文(上次) ...
 ```
 
-- 该行以**套餐身份**标注（`GLM 个人` / `GLM Team`），与上下文占用 `上下文(上次)` 明确区分；显示 5 小时与周窗口（服务端百分比的补数作为剩余），工具池、精确数量、重置时间与故障详情放在 `/hud quotas`。
-- **验证基础**：两个查询模式在调研轮已用真实账号验证并与控制台对照（`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8）；本实现对个人凭据的实时端到端记录见 `docs/quota-live-e2e.json`（HUD 输出与同分钟原始查询交叉核对）。团队实时 E2E 按所有者决定沿用调研记录；未验证候选 —— `queryMode: "personal"`（type=1）与 `region: "global"` —— 仅保留配置诊断，不发送请求（`needs-verification`）。团队失败不回退个人查询。
-- **安全边界**：固定源 HTTPS GET（`https://open.bigmodel.cn`）、5 秒超时、256 KiB 响应上限、拒绝一切重定向、不读 cookie、不发模型请求探测；凭据在查询时由 Pi 自己的 provider 认证解析，不写入 HUD 配置或缓存（仅保留不可逆指纹）；诊断全部脱敏（无 token、headers、原始响应）。
+- **API 余额（DeepSeek、硅基流动）** —— 官方只读余额接口，展示服务端原值与币种：
+
+```text
+[deepseek-v4-pro] · high · deepseek · ~/project · DeepSeek · ¥110.00 · 上下文(上次) ...
+```
+
+- 该行以**额度身份**标注（`GLM 个人` / `GLM Team` / `DeepSeek` / `硅基流动`，本地化），与上下文占用 `上下文(上次)` 明确区分；GLM 显示 5 小时与周窗口（服务端百分比的补数作为剩余），余额适配器显示账户总余额（服务端原值十进制文本与币种）；工具池、分项余额、精确数量、重置时间与故障详情放在 `/hud quotas`。
+- **验证基础**：GLM 两个查询模式在调研轮已用真实账号验证并与控制台对照（`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8）；本实现对个人凭据的实时端到端记录见 `docs/quota-live-e2e.json`（HUD 输出与同分钟原始查询交叉核对）。团队实时 E2E 按所有者决定沿用调研记录；未验证候选 —— `queryMode: "personal"`（type=1）与 `region: "global"` —— 仅保留配置诊断，不发送请求（`needs-verification`）。团队失败不回退个人查询。DeepSeek/硅基流动余额适配器按官方文档契约实现（`GET /user/balance`、`GET /v1/user/info`，Bearer 认证）：金额保留服务端十进制原文，不从分项重新加总（总额永远用服务端值）；硅基流动三个余额字段的含义按官方 openapi 示例归一化，币种按文档计费币种 CNY；真实账号端到端验证待完成（见方案完成度表）。凭据解析出的 baseUrl 指向其他源（中转）时拒绝查询（`needs-verification`），中转密钥永不发往官方域名。
+- **安全边界**：固定源 HTTPS GET（GLM `https://open.bigmodel.cn`；DeepSeek `https://api.deepseek.com`；硅基流动 `https://api.siliconflow.cn`）、5 秒超时、256 KiB 响应上限、拒绝一切重定向、不读 cookie、不发模型请求探测；凭据在查询时由 Pi 自己的 provider 认证解析，不写入 HUD 配置或缓存（仅保留不可逆指纹）；诊断全部脱敏（无 token、headers、原始响应）。
 - **调度**：仅事件驱动（首次启用、provider/身份切换、`agent_settled`、手动刷新）；5 分钟 TTL 到期不主动联网；手动刷新遵守 ≥30 秒冷却与服务端 Retry-After；全局 ≤2 并发、每身份单飞；关闭、退出、身份切换后用 generation token 丢弃晚到结果。
-- **命令**：`/hud quota on|off`（内存生效，off 立即取消任务）、`/hud quota refresh`、`/hud quotas`（缓存状态、来源、时间与不可用原因，不含凭据）。多个 profile 匹配当前模型时显示 `ambiguous-profile`，不按列表顺序选择。MiniMax/Codex/Gemini/DeepSeek/硅基流动的适配器名仅为前向兼容保留，查询时报告 `unsupported-adapter` 且不触网。
+- **命令**：`/hud quota on|off`（内存生效，off 立即取消任务）、`/hud quota refresh`、`/hud quotas`（缓存状态、来源、时间与不可用原因，不含凭据）。多个 profile 匹配当前模型时显示 `ambiguous-profile`，不按列表顺序选择。MiniMax/Codex/Gemini 的适配器名仅为前向兼容保留，查询时报告 `unsupported-adapter` 且不触网。
 
 配置仍在同一个 `pi-hud.json`（`quota.profiles`，上限 16；组织/项目属于账号上下文，不要提交到共享仓库）。完整契约见[配置说明](docs/CONFIGURATION.md)与[额度方案](docs/PROVIDER-LIMITS-PLAN.zh-CN.md)。
 

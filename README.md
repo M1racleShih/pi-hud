@@ -59,17 +59,25 @@ Ownership rules: `/hud off` restores the built-in footer while the HUD still own
 
 ## Provider quota support (experimental, default off)
 
-`quota.enabled: true` adds a plan-remaining row for providers with a verified read-only quota API. The first slice implements **GLM (Z.ai / BigModel) domestic plans** with the two account-verified query modes:
+`quota.enabled: true` adds a plan-remaining row for providers with a verified read-only quota API. Two adapter families are implemented:
+
+- **GLM (Z.ai / BigModel) domestic plans** — the two account-verified query modes:
 
 ```text
 [glm-4.7] · high · zai-coding-cn · ~/project · GLM Personal · 5h 100% · wk 67% · ctx(last) ...
 ```
 
+- **API balance (DeepSeek, SiliconFlow)** — the official read-only balance endpoints, showing the exact server amount with its currency:
+
+```text
+[deepseek-v4-pro] · high · deepseek · ~/project · DeepSeek · ¥110.00 · ctx(last) ...
+```
+
 - The row is labelled by the **plan identity** (`GLM Personal` / `GLM Team`, localized), so plan remaining is always visually distinct from the context meter `ctx(last)`. It shows the 5-hour and weekly windows (server-provided percentages, complement shown as remaining); the tools pool, exact numbers, reset times and issue details live in `/hud quotas`.
-- **Verification basis:** both query modes were verified against real accounts and compared with the provider console during the research round (`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8); a live end-to-end run of this implementation against the personal credential is recorded in `docs/quota-live-e2e.json` (HUD output cross-checked against a same-minute raw query). The team live E2E reuses the research records; the unverified candidates — `queryMode: "personal"` (type=1) and `region: "global"` — are configuration-diagnostic only and never send a request (`needs-verification`). A team failure never falls back to a personal query.
-- **Safety:** queries are fixed-origin HTTPS GETs (`https://open.bigmodel.cn`), 5 s timeout, 256 KiB body cap, redirects refused, no cookies, no model-request probing; credentials come from Pi's own provider auth at query time and are never stored in the HUD's config or cache (only an opaque fingerprint); diagnostics are redacted (no tokens, headers or raw responses).
+- **Verification basis:** both GLM query modes were verified against real accounts and compared with the provider console during the research round (`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8); a live end-to-end run of this implementation against the personal credential is recorded in `docs/quota-live-e2e.json` (HUD output cross-checked against a same-minute raw query). The team live E2E reuses the research records; the unverified candidates — `queryMode: "personal"` (type=1) and `region: "global"` — are configuration-diagnostic only and never send a request (`needs-verification`). A team failure never falls back to a personal query. The DeepSeek/SiliconFlow balance adapters follow the official documented contracts (`GET /user/balance`, `GET /v1/user/info`, Bearer auth): amounts keep the server's exact decimal text and are never re-summed (total comes from the server, never granted+topped-up), SiliconFlow's three balance fields are normalized from the official openapi examples with CNY as the documented billing currency, and real-account end-to-end runs are pending (see the plan's completion table). A provider whose resolved base URL is a different origin (a relay) is refused with `needs-verification` — relay keys are never sent to the official hosts.
+- **Safety:** queries are fixed-origin HTTPS GETs (GLM `https://open.bigmodel.cn`; DeepSeek `https://api.deepseek.com`; SiliconFlow `https://api.siliconflow.cn`), 5 s timeout, 256 KiB body cap, redirects refused, no cookies, no model-request probing; credentials come from Pi's own provider auth at query time and are never stored in the HUD's config or cache (only an opaque fingerprint); diagnostics are redacted (no tokens, headers or raw responses).
 - **Scheduling:** event-driven only (enable, provider/identity switch, `agent_settled`, manual refresh); the 5-minute TTL never triggers network by itself; manual refresh honors a ≥30 s cooldown and server Retry-After; at most 2 concurrent queries with one per identity; off/shutdown/identity switches discard late results via generation tokens.
-- **Commands:** `/hud quota on|off` (in-memory; off cancels tasks immediately), `/hud quota refresh`, `/hud quotas` (cache state, sources, times and the exact reason a profile is unavailable). Multi-profile matches show `ambiguous-profile` instead of picking by list order. MiniMax/Codex/Gemini/DeepSeek/SiliconFlow adapter names are accepted in configuration for forward compatibility but report `unsupported-adapter` without any request.
+- **Commands:** `/hud quota on|off` (in-memory; off cancels tasks immediately), `/hud quota refresh`, `/hud quotas` (cache state, sources, times and the exact reason a profile is unavailable). Multi-profile matches show `ambiguous-profile` instead of picking by list order. MiniMax/Codex/Gemini adapter names are accepted in configuration for forward compatibility but report `unsupported-adapter` without any request.
 
 Configuration lives in the same `pi-hud.json` (`quota.profiles`, ≤16; organization/project values are account context — keep them out of shared repositories). See [configuration reference](docs/CONFIGURATION.md) and [the plan](docs/PROVIDER-LIMITS-PLAN.zh-CN.md) (Chinese) for the full contract.
 

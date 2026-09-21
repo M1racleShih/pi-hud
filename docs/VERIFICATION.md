@@ -379,3 +379,20 @@ Design: [PROVIDER-LIMITS-PLAN.zh-CN.md](PROVIDER-LIMITS-PLAN.zh-CN.md) (§9 conf
 | Team live E2E | **Deliberately deferred to the research records** (owner decision): the verified team request shape, real team query and console comparison are [GLM-PLAN-SCOPES.zh-CN.md §7–8](GLM-PLAN-SCOPES.zh-CN.md) (2026-09-19); organization/project values were intentionally never persisted. The implemented team path is covered by the injected test set (type=2 URL + scope headers, host-header completion, conflict/needs-scope refusals, no personal fallback, identity isolation). |
 
 Explicitly **not verified** in this slice (kept out of any support claim): `queryMode: "personal"` (type=1), `region: "global"` (international site), other member/permission roles or multi-organization setups, and the MiniMax/Codex/Gemini/DeepSeek/SiliconFlow adapters (interface only; `unsupported-adapter` without requests).
+
+## Provider quota slice 2: DeepSeek + SiliconFlow balance adapters (2026-09-21)
+
+Design: [PROVIDER-LIMITS-PLAN.zh-CN.md](PROVIDER-LIMITS-PLAN.zh-CN.md) §2 API 余额 (implementation-status note), §9/§10. **Default off; no gate was relaxed.**
+
+| Check | Status and scope |
+| --- | --- |
+| Contract basis | DeepSeek: official `GET https://api.deepseek.com/user/balance` reference (`is_available`, `balance_infos[]` with `currency` CNY/USD and `total_balance`/`granted_balance`/`topped_up_balance` decimal strings; Bearer auth). SiliconFlow: official openapi.yaml in `siliconflow/siliconcloud` (`GET https://api.siliconflow.cn/v1/user/info`; envelope `code: 20000`/`status: true`; `data.balance`/`chargeBalance`/`totalBalance`; Bearer auth). Both re-read on 2026-09-21 during implementation. |
+| Regression suite | **324 tests pass / 0 fail** (18 new: official-sample normalization for both adapters, exact-text amounts never re-summed, zero/negative/USD values, invalid-amount partial/protocol/no-data classification, business-envelope failures without message echo, §10 HTTP mapping incl. Retry-After, Bearer prefix never doubled, relay-guard refusals (relay/http/unparsable base URLs), helper unit tests, service end-to-end with injected fetch (request shape, HUD balance view, cache/TTL, `/hud quotas` balance details, business-failure-keeps-values, 401-hides-values), balance rendering both languages/ASCII/negative/unmapped-currency, config validation for the two adapters). No test touches a live account. |
+| `npm run verify` | PASS: boundary scan (three new data-only adapter modules added to the enforced no-builtin list; fetch still confined to the transport boundary), schema/example/defaults in sync, preview unchanged, performance gates unchanged. |
+| `npm run package:check` | PASS: 59 files packed, offline production install, packed entry import. Zero npm runtime dependencies kept. |
+| Pinned SDK contract (`sdk-check`) | PASS against Pi 0.85.1 (quota surface type-check incl. the updated `QuotaService`/view shape). |
+| Usage oracle / RPC / PTY smoke | PASS unchanged (`usage-oracle-check`, RPC smoke, PTY smoke re-run on the new tree). |
+| Real-account E2E | **Not executed yet — recorded as pending, not claimed.** The owner's environment currently has an empty `deepseek` key (Pi's built-in official provider) and no SiliconFlow provider/credential; the existing `dgx-deepseek` provider is a third-party relay and is deliberately refused by the relay guard. Completing the plan's phase-A rule (real read-only query + redacted sample + console comparison) requires the owner to provide official API keys. |
+| Real-TUI balance row | Pending with the real-account E2E above (the render path itself is covered by injected tests at fixed row counts, narrow widths and both languages). |
+
+Explicitly **not verified** in this slice (kept out of any support claim): real-account responses for either service, the SiliconFlow field-meaning inference (`balance` = granted, `chargeBalance` = topped-up, derived from the official example arithmetic; `totalBalance` used verbatim regardless) and the CNY currency normalization for SiliconFlow, and the MiniMax/Codex/Gemini adapters (still `unsupported-adapter` without requests).

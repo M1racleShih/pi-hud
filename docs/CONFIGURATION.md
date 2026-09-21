@@ -35,7 +35,7 @@ Fields may be omitted; defaults fill them. There are no Full/Minimal presets tha
 
 ### Quota profiles
 
-Each profile binds one quota identity to an exact Pi provider. Only `zai` (GLM, region `cn`) is implemented; the other adapter names load for forward compatibility and report `unsupported-adapter` at query time without any request. Credentials are never part of the configuration: the key is resolved from the provider's own auth at query time.
+Each profile binds one quota identity to an exact Pi provider. `zai` (GLM, region `cn`), `deepseek` and `siliconflow` (API balance) are implemented; the other adapter names load for forward compatibility and report `unsupported-adapter` at query time without any request. Credentials are never part of the configuration: the key is resolved from the provider's own auth at query time. For the balance adapters the provider's resolved base URL must be the official origin — a profile bound to a relay provider (different origin) reports `needs-verification` and never sends the relay's key to the official host.
 
 ```json
 {
@@ -44,10 +44,15 @@ Each profile binds one quota identity to an exact Pi provider. Only `zai` (GLM, 
     "enabled": true,
     "profiles": [
       { "id": "glm-personal", "providerId": "zai-coding-cn", "adapter": "zai", "source": "pi", "region": "cn", "plan": "personal", "queryMode": "personal-legacy" },
-      { "id": "glm-team", "providerId": "zai-coding-cn-team", "adapter": "zai", "source": "pi", "region": "cn", "plan": "team", "queryMode": "team", "organizationId": "<your-organization-id>", "projectId": "<your-project-id>" }
-    ]  }
+      { "id": "glm-team", "providerId": "zai-coding-cn-team", "adapter": "zai", "source": "pi", "region": "cn", "plan": "team", "queryMode": "team", "organizationId": "<your-organization-id>", "projectId": "<your-project-id>" },
+      { "id": "ds-balance", "providerId": "deepseek", "adapter": "deepseek", "source": "pi" },
+      { "id": "sf-balance", "providerId": "siliconflow", "adapter": "siliconflow", "source": "pi" }
+    ]
+  }
 }
 ```
+
+The `siliconflow` `providerId` refers to a user-registered custom provider with base URL `https://api.siliconflow.cn/v1` (Pi has no built-in SiliconFlow provider); the `deepseek` id is Pi's built-in official provider.
 
 | Field | Rules |
 | --- | --- |
@@ -60,7 +65,7 @@ Each profile binds one quota identity to an exact Pi provider. Only `zai` (GLM, 
 | `plan` / `queryMode` | required for `zai`; verified combinations: `personal`+`personal-legacy`, `team`+`team`; the `personal` (type=1) candidate is unverified and reports `needs-verification` without requests |
 | `organizationId` / `projectId` | optional account context (1–128 characters, no control characters); a team profile without a complete scope reports `needs-scope` before any request; values conflicting with host-resolved headers report `scope-conflict` |
 | `modelIds` | optional exact model ids (1–16) narrowing the profile inside its provider |
-| `origin` | optional; must equal the adapter's fixed origin for the region (`https://open.bigmodel.cn` for GLM `cn`) |
+| `origin` | optional; must equal the adapter's fixed origin for the region (`https://open.bigmodel.cn` for GLM `cn`; `https://api.deepseek.com` for `deepseek`; `https://api.siliconflow.cn` for `siliconflow`) |
 
 Unknown fields, duplicate ids, invalid combinations and wrong types reject the whole configuration load; the previous valid configuration stays active. Multiple enabled profiles matching the current model show `ambiguous-profile` instead of picking by list order. `/hud quota on|off|refresh` and `/hud quotas` change or inspect this in memory only.
 

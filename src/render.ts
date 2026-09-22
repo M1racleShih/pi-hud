@@ -80,6 +80,42 @@ interface Field extends HudField {}
 export const hudSegment = (role: HudRole, text: string): HudSegment => ({ role, text });
 const seg = hudSegment;
 
+/* ------------------------------------------------------------------ */
+/* Thinking level field (shared by both surfaces)                      */
+/* ------------------------------------------------------------------ */
+
+/** Pi's thinking levels, low to high (extensions.md: /thinking selector). */
+export const THINKING_LEVELS: readonly string[] = Object.freeze(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+/** Short labels behind the `think:` prefix, matching pi-powerline-footer's footer style. */
+const THINKING_SHORT: Readonly<Record<string, string>> = Object.freeze({
+  off: "off", minimal: "min", low: "low", medium: "med", high: "high", xhigh: "xhi", max: "max",
+});
+/** Each known level styles through its own fixed role (see palette.ts); high tiers rainbow. */
+const THINKING_ROLE: Readonly<Record<string, HudRole>> = Object.freeze({
+  off: "thinkOff", minimal: "thinkMinimal", low: "thinkLow", medium: "thinkMedium",
+  high: "thinkHigh", xhigh: "thinkXhigh", max: "thinkMax",
+});
+
+/** Normalize a host thinking-level string to a known level; unknown values stay null. */
+export function normalizeThinkingLevel(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const level = value.trim().toLowerCase();
+  return (THINKING_LEVELS as readonly string[]).includes(level) ? level : null;
+}
+
+/**
+ * The thinking level as a `think:<short>` field with per-level coloring (off dim, then
+ * brighter; high/xhigh/max get the rainbow pass with its saturation ladder in palette.ts).
+ * Unknown or custom level strings degrade to the plain `thinking` role with the raw
+ * text, never an error.
+ */
+export function thinkingField(snapshot: HudSnapshot, config: HudConfig, priority: number): HudField | null {
+  if (!config.showThinking || !snapshot.thinking) return null;
+  const level = normalizeThinkingLevel(snapshot.thinking);
+  if (!level) return field(priority, [seg("thinking", clip(snapshot.thinking, 16, config.ascii))]);
+  return field(priority, [seg(THINKING_ROLE[level]!, `think:${THINKING_SHORT[level]}`)]);
+}
+
 /** Build a field from optional segments; empty fields disappear instead of leaving gaps. */
 export function field(priority: number, candidates: (HudSegment | null | false | "")[]): HudField | null {
   const segments: HudSegment[] = [];
@@ -189,7 +225,7 @@ function identityFields(snapshot: HudSnapshot, config: HudConfig, width: number,
   const projectBudget = Math.max(8, Math.min(32, Math.floor(width / 4)));
   return [
     field(narrow ? NARROW_MODEL_PRIORITY : MODEL_PRIORITY, [seg("model", `[${clip(snapshot.model, modelBudget, config.ascii)}]`)]),
-    config.showThinking && snapshot.thinking ? field(35, [seg("thinking", clip(snapshot.thinking, 16, config.ascii))]) : null,
+    thinkingField(snapshot, config, 35),
     field(85, [seg("path", clip(snapshot.project, projectBudget, config.ascii))]),
     gitField(snapshot, config),
     context,
@@ -358,6 +394,7 @@ export function quotaPlanLabel(planKey: string, language: HudLanguage): string {
   if (planKey === "zai:team") return language === "zh-CN" ? "GLM 团队" : "GLM Team";
   if (planKey === "deepseek") return "DeepSeek";
   if (planKey === "siliconflow") return language === "zh-CN" ? "硅基流动" : "SiliconFlow";
+  if (planKey === "codex") return "Codex";
   const clean = planKey.replace(/[^a-zA-Z0-9:_-]/g, "").slice(0, 24);
   return clean || "plan";
 }

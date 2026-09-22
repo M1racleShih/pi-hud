@@ -217,7 +217,7 @@ test("title, provider, thinking and model updates reach the footer without histo
   const text = plain(f.footer().render(180)).join("\n");
   assert.match(text, /Next Model/);
   assert.match(text, /other-provider/);
-  assert.match(text, /minimal/);
+  assert.match(text, /think:min/);
   assert.match(text, /Goal: footer phase/);
   f.emit("session_shutdown");
 });

@@ -11,34 +11,34 @@ widget rows are unchanged in count (minimal 1 / balanced 2 / full 3).
 Separators are · in Unicode mode and | in ASCII mode.
 
 en / minimal / 120 columns
-[Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
 
 en / balanced / 120 columns
-[Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
 
 en / full / 120 columns
-[Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042
 agents 1 · tasks 3/7 · Build Pi HUD · obs* ↑12k ↓3.0k R75k CH86.2% · spd* 50.0 t/s
 
 zh-CN / minimal / 120 columns
-[Example Model] · high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
 
 zh-CN / balanced / 120 columns
-[Example Model] · high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
 ● 工作中 · 已中断 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · 估算* $0.042 · 代理 1 · 任务 3/7
 
 zh-CN / full / 120 columns
-[Example Model] · high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
 ● 工作中 · 已中断 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · 估算* $0.042
 代理 1 · 任务 3/7 · Build Pi HUD · 观测* ↑12k ↓3.0k R75k CH86.2% · 速度* 50.0 tok/s
 
 width folding (en / balanced)
 40 columns: [Example Model] · pi-hud · ctx(last) 45%  ⏎  ● working · interrupted 1
-80 columns: [Example Model] · high · pi-hud · git:main* · ctx(last) ███░░░ 45%  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042
-120 columns: [Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
-180 columns: [Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
+80 columns: [Example Model] · think:high · pi-hud · git:main* · ctx(last) ███░░░ 45%  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042
+120 columns: [Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
+180 columns: [Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
 
 narrow identity row (40 columns, long model name, context warning keeps its percentage)
 en 45%: [Claude Sonnet 4.5 (…] · ctx(last) 45%
@@ -56,7 +56,7 @@ zh-CN 44 columns:
 代理 1 · 任务 3/7 · Build Pi HUD
 
 no bridge data (en / full / 120 columns): no empty placeholder, the area shows usage only
-[Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
 ✓ ready · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042
 obs* ↑12k ↓3.0k R75k CH86.2% · spd* 50.0 t/s
 
@@ -64,30 +64,49 @@ category overflow (en / balanced / 180 columns): only the top three names, the r
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
 
 ASCII mode (en / balanced / 120 columns, same information)
-[Example Model] | high | pi-hud | git:main* | ctx(last) #####..... 45% 90k/200k
+[Example Model] | think:high | pi-hud | git:main* | ctx(last) #####..... 45% 90k/200k
 > working | interrupted 1 | bash ok14 !1 ~1 | edit ok3 | write ok2 +1 | est* $0.042 | agents 1 | tasks 3/7
 
 alert scoping (en / balanced / 120 columns, context 96%)
-[Example Model] · high · pi-hud · git:main* · ctx(last) ██████████ 96%! 192k/200k
+[Example Model] · think:high · pi-hud · git:main* · ctx(last) ██████████ 96%! 192k/200k
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · est* $0.042 · agents 1 · tasks 3/7
 Only the context field switches to the error color; model, path and separators keep their roles.
 Historical tool failures recolor their own count and mark, never the whole row.
 
+thinking level field (en / minimal / 60 columns): the think: prefix with off/minimal/low/medium
+taking one per-level color each; high/xhigh/max take the per-character rainbow pass
+with a saturation ladder in color mode; the theme palette follows the host
+off      [Example Model] · think:off · pi-hud · ctx(last) ?
+minimal  [Example Model] · think:min · pi-hud · ctx(last) ?
+low      [Example Model] · think:low · pi-hud · ctx(last) ?
+medium   [Example Model] · think:med · pi-hud · ctx(last) ?
+high     [Example Model] · think:high · pi-hud · ctx(last) ?
+xhigh    [Example Model] · think:xhi · pi-hud · ctx(last) ?
+max      [Example Model] · think:max · pi-hud · ctx(last) ?
+thinkingOff..thinkingMax border tokens instead.
+
 palette roles: role, pastel dark, pastel light, theme token
-model      #e5c890  #df8e1d  accent
-thinking   #d8c39a  #c08a2e  thinkingText
-path       #a6d189  #40a02b  success
-git        #8caaee  #1e66f5  mdLink
-phase      #ca9ee6  #8839ef  customMessageLabel
-context    #ef9f76  #fe640b  mdHeading
-body       #c6d0f5  #4c4f69  text
-label      #838ba7  #9ca0b0  muted
-separator  #838ba7  #9ca0b0  dim
-success    #a6d189  #40a02b  success
-warning    #f9e2af  #9a6700  warning
-error      #e78284  #d20f39  error
-barUsed    #ef9f76  #fe640b  mdHeading
-barEmpty   #6c7086  #ccd0da  dim
+model         #e5c890  #df8e1d  accent
+thinking      #d8c39a  #c08a2e  thinkingText
+path          #a6d189  #40a02b  success
+git           #8caaee  #1e66f5  mdLink
+phase         #ca9ee6  #8839ef  customMessageLabel
+context       #ef9f76  #fe640b  mdHeading
+body          #c6d0f5  #4c4f69  text
+label         #838ba7  #9ca0b0  muted
+separator     #838ba7  #9ca0b0  dim
+success       #a6d189  #40a02b  success
+warning       #f9e2af  #9a6700  warning
+error         #e78284  #d20f39  error
+barUsed       #ef9f76  #fe640b  mdHeading
+barEmpty      #6c7086  #ccd0da  dim
+thinkOff      #8087a2  #7c7f93  thinkingOff
+thinkMinimal  #f4dbd6  #dc8a78  thinkingMinimal
+thinkLow      #91d7e3  #04a5e5  thinkingLow
+thinkMedium   #ed8796  #ea76cb  thinkingMedium
+thinkHigh     #ca9ee6  #8839ef  thinkingHigh
+thinkXhigh    #ed8796  #ea76cb  thinkingXhigh
+thinkMax      #eed49f  #df8e1d  thinkingMax
 
 mono and color:false render the same text without any escape sequences.
 
@@ -95,43 +114,43 @@ footer surface (surface: footer) — body rows are fixed at minimal 2 / balanced
 extension statuses use a separate bounded area of at most 2 rows, 8 entries and 64 characters each.
 
 en / minimal / 120 columns
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 ctx(last) █████░░░░░ 45% 90k/200k · est* $0.042 · ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 
 en / balanced / 120 columns
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 ctx(last) █████░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042 · spd* 50.0 t/s
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 
 en / full / 120 columns
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 ctx(last) █████░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042 · spd* 50.0 t/s
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 agents 1 · tasks 3/7 · Build Pi HUD
 
 zh-CN / minimal / 120 columns
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 上下文(上次) █████░░░░░ 45% 90k/200k · 估算* $0.042 · ● 工作中 · 已中断 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 
 zh-CN / balanced / 120 columns
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 上下文(上次) █████░░░░░ 45% 90k/200k · 观测* ↑12k ↓3.0k R75k CH86.2% · 估算* $0.042 · 速度* 50.0 tok/s
 ● 工作中 · 已中断 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 
 zh-CN / full / 120 columns
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 上下文(上次) █████░░░░░ 45% 90k/200k · 观测* ↑12k ↓3.0k R75k CH86.2% · 估算* $0.042 · 速度* 50.0 tok/s
 ● 工作中 · 已中断 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 代理 1 · 任务 3/7 · Build Pi HUD
 
 footer width folding (en / balanced)
 40 columns: [Example Model] · ~/opensource/pi-hud  ⏎  ctx(last) 45% · est* $0.042  ⏎  ● working · interrupted 1
-80 columns: [Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs  ⏎  ctx(last) ███░░░ 45% · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
-120 columns: [Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs  ⏎  ctx(last) █████░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042 · spd* 50.0 t/s  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
-180 columns: [Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs  ⏎  ctx(last) █████░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042 · spd* 50.0 t/s  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
+80 columns: [Example Model] · think:high · demo · ~/opensource/pi-hud · git:main*  ⏎  ctx(last) ███░░░ 45% · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
+120 columns: [Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs  ⏎  ctx(last) █████░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042 · spd* 50.0 t/s  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
+180 columns: [Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs  ⏎  ctx(last) █████░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042 · spd* 50.0 t/s  ⏎  ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 
 footer with other-extension statuses (en / balanced / 120 columns, then 40 columns)
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 ctx(last) █████░░░░░ 45% 90k/200k · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042 · spd* 50.0 t/s
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 goal active · automatic · surface footer
@@ -142,7 +161,7 @@ ctx(last) 45% · est* $0.042
 goal active · automatic · surface footer
 
 footer ASCII mode (en / full / 120 columns, same information)
-[Example Model] | high | demo | ~/opensource/pi-hud | git:main* | Compare HUDs
+[Example Model] | think:high | demo | ~/opensource/pi-hud | git:main* | Compare HUDs
 ctx(last) #####..... 45% 90k/200k | obs* in12k out3.0k R75k CH86.2% | est* $0.042 | spd* 50.0 t/s
 > working | interrupted 1 | bash ok14 !1 ~1 | edit ok3 | write ok2 +1
 agents 1 | tasks 3/7 | Build Pi HUD
@@ -150,10 +169,10 @@ goal active · automatic | surface footer
 
 footer identity folding (en / balanced): session title folds before the branch, provider and cwd
 40 columns: [Example Model] · ~/opensource/pi-hud
-80 columns: [Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+80 columns: [Example Model] · think:high · demo · ~/opensource/pi-hud · git:main*
 
 footer unknown data (en / balanced / 120 columns): no usage observed, no cache denominator, unknown cost
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
 ctx(last) ? · est* ?
 ✓ ready
 
@@ -163,7 +182,7 @@ footer 95% context warning keeps its percentage at 40/80 columns (long Chinese m
 120 columns: 上下文(上次) ██████████ 95%! 190k/200k · 观测* ↑12k ↓3.0k R75k CH86.2% · 估算* $0.042 · 速度* 50.0 tok/s
 
 status area folding (en / balanced / 80 columns, 20 statuses): entries beyond the cap fold into +N
-[Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
+[Example Model] · think:high · demo · ~/opensource/pi-hud · git:main*
 ctx(last) ███░░░ 45% · obs* ↑12k ↓3.0k R75k CH86.2% · est* $0.042
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1
 status text number 0 · status text number 1 · status text number 2
@@ -177,23 +196,23 @@ and narrow footers drop the token field). ctx(last), CH and tool categories keep
 observed scope. An unavailable host surface degrades to the observed-labelled fields.
 
 session ready (en / full / 120 columns)
-[Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · sess* $0.384
 agents 1 · tasks 3/7 · Build Pi HUD · sess* ↑61k ↓15k R312k W9.4k CH86.2% · spd* 50.0 t/s
 
 session updating during a rebuild (old snapshot kept and marked)
-[Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · sess* ↻ $0.384
 agents 1 · tasks 3/7 · Build Pi HUD · sess* ↻ ↑61k ↓15k R312k W9.4k CH86.2% · spd* 50.0 t/s
 
 session partial: two summaries lack usage, so the cost field keeps its known
 subtotal with +?; missing token fields would mark the same +? next to the label
-[Example Model] · high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · ctx(last) █████░░░░░ 45% 90k/200k
 ● working · interrupted 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · sess* $0.384+?
 agents 1 · tasks 3/7 · Build Pi HUD · sess* +? ↑61k ↓15k R312k W9.4k CH86.2% · spd* 50.0 t/s
 
 session loading (zh-CN / full / 120 columns): totals unknown, ctx(last) still observed
-[Example Model] · high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
+[Example Model] · think:high · pi-hud · git:main* · 上下文(上次) █████░░░░░ 45% 90k/200k
 ● 工作中 · 已中断 1 · bash ✓14 !1 ~1 · edit ✓3 · write ✓2 +1 · 全会话* ?
 代理 1 · 任务 3/7 · Build Pi HUD · 全会话* ? CH86.2% · 速度* 50.0 tok/s
 
@@ -215,7 +234,7 @@ no bridge data; saturated, updating and incomplete at once)
 Counters clip first; the sess* scope and the ↻/+?/limited* markers stay readable.
 
 session ASCII mode (en / full / 120 columns)
-[Example Model] | high | pi-hud | git:main* | ctx(last) #####..... 45% 90k/200k
+[Example Model] | think:high | pi-hud | git:main* | ctx(last) #####..... 45% 90k/200k
 > working | interrupted 1 | bash ok14 !1 ~1 | edit ok3 | write ok2 +1 | sess* $0.384
 agents 1 | tasks 3/7 | Build Pi HUD | sess* in61k out15k R312k W9.4k CH86.2% | spd* 50.0 t/s
 

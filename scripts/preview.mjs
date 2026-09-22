@@ -131,8 +131,21 @@ export function renderPreview() {
   push("Only the context field switches to the error color; model, path and separators keep their roles.");
   push("Historical tool failures recolor their own count and mark, never the whole row.");
   push("");
+  push("thinking level field (en / minimal / 60 columns): the think: prefix with off/minimal/low/medium");
+  push("taking one per-level color each; high/xhigh/max take the per-character rainbow pass");
+  push("with a saturation ladder in color mode; the theme palette follows the host");
+  {
+    const config = normalizeConfig({ preset: "minimal", color: false });
+    for (const level of ["off", "minimal", "low", "medium", "high", "xhigh", "max"]) {
+      const value = new HudState("/workspace/pi-hud", { id: "example-model", name: "Example Model", provider: "demo", contextWindow: 200_000 }, 0);
+      value.thinking = level;
+      push(`${level.padEnd(8)} ${formatHud(value.snapshot(), config, 60)[0].text}`);
+    }
+  }
+  push("thinkingOff..thinkingMax border tokens instead.");
+  push("");
   push("palette roles: role, pastel dark, pastel light, theme token");
-  for (const role of HUD_ROLES) push(`${role.padEnd(10)} ${PASTEL_DARK[role]}  ${PASTEL_LIGHT[role]}  ${THEME_ROLES[role]}`);
+  for (const role of HUD_ROLES) push(`${role.padEnd(13)} ${PASTEL_DARK[role]}  ${PASTEL_LIGHT[role]}  ${THEME_ROLES[role]}`);
   push("");
   push("mono and color:false render the same text without any escape sequences.");
   push("");

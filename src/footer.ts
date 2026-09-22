@@ -17,7 +17,7 @@
  * place, so nothing smaller than a value comparison can detect a change.
  */
 import { clip, safeText, visibleWidth } from "./text.ts";
-import { LABELS, activityField, agentsField, assembleRow, bridgeFields, compactionField, contextField, costField, field, hudSegment, quotaField, speedField, tasksField, tokensField, toolCategoriesField } from "./render.ts";
+import { LABELS, activityField, agentsField, assembleRow, bridgeFields, compactionField, contextField, costField, field, hudSegment, quotaField, speedField, tasksField, thinkingField, tokensField, toolCategoriesField } from "./render.ts";
 import type { HudField, HudRow, HudSegment, HudWords, WidgetTui } from "./render.ts";
 import { createStyler } from "./palette.ts";
 import type { HudStyler, HudThemeLike } from "./palette.ts";
@@ -103,11 +103,6 @@ function modelField(snapshot: HudSnapshot, config: HudConfig, width: number): Hu
   return field(100, [hudSegment("model", `[${clip(snapshot.model, budget, config.ascii)}]`)]);
 }
 
-function thinkingField(snapshot: HudSnapshot, config: HudConfig): HudField | null {
-  if (!config.showThinking || !snapshot.thinking) return null;
-  return field(45, [hudSegment("thinking", clip(snapshot.thinking, 16, config.ascii))]);
-}
-
 function providerField(identity: HudIdentity, config: HudConfig): HudField | null {
   if (!identity.provider) return null;
   return field(60, [hudSegment("label", clip(identity.provider, 24, config.ascii))]);
@@ -134,7 +129,7 @@ function titleField(identity: HudIdentity, config: HudConfig, width: number): Hu
 function identityRowFields(snapshot: HudSnapshot, config: HudConfig, width: number, identity: HudIdentity): (HudField | null)[] {
   return [
     modelField(snapshot, config, width),
-    thinkingField(snapshot, config),
+    thinkingField(snapshot, config, 45),
     providerField(identity, config),
     cwdField(identity, config, width),
     branchField(identity, config),

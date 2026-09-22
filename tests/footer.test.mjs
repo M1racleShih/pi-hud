@@ -408,3 +408,27 @@ test("the footer usage row shows spd* after cost and folds it before tokens and 
   assert.ok(narrow[1].text.includes("obs*") || narrow[1].text.includes("est*") || narrow[1].text.includes("ctx"), "higher-priority usage fields survive");
   assert.equal(speedField(state.snapshot(), normalizeConfig({ showSpeed: false }), LABELS.en), null);
 });
+
+// ---------------------------------------------------------------------------
+// Thinking level field: footer/widget parity for the per-level think: field.
+// ---------------------------------------------------------------------------
+
+test("the footer identity row carries the same per-level think: field as the widget", () => {
+  const expected = { off: "think:off", minimal: "think:min", low: "think:low", medium: "think:med", high: "think:high", xhigh: "think:xhi", max: "think:max" };
+  for (const [level, text] of Object.entries(expected)) {
+    const value = state();
+    value.thinking = level;
+    const snapshot = value.snapshot();
+    const [footerRow] = formatFooter(snapshot, config({ preset: "balanced" }), 180, identity());
+    const footerSegment = footerRow.segments.find((segment) => segment.text === text);
+    const [widgetRow] = formatHud(snapshot, config({ preset: "minimal" }), 180);
+    const widgetSegment = widgetRow.segments.find((segment) => segment.text === text);
+    assert.ok(footerSegment, `${level}: ${footerRow.text}`);
+    assert.ok(widgetSegment, `${level}: ${widgetRow.text}`);
+    assert.equal(footerSegment.role, widgetSegment.role);
+  }
+});
+test("the default fixture shows think:max after the model name", () => {
+  const wide = rows(state().snapshot(), "balanced", 180)[0];
+  assert.match(wide, /\[GLM-5\.3\] · think:max · zai/);
+});

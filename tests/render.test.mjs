@@ -660,3 +660,61 @@ test("the full widget row carries spd* behind the usage counters and folds it fi
   // No measurement yet: no placeholder anywhere at any width.
   for (const width of WIDTHS) assert.ok(!formatHud(snapshot(), config, width).at(-1).text.includes("spd"));
 });
+
+// ---------------------------------------------------------------------------
+// Thinking level field: think:<short> labels, per-level roles, safe fallbacks.
+// ---------------------------------------------------------------------------
+
+import { THINKING_LEVELS, normalizeThinkingLevel, thinkingField } from "../src/render.ts";
+
+test("normalizeThinkingLevel accepts the host levels case-insensitively and rejects the rest", () => {
+  assert.deepEqual([...THINKING_LEVELS], ["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
+  for (const [raw, level] of [
+    ["off", "off"], ["minimal", "minimal"], ["low", "low"], ["medium", "medium"],
+    ["high", "high"], ["xhigh", "xhigh"], ["max", "max"],
+    [" High ", "high"], ["MAX", "max"],
+  ]) {
+    assert.equal(normalizeThinkingLevel(raw), level);
+  }
+  for (const bad of ["", "  ", "ultra", "ultrathink", "high\x1b[31m", 42, null, undefined]) {
+    assert.equal(normalizeThinkingLevel(bad), null);
+  }
+});
+test("the thinking field shows think:<short> with the per-level role on both layout paths", () => {
+  const expected = {
+    off: ["think:off", "thinkOff"], minimal: ["think:min", "thinkMinimal"], low: ["think:low", "thinkLow"],
+    medium: ["think:med", "thinkMedium"], high: ["think:high", "thinkHigh"],
+    xhigh: ["think:xhi", "thinkXhigh"], max: ["think:max", "thinkMax"],
+  };
+  for (const [level, [text, role]] of Object.entries(expected)) {
+    const state = new HudState("/tmp/p", MODEL, 0);
+    state.thinking = level;
+    const config = normalizeConfig({ preset: "minimal" });
+    const direct = thinkingField(state.snapshot(), config, 35);
+    assert.equal(direct.text, text);
+    assert.equal(direct.segments[0].role, role);
+    // The widget identity row carries the same segment.
+    const [row] = formatHud(state.snapshot(), config, 180);
+    const segment = row.segments.find((item) => item.text === text);
+    assert.ok(segment, `${level}: ${row.text}`);
+    assert.equal(segment.role, role);
+  }
+});
+test("unknown thinking levels degrade to the plain thinking role and showThinking hides the field", () => {
+  const state = new HudState("/tmp/p", MODEL, 0);
+  state.thinking = "ultra-deep";
+  const config = normalizeConfig({ preset: "minimal" });
+  const direct = thinkingField(state.snapshot(), config, 35);
+  assert.equal(direct.text, "ultra-deep");
+  assert.equal(direct.segments[0].role, "thinking");
+  const hidden = thinkingField(state.snapshot(), normalizeConfig({ preset: "minimal", showThinking: false }), 35);
+  assert.equal(hidden, null);
+  state.thinking = "";
+  assert.equal(thinkingField(state.snapshot(), config, 35), null);
+});
+test("a long custom thinking value stays clipped to the 16-cell budget", () => {
+  const state = new HudState("/tmp/p", MODEL, 0);
+  state.thinking = "x".repeat(200);
+  const direct = thinkingField(state.snapshot(), normalizeConfig({ preset: "minimal", ascii: true }), 35);
+  assert.equal(visibleWidth(direct.text), 16);
+});

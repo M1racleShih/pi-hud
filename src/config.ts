@@ -39,7 +39,7 @@ export type QuotaAdapterName = "zai" | "minimax" | "codex" | "gemini-cli" | "dee
 export type QuotaSourceName = "pi" | "codex-app-server";
 export type QuotaRegionName = "cn" | "global";
 export type QuotaPlanName = "personal" | "team";
-export type QuotaQueryMode = "personal-legacy" | "personal" | "team";
+export type QuotaQueryMode = "personal-legacy" | "team";
 
 /** One quota identity binding. Never carries credentials: keys are resolved from the
  *  host at query time, so no profile field can store a raw key or token. */
@@ -124,8 +124,10 @@ const own = (value: object, key: string) => Object.hasOwn(value, key);
 
 const QUOTA_ADAPTERS: readonly QuotaAdapterName[] = ["zai", "minimax", "codex", "gemini-cli", "deepseek", "siliconflow"];
 const QUOTA_REGIONAL: readonly QuotaAdapterName[] = ["zai", "minimax"];
-/** Verified plan/queryMode combinations (docs/GLM-PLAN-SCOPES.zh-CN.md §2/§9). */
-const ZAI_MODES: readonly [QuotaPlanName, QuotaQueryMode][] = [["personal", "personal-legacy"], ["personal", "personal"], ["team", "team"]];
+/** Verified plan/queryMode combinations (docs/GLM-PLAN-SCOPES.zh-CN.md §2/§9). The
+ * type=1 `personal` candidate was dropped from scope (owner decision 2026-09-22);
+ * configs naming it are rejected at load instead of reaching the adapter. */
+const ZAI_MODES: readonly [QuotaPlanName, QuotaQueryMode][] = [["personal", "personal-legacy"], ["team", "team"]];
 /** Adapter-fixed https origins per plan §9: the optional `origin` field must equal
  *  the adapter's fixed domain (never an arbitrary query URL). Regional adapters
  *  (zai/minimax) choose by region; balance adapters have one fixed origin each. */

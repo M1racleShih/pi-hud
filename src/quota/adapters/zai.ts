@@ -8,10 +8,12 @@
  * - `team`: `type=2` plus the `bigmodel-organization`/`bigmodel-project` scope
  *   headers bound to this profile (verified against the team "my usage" console).
  *
- * The unverified candidates — `queryMode: "personal"` (type=1) and `region:
- * "global"` — are configuration-diagnostic only: they are refused with
- * `needs-verification` and never send a request. Team failures never fall back to
- * a personal query, and no `type` values are ever probed.
+ * The unverified candidate — `region: "global"` — is configuration-diagnostic
+ * only: it is refused with `needs-verification` and never sends a request. The
+ * type=1 `personal` query mode was dropped from scope (owner decision
+ * 2026-09-22) and is rejected at config load, so it never reaches the adapter.
+ * Team failures never fall back to a personal query, and no `type` values are
+ * ever probed.
  *
  * Response normalization follows the §9 mapping table exactly:
  * `TOKENS_LIMIT` is a percentage (never a token count); unit 3/6/5 maps to
@@ -71,10 +73,6 @@ export function zaiPrepare(input: ZaiPrepareInput): ZaiPrepareResult {
     return issue("needs-verification", false, "region global is not verified for the GLM quota API");
   }
   const queryMode = profile.queryMode ?? "";
-  if (queryMode === "personal") {
-    // type=1 candidate: refused until an account-verified contract exists.
-    return issue("needs-verification", false, "queryMode personal (type=1) is not verified");
-  }
   if (scope.conflict) {
     return issue("scope-conflict", false, "profile scope disagrees with host-resolved headers");
   }

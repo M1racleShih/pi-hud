@@ -1,6 +1,6 @@
 # Provider 套餐额度与 API 余额方案
 
-状态：阶段 A 首切片与 API 余额切片已实现（2026-09-21：公共额度基础 + GLM 国内个人/团队两 profile，默认关闭；2026-09-21 第二切片：DeepSeek / 硅基流动余额适配器，按官方文档契约实现、真实账号 E2E 待完成。证据见 [VERIFICATION](VERIFICATION.md) 的额度章节与 [quota-live-e2e.json](quota-live-e2e.json)、[quota-tui-stream.json](quota-tui-stream.json)）。MiniMax / Codex / Gemini 仍为设计态。调研日期：2026-09-19。目标宿主：Pi 0.85.1。
+状态：阶段 A 首切片与 API 余额切片已实现（2026-09-21：公共额度基础 + GLM 国内个人/团队两 profile，默认关闭；2026-09-21 第二切片：DeepSeek / 硅基流动余额适配器，按官方文档契约实现；2026-09-22：DeepSeek 真实账号只读 E2E 已完成并通过同分钟原始查询交叉核对，GLM 团队 live E2E 已补齐（作用域值仅运行时提供、未持久化），硅基流动因无官方 key 本轮不做、保持待实测；2026-09-22 第三切片：Codex 订阅适配器已按官方 App Server 协议（codex-cli 0.155.1）实现并完成真实账号只读 E2E。证据见 [VERIFICATION](VERIFICATION.md) 的额度章节与 [quota-live-e2e.json](quota-live-e2e.json)、[quota-tui-stream.json](quota-tui-stream.json)）。MiniMax / Codex / Gemini 仍为设计态。调研日期：2026-09-19。目标宿主：Pi 0.85.1。
 
 本文件确定首版范围、接入方式和验收标准；除已标注实现的切片外，不代表当前版本已具备这些能力。已核对本地源码、Pi SDK 类型、官方文档及部分官方客户端源码；已对当前 GLM 个人和团队凭据分别完成真实只读查询，并与对应控制台截图对照；其他服务尚未完成账号验证。上游 main 分支链接是调研依据，实施时必须记录实际版本或 commit，并保存脱敏响应样本。
 
@@ -31,7 +31,7 @@ OpenRouter 留作下一批：账户 credits 需要 management key，普通 key �
 
 ### Z.ai / 智谱
 
-个人/团队查询需要独立处理，详见 [GLM 套餐作用域专项调研](GLM-PLAN-SCOPES.zh-CN.md)。已核对的团队实现使用 `?type=2` 和 `bigmodel-organization`、`bigmodel-project` 请求头。新版个人候选 `type=1` 及其上下文要求尚待账号实测；下述官方脚本只证明旧请求模式，不能作为所有套餐的统一实现。当前个人不带 type、团队 type=2 + 组织/项目的查询均已实测成功；团队响应为 CREDIT_LIMIT，remaining 与总额减已用存在微小差异，必须使用服务端原值。首版必须覆盖个人与团队共存、切换及缓存隔离，团队失败不得回退个人查询。
+个人/团队查询需要独立处理，详见 [GLM 套餐作用域专项调研](GLM-PLAN-SCOPES.zh-CN.md)。已核对的团队实现使用 `?type=2` 和 `bigmodel-organization`、`bigmodel-project` 请求头。新版个人候选 `type=1` 已移出范围（所有者 2026-09-22 决定，配置加载即拒绝）；下述官方脚本只证明旧请求模式，不能作为所有套餐的统一实现。当前个人不带 type、团队 type=2 + 组织/项目的查询均已实测成功；团队响应为 CREDIT_LIMIT，remaining 与总额减已用存在微小差异，必须使用服务端原值。首版必须覆盖个人与团队共存、切换及缓存隔离，团队失败不得回退个人查询。
 
 [官方查询脚本](https://github.com/zai-org/zai-coding-plugins/blob/main/plugins/glm-plan-usage/skills/usage-query-skill/scripts/query-usage.mjs) 使用 `GET /api/monitor/usage/quota/limit`，支持 `api.z.ai` 和 `open.bigmodel.cn` 等主机，并把凭据原样放入 Authorization。适配时核对原始 key 格式，不能统一擅加 Bearer。只查询所需 quota，不复制脚本额外的历史用量请求。
 
@@ -53,13 +53,15 @@ Pi 的 Codex OAuth 与本机 Codex 登录可能属于不同账号。能验证身
 
 这是官方客户端使用的内部接口，不能称为稳定公开 API。适配器须隔离实现、固定参考版本并具备协议变更降级。仅在服务端返回值有效时显示剩余比例；缺少单位时只显示比例，不把 remainingAmount 自动标成 token，不推算总额度。
 
+**实现状态（2026-09-22 第三切片）**：Codex 适配器已实现并完成真实账号只读 E2E（证据见 [quota-live-e2e.json](quota-live-e2e.json) `codex` 节与 [VERIFICATION](VERIFICATION.md) 切片 3）。已验证契约（codex-cli 0.155.1，`codex app-server generate-json-schema` 固定）：stdio 上的换行分隔 JSON-RPC；`initialize`（clientInfo 必填）→ `initialized`（唯一客户端通知）→ `account/rateLimits/read`；响应含必填单桶 `rateLimits` 与多桶 `rateLimitsByLimitId`；窗口 `{usedPercent 整数（必填）, resetsAt unix 秒, windowDurationMins}`，300 分钟→5 小时窗、10080→周窗、43200→月窗，其余时长保持未知窗口；`planType` 枚举作套餐标签。运行时发现并已固化：**请求后立即关 stdin 是关停信号**（子进程不答即退出 0），驱动保持 stdin 打开、拿到答案后回收子进程；服务端会主动推无关通知（如 remoteControl/status/changed），读取端按 id 匹配跳过；子进程继承宿主环境（需出网代理的网络须在 Pi 运行环境设好，HUD 不读取、不存储、不注入代理配置）。进程边界：`spawn` 仅限 `src/quota/codex-process.ts` 标记边界，同步变体全局禁止，check.mjs 同时断言 `node:child_process` import 存在。总期限下限 10 秒（冷启动+一次后端读不满足 5 秒 HTTP 默认），单帧 256 KiB、总输出 1 MiB、SIGTERM→SIGKILL 升级。凭据语义：该源不解析任何 Pi 凭据（authResolutions 恒 0），子进程用本机 codex 登录；身份与 Pi openai-codex 账号的一致性在调研中观察到匹配但适配器不做自动核验（方案原文的显式标注原则不变）。
+
 [Gemini API 计费文档](https://ai.google.dev/gemini-api/docs/billing) 将余额管理放在 AI Studio Billing；本次未确认可用普通 API key 查询余额的公开接口，因此该路径不承诺余额展示。
 
 ### API 余额
 
 [DeepSeek 文档](https://api-docs.deepseek.com/zh-cn/api/get-user-balance/) 提供余额查询；[硅基流动文档](https://siliconflow.readme.io/reference/user-info) 提供用户余额信息。均通过对应 provider 的 API key 认证，保留服务端币种与金额语义。金额采用十进制字符串或明确精度的表示，避免浮点累加与重复加总充值、赠金、总额。
 
-**实现状态（2026-09-21 第二切片）**：两个适配器已按官方契约实现（DeepSeek `GET /user/balance`，响应含 `is_available` 与 `balance_infos[]`（currency/total/granted/topped_up，官方枚举 CNY/USD）；硅基流动 `GET /v1/user/info`，`code=20000 && status=true` 包裹，`data.balance/chargeBalance/totalBalance` 三个字段含义按官方 openapi 示例算术（0.88+88.00=88.88）归一化为赠送/充值/总额，响应无币种字段，按文档计费币种固定 CNY——此推断待真实账号核对）。共同约束：金额保留服务端原文，不从分项加总总额；零/负值为合法服务端值；中转防护——provider 解析出的 baseUrl 源与官方源不一致时拒绝（needs-verification），中转密钥不发官方域名。**真实账号只读 E2E 尚未执行**（需所有者提供两家的有效 API key，或在完成度表中保持待实测状态，不得据 mock 宣称账号验证完成）。
+**实现状态（2026-09-22 更新）**：DeepSeek 适配器已完成真实账号只读 E2E（宿主从环境变量解析官方 key，HUD 行 `DeepSeek · ¥66.90`，与同分钟原始查询交叉核对，两条读数间的 0.05 元差为账户实时消耗；证据见 [quota-live-e2e.json](quota-live-e2e.json) `deepseek` 节）——验证范围限单一 CNY 账户一次读数，USD 品种仍由官方样本注入测试覆盖。硅基流动适配器已按官方 openapi 契约实现（`code=20000 && status=true` 包裹，`data.balance/chargeBalance/totalBalance` 三字段含义按官方示例算术归一化为赠送/充值/总额，响应无币种字段，按文档计费币种固定 CNY），但真实账号 E2E 未执行（所有者 2026-09-22 决定本轮不做，无官方 key）——字段含义与 CNY 推断保持待实测状态，不得宣称账号验证完成。共同约束：金额保留服务端原文，不从分项加总总额；零/负值为合法服务端值；中转防护——provider 解析出的 baseUrl 源与官方源不一致时拒绝（needs-verification），中转密钥不发官方域名。
 
 后续 [OpenRouter credits](https://openrouter.ai/docs/api/api-reference/credits/get-remaining-credits) 与 [key 信息](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-api-key) 分别映射账户余额和 key 限额，不合并为一个余额值。
 
@@ -133,7 +135,7 @@ Pi 的 Codex OAuth 与本机 Codex 登录可能属于不同账号。能验证身
 }
 ```
 
-`adapter` 是逻辑适配器，`providerId` 精确绑定 Pi 原生或自定义 provider；上例 GLM ID 对应本次检查的用户扩展。采用多个 profile 而非每个服务商一个配置，允许个人和团队并存。保留现有 TS provider 注册方式，HUD 不读取其源码，也不改动模型请求。当前个人示例已按真实成功请求选用 personal-legacy；新版个人 queryMode 仍需单独验证，不能假定可直接使用。区域、project、Codex 可执行路径与账号绑定配置在接口验证阶段定稿。配置只保存必要参数或环境变量引用，不写原始 key、refresh token、cookie；组织/项目等账号上下文不提交到公共仓库。
+`adapter` 是逻辑适配器，`providerId` 精确绑定 Pi 原生或自定义 provider；上例 GLM ID 对应本次检查的用户扩展。采用多个 profile 而非每个服务商一个配置，允许个人和团队并存。保留现有 TS provider 注册方式，HUD 不读取其源码，也不改动模型请求。当前个人示例已按真实成功请求选用 personal-legacy；type=1 的 `personal` queryMode 已移出范围（所有者 2026-09-22 决定），配置加载即拒绝。区域、project、Codex 可执行路径与账号绑定配置在接口验证阶段定稿。配置只保存必要参数或环境变量引用，不写原始 key、refresh token、cookie；组织/项目等账号上下文不提交到公共仓库。
 
 拟新增命令：
 
@@ -167,7 +169,7 @@ DeepSeek · ¥128.50
 
 ### 阶段 A：六类接口与身份验证
 
-为每个适配器固定上游参考版本、确认 Pi provider ID/认证结构，记录请求方法、主机、权限、响应口径和脱敏样本。优先解决 GLM 个人/团队的 type 与组织/项目作用域、积分单位和比例方向、Codex 登录绑定、Gemini token/project 获取。GLM 当前个人和团队的成功查询已完成，优先据此实现；新版个人 type=1 保持待验证状态，不能借用旧个人结果宣称支持。国际站和其他权限角色分别验收，详见专项调研。
+为每个适配器固定上游参考版本、确认 Pi provider ID/认证结构，记录请求方法、主机、权限、响应口径和脱敏样本。优先解决 GLM 个人/团队的 type 与组织/项目作用域、积分单位和比例方向、Codex 登录绑定、Gemini token/project 获取。GLM 当前个人和团队的成功查询已完成，优先据此实现；新版个人 type=1 已移出范围（所有者 2026-09-22 决定），不能借用旧个人结果宣称支持。国际站和其他权限角色分别验收，详见专项调研。
 
 使用专门的只读查询验证，不发生成请求。没有相应测试账号时标记“待实测”，不能据 mock 宣称支持完成，也不能默默移出首版范围。范围变化须明确记录。
 
@@ -203,7 +205,7 @@ DeepSeek · ¥128.50
 | source | pi 或 codex-app-server；与适配器做组合校验 |
 | enabled | 单个实例默认 true；全局关闭优先 |
 | region | 有区域差异的适配器必须明确配置；GLM 当前 cn，国际站 global 单独验证 |
-| plan / queryMode | GLM 必填；personal + personal-legacy、team + team 为已验证组合；候选 personal 模式在未验证前不可查询 |
+| plan / queryMode | GLM 必填；personal + personal-legacy、team + team 为已验证组合；type=1 的 personal 模式已移出范围（所有者 2026-09-22 决定），配置加载即拒绝 |
 | organizationId / projectId | 仅作为查询上下文；组织/项目缺项与不匹配须显式报错 |
 | modelIds | 可选精确模型 ID 列表，用于同 provider 下进一步匹配；不接受可执行表达式 |
 | origin | 可选约束当前模型有效 origin，必须与适配器固定域名表吻合；不是任意查询 URL |
@@ -245,18 +247,20 @@ GLM 团队可从宿主已解析 headers 取得 scope，也可由 profile 补齐�
 
 先完成已实测的两个国内 profile，以验证同 provider 家族多个计费身份共存，再将公共能力用于其余首版适配器。此顺序不改变六类首版范围。
 
-具体字段映射、合成样本和回归验收见 [GLM 实施契约](GLM-PLAN-SCOPES.zh-CN.md#9-glm-实施契约)。这两条成功路径不再依赖新的账号调研即可编码；运行时身份解析、取消和布局仍需测试。未经验证的 type=1 不作为已知个人套餐的替代路径。
+具体字段映射、合成样本和回归验收见 [GLM 实施契约](GLM-PLAN-SCOPES.zh-CN.md#9-glm-实施契约)。这两条成功路径不再依赖新的账号调研即可编码；运行时身份解析、取消和布局仍需测试。未经验证的 type=1 已移出范围（所有者 2026-09-22 决定），配置加载即拒绝，不作为已知个人套餐的替代路径。
 
 ## 12. 完成度与后续交付
 
 | 项目 | 当前状态 | 后续交付 |
 | --- | --- | --- |
 | GLM 国内个人旧查询 | API 成功并与控制台对照；适配器已实现 | 后续仅维护 |
-| GLM 国内团队查询 | API 成功并与控制台对照；适配器已实现 | 后续仅维护 |
-| GLM 新个人 type=1 / 国际站 | 待相应账号验证 | 独立契约与证据，未完成前明确不可用 |
-| DeepSeek 余额 | 适配器已按官方文档契约实现（含中转防护） | 真实账号只读 E2E 与脱敏样本；未完成前标注待实测 |
-| 硅基流动余额 | 适配器已按官方 openapi 契约实现（字段含义推断 + CNY 待核对） | 真实账号只读 E2E 核对三字段含义与币种；未完成前标注待实测 |
-| MiniMax、Codex、Gemini | 已有文档或源码接入依据，未完成本项目账号实测 | 逐项完成阶段 A–D |
+| GLM 国内团队查询 | API 成功并与控制台对照；适配器已实现；live E2E 已补齐（2026-09-22，作用域值仅运行时提供） | 后续仅维护 |
+| GLM 新个人 type=1 | 已移出范围（所有者 2026-09-22 决定）；配置加载即拒绝 | 无（如未来需要，须重新立项并独立验证契约） |
+| GLM 国际站 | 待相应账号验证 | 独立契约与证据，未完成前明确不可用 |
+| DeepSeek 余额 | 适配器已实现；真实账号只读 E2E 已完成（2026-09-22，单 CNY 账户一次读数 + 同分钟原始查询交叉核对） | USD 品种真实验证（可选；官方样本注入测试已覆盖映射） |
+| 硅基流动余额 | 适配器已按官方 openapi 契约实现（字段含义推断 + CNY 待核对） | 真实账号只读 E2E：所有者 2026-09-22 决定本轮不做（无官方 key）；完成前标注待实测，不得宣称支持完成 |
+| Codex 订阅 | 适配器已实现（app-server 协议，0.155.1 固定）+ 真实账号只读 E2E（2026-09-22，prolite 单窗口账号） | 其他 planType、secondary 5h 窗、未登录态与版本漂移的真实验证 |
+| MiniMax、Gemini | 已有文档或源码接入依据，未完成本项目账号实测 | 逐项完成阶段 A–D |
 | 公共查询框架及配置 | 已实现（含共享 HTTP 映射/十进制金额校验，src/quota/adapters/http.ts） | 随新适配器扩展 |
 | 真实 HUD 体验 | GLM 切片已验收（quota-tui-stream.json）；余额切片待真实账号后补 | 余额切片固定行数、切换与流式交互 A/B |
 

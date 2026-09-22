@@ -59,7 +59,7 @@ Ownership rules: `/hud off` restores the built-in footer while the HUD still own
 
 ## Provider quota support (experimental, default off)
 
-`quota.enabled: true` adds a plan-remaining row for providers with a verified read-only quota API. Two adapter families are implemented:
+`quota.enabled: true` adds a plan-remaining row for providers with a verified read-only quota API. Three adapter families are implemented:
 
 - **GLM (Z.ai / BigModel) domestic plans** — the two account-verified query modes:
 
@@ -73,11 +73,17 @@ Ownership rules: `/hud off` restores the built-in footer while the HUD still own
 [deepseek-v4-pro] · high · deepseek · ~/project · DeepSeek · ¥110.00 · ctx(last) ...
 ```
 
+- **Codex subscription** — a short-lived `codex app-server` child (the official stdio JSON-RPC protocol) performs one read-only `account/rateLimits/read` and is killed as soon as the answer lands; no thread/turn and no model request. The subprocess uses the local codex login (`~/.codex`) — no Pi credential is read — and requires the codex CLI on PATH (verified against codex-cli 0.155.1):
+
+```text
+[gpt-6-astra] · high · openai-codex · ~/project · Codex · wk 21% · ctx(last) ...
+```
+
 - The row is labelled by the **plan identity** (`GLM Personal` / `GLM Team`, localized), so plan remaining is always visually distinct from the context meter `ctx(last)`. It shows the 5-hour and weekly windows (server-provided percentages, complement shown as remaining); the tools pool, exact numbers, reset times and issue details live in `/hud quotas`.
-- **Verification basis:** both GLM query modes were verified against real accounts and compared with the provider console during the research round (`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8); a live end-to-end run of this implementation against the personal credential is recorded in `docs/quota-live-e2e.json` (HUD output cross-checked against a same-minute raw query). The team live E2E reuses the research records; the unverified candidates — `queryMode: "personal"` (type=1) and `region: "global"` — are configuration-diagnostic only and never send a request (`needs-verification`). A team failure never falls back to a personal query. The DeepSeek/SiliconFlow balance adapters follow the official documented contracts (`GET /user/balance`, `GET /v1/user/info`, Bearer auth): amounts keep the server's exact decimal text and are never re-summed (total comes from the server, never granted+topped-up), SiliconFlow's three balance fields are normalized from the official openapi examples with CNY as the documented billing currency, and real-account end-to-end runs are pending (see the plan's completion table). A provider whose resolved base URL is a different origin (a relay) is refused with `needs-verification` — relay keys are never sent to the official hosts.
-- **Safety:** queries are fixed-origin HTTPS GETs (GLM `https://open.bigmodel.cn`; DeepSeek `https://api.deepseek.com`; SiliconFlow `https://api.siliconflow.cn`), 5 s timeout, 256 KiB body cap, redirects refused, no cookies, no model-request probing; credentials come from Pi's own provider auth at query time and are never stored in the HUD's config or cache (only an opaque fingerprint); diagnostics are redacted (no tokens, headers or raw responses).
+- **Verification basis:** both GLM query modes were verified against real accounts and compared with the provider console during the research round (`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8); live end-to-end runs of this implementation against both the personal and the team credential are recorded in `docs/quota-live-e2e.json` (HUD output cross-checked against same-minute raw queries; the team run's scope values were provided live and never persisted). The `queryMode: "personal"` (type=1) candidate was dropped from scope (owner decision 2026-09-22) and is rejected at config load; the remaining unverified candidate — `region: "global"` — is configuration-diagnostic only and never sends a request (`needs-verification`). A team failure never falls back to a personal query. The DeepSeek balance adapter follows the official documented contract (`GET /user/balance`, Bearer auth): amounts keep the server's exact decimal text and are never re-summed, and its real-account end-to-end run is recorded in `docs/quota-live-e2e.json` (single CNY account reading; the USD variant is covered by injected official-sample tests only). The SiliconFlow adapter follows the official openapi examples with CNY as the documented billing currency; its real-account run stays pending (no official key; owner decision 2026-09-22). A provider whose resolved base URL is a different origin (a relay) is refused with `needs-verification` — relay keys are never sent to the official hosts.
+- **Safety:** queries are fixed-origin HTTPS GETs (GLM `https://open.bigmodel.cn`; DeepSeek `https://api.deepseek.com`; SiliconFlow `https://api.siliconflow.cn`), 5 s timeout, 256 KiB body cap, redirects refused, no cookies, no model-request probing; credentials come from Pi's own provider auth at query time and are never stored in the HUD's config or cache (only an opaque fingerprint); diagnostics are redacted (no tokens, headers or raw responses). The codex process transport is the one audited subprocess boundary: fixed command and arguments (no shell), piped stdio, inherited host environment (network egress requirements are the environment's — the HUD never reads, stores or injects proxy configuration), total deadline floored at 10 s with SIGTERM→SIGKILL escalation, 256 KiB frame / 1 MiB total output caps, the child killed as soon as the query settles; a missing executable or an unusable login is a clear issue, never a silent zero.
 - **Scheduling:** event-driven only (enable, provider/identity switch, `agent_settled`, manual refresh); the 5-minute TTL never triggers network by itself; manual refresh honors a ≥30 s cooldown and server Retry-After; at most 2 concurrent queries with one per identity; off/shutdown/identity switches discard late results via generation tokens.
-- **Commands:** `/hud quota on|off` (in-memory; off cancels tasks immediately), `/hud quota refresh`, `/hud quotas` (cache state, sources, times and the exact reason a profile is unavailable). Multi-profile matches show `ambiguous-profile` instead of picking by list order. MiniMax/Codex/Gemini adapter names are accepted in configuration for forward compatibility but report `unsupported-adapter` without any request.
+- **Commands:** `/hud quota on|off` (in-memory; off cancels tasks immediately), `/hud quota refresh`, `/hud quotas` (cache state, sources, times and the exact reason a profile is unavailable). Multi-profile matches show `ambiguous-profile` instead of picking by list order. MiniMax/Gemini adapter names are accepted in configuration for forward compatibility but report `unsupported-adapter` without any request.
 
 Configuration lives in the same `pi-hud.json` (`quota.profiles`, ≤16; organization/project values are account context — keep them out of shared repositories). See [configuration reference](docs/CONFIGURATION.md) and [the plan](docs/PROVIDER-LIMITS-PLAN.zh-CN.md) (Chinese) for the full contract.
 
@@ -146,7 +152,9 @@ Styling is semantic and per field, not per row. Plain text is laid out and trunc
 | Field | Role | Dark pastel | Light pastel | `theme` palette token |
 | --- | --- | --- | --- | --- |
 | Model | `model` | `#e5c890` | `#df8e1d` | `accent` |
-| Thinking level | `thinking` | `#d8c39a` | `#c08a2e` | `thinkingText` |
+| Thinking level (custom/unknown value) | `thinking` | `#d8c39a` | `#c08a2e` | `thinkingText` |
+| Thinking off / minimal / low / medium | `thinkOff`, `thinkMinimal`, `thinkLow`, `thinkMedium` | `#8087a2`, `#f4dbd6`, `#91d7e3`, `#ed8796` | `#7c7f93`, `#dc8a78`, `#04a5e5`, `#ea76cb` | `thinkingOff`, `thinkingMinimal`, `thinkingLow`, `thinkingMedium` |
+| Thinking high / xhigh / max (rainbow) | `thinkHigh`, `thinkXhigh`, `thinkMax` | per-character rainbow | per-character rainbow | fixed rainbow (no host token) |
 | Project / path | `path` | `#a6d189` | `#40a02b` | `success` |
 | Git branch | `git` | `#8caaee` | `#1e66f5` | `mdLink` |
 | Phase / active tool | `phase` | `#ca9ee6` | `#8839ef` | `customMessageLabel` |
@@ -156,6 +164,10 @@ Styling is semantic and per field, not per row. Plain text is laid out and trunc
 | Completion / waiting / failure | `success`, `warning`, `error` | `#a6d189`, `#f9e2af`, `#e78284` | `#40a02b`, `#9a6700`, `#d20f39` | `success`, `warning`, `error` |
 
 `palette: pastel` (default) selects the soft dark-terminal candidates, or their deeper same-family variants when the host theme reports light text. `palette: theme` uses host theme tokens so the HUD follows a user theme. `palette: mono` and `color: false` render plain text; `ascii: true` swaps `·`, `█`, `░`, `✓`, `●`, `↑`, `↓` and `…` for ASCII equivalents while keeping translated labels and the `~` interruption mark. The full generated role table is in [preview.txt](docs/preview.txt).
+
+### Thinking level field
+
+The thinking level (`ctx.thinkingLevel`, kept current by `thinking_level_select`) renders as a compact `think:` field: `think:off`, `think:min`, `think:low`, `think:med`, `think:high`, `think:xhi`, `think:max`. Known levels each get their own color — dim gray for `off`, rosewater for `minimal`, sky for `low`, pink for `medium` (adjacent levels alternate hue families so they stay distinguishable) — following the host's own thinking-border progression (`thinkingOff`…`thinkingMax` tokens under `palette: theme`). The three high tiers (`high`, `xhigh`, `max`) render as a per-character rainbow over the HUD's Catppuccin accents (mauve, pink, yellow, green, teal, blue; separators keep the cycle) with a visible saturation ladder — pastel for `high`, richer for `xhigh`, near-vivid for `max` — so the tier is readable without any marker, a homage to pi-powerline-footer's ultrathink effect; `theme` palette uses the same fixed cycle because the host theme has no rainbow token. 256-color terminals get each hue downconverted per character; `mono`/`color: false` stay plain. A custom or unknown level string falls back to the plain `thinking` role with the raw text, and `showThinking: false` hides the field. Colors never change the width: styling is prefix-only on the already-laid-out label.
 
 ## What the numbers actually mean
 

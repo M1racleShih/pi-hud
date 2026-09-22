@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Real-account GLM quota E2E (read-only).
+"""Real-account quota E2E (read-only).
 
-Runs the real Pi 0.85.1 TUI with the user's real agent directory (auth.json holds
-the zai-coding-cn personal credential), a temporary HUD config that enables the
-quota feature with the personal-legacy profile, and the working-tree extension.
+GLM mode runs the real Pi 0.85.1 TUI with the user's real agent directory
+(auth.json holds the zai-coding-cn personal credential). DeepSeek mode runs the
+same flow against Pi's built-in `deepseek` provider, whose key resolves from the
+DEEPSEEK_API_KEY environment variable at query time (the auth.json entry is
+empty, so the env fallback applies). Both use a temporary HUD config that enables
+the quota feature with the matching profile and the working-tree extension.
 It never prints credentials; only sanitized HUD rows and the /hud quotas JSON are
-captured. No model requests are sent; the quota query is a read-only GET against
-https://open.bigmodel.cn.
+captured. No model requests are sent; the quota queries are read-only GETs
+against https://open.bigmodel.cn (GLM) / https://api.deepseek.com (DeepSeek).
 """
 import json
 import os
@@ -41,6 +44,19 @@ PROFILES = {
         "organizationId": os.environ.get("E2E_TEAM_ORG", ""),
         "projectId": os.environ.get("E2E_TEAM_PROJECT", ""),
     },
+    "deepseek": {
+        "id": "deepseek-balance", "providerId": "deepseek", "adapter": "deepseek", "source": "pi",
+    },
+    "codex": {
+        "id": "codex-main", "providerId": "openai-codex", "adapter": "codex", "source": "codex-app-server",
+    },
+}
+
+MODELS = {
+    "personal": "zai-coding-cn/glm-4.7",
+    "team": "zai-coding-team/glm-5.3",
+    "deepseek": "deepseek/deepseek-v4-flash",
+    "codex": "openai-codex/gpt-6-astra",
 }
 
 
@@ -66,7 +82,10 @@ def strip_ansi(text):
 
 def main() -> int:
     mode = sys.argv[1] if len(sys.argv) > 1 else "personal"
-    model = {"personal": "zai-coding-cn/glm-4.7", "team": "zai-coding-team/glm-5.3"}[mode]
+    if mode not in PROFILES:
+        print(json.dumps({"mode": mode, "error": "unknown mode; use personal|team|deepseek|codex"}))
+        return 2
+    model = MODELS[mode]
     profile = dict(PROFILES[mode])
     if mode == "team":
         if not profile["organizationId"] or not profile["projectId"]:
@@ -84,6 +103,15 @@ def main() -> int:
         "PI_CODING_AGENT_DIR": os.environ.get("PI_CODING_AGENT_DIR", str(pathlib.Path.home() / ".pi/agent")),
         "PI_HUD_CONFIG": str(config_path), "PI_OFFLINE": "1",
         "ZAI_API_KEY_TEAM": os.environ.get("ZAI_API_KEY_TEAM", ""),
+        # DeepSeek: the built-in provider resolves the key from this env var when
+        # the auth.json entry is empty; passed through, never printed.
+        "DEEPSEEK_API_KEY": os.environ.get("DEEPSEEK_API_KEY", ""),
+        # Codex: the app-server child inherits this environment; networks that need
+        # an egress proxy must have it set where this script runs (generic passthrough).
+        "http_proxy": os.environ.get("http_proxy", ""),
+        "https_proxy": os.environ.get("https_proxy", ""),
+        "all_proxy": os.environ.get("all_proxy", ""),
+        "no_proxy": os.environ.get("no_proxy", ""),
     }
     pid, fd = pty.fork()
     if pid == 0:
@@ -134,7 +162,7 @@ def main() -> int:
 def quota_rows(text):
     rows = []
     for line in strip_ansi(text).splitlines():
-        if "GLM Personal" in line or "GLM Team" in line or "GLM \u4e2a\u4eba" in line or "GLM \u56e2\u961f" in line:
+        if any(mark in line for mark in ("GLM Personal", "GLM Team", "GLM \u4e2a\u4eba", "GLM \u56e2\u961f", "DeepSeek", "Codex")):
             rows.append(line.strip()[:160])
     return rows[-4:]
 

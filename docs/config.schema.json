@@ -114,7 +114,7 @@
     "quota": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Optional provider quota support. Default off: with enabled=false no credentials are parsed and no network/subprocess tasks exist. Credentials are never stored here; the host resolves the current provider key at query time. Implemented adapters: zai (GLM personal-legacy and team query modes, region cn), deepseek and siliconflow (official balance endpoints, Bearer auth). Other adapter names are accepted for configuration diagnostics and report unsupported-adapter without any request. Balance adapters refuse a provider whose resolved base URL is a different origin (needs-verification); relay keys are never sent to the official hosts.",
+      "description": "Optional provider quota support. Default off: with enabled=false no credentials are parsed and no network/subprocess tasks exist. Credentials are never stored here; the host resolves the current provider key at query time. Implemented adapters: zai (GLM personal-legacy and team query modes, region cn), deepseek and siliconflow (official balance endpoints, Bearer auth), codex (app-server subprocess source: a short-lived `codex app-server` child performs a read-only account/rateLimits/read using the local codex login; requires the codex CLI on PATH; no Pi credential is read). Other adapter names are accepted for configuration diagnostics and report unsupported-adapter without any request. Balance adapters refuse a provider whose resolved base URL is a different origin (needs-verification); relay keys are never sent to the official hosts.",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -173,8 +173,8 @@
                 "enum": ["personal", "team"]
               },
               "queryMode": {
-                "enum": ["personal-legacy", "personal", "team"],
-                "description": "personal-legacy and team are account-verified; personal (type=1) stays needs-verification until independently verified."
+                "enum": ["personal-legacy", "team"],
+                "description": "personal-legacy and team are account-verified. The type=1 `personal` candidate was dropped from scope (owner decision 2026-09-22) and is rejected at load."
               },
               "organizationId": {
                 "type": "string",

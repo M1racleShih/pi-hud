@@ -37,6 +37,7 @@ const allowedBuiltins = {
   "config.ts": new Set(["node:fs", "node:fs/promises", "node:os", "node:path"]),
   "git.ts": new Set(["node:child_process"]),
   "text.ts": new Set(["node:util"]),
+  "quota/codex-process.ts": new Set(["node:child_process"]),
 };
 // `setFooter` is a single-replacement host slot. The full forbidden-API group still applies
 // to every source file; only the dedicated surface module may call the slot, and only inside
@@ -102,6 +103,28 @@ if (transportSource) {
   assert.equal(
     countFetchCalls(transportSource), countFetchCalls(transportSection),
     "fetch may only be called inside the marked transport boundary section",
+  );
+}
+// The codex adapter adds exactly one subprocess module. `spawn` (async) is confined
+// to the marked process boundary; the sync variants stay forbidden everywhere
+// via forbiddenBase, so no hot path can ever block on a child.
+const PROCESS_FILE = "quota/codex-process.ts";
+const PROCESS_START = "/* process-boundary:start */";
+const PROCESS_END = "/* process-boundary:end */";
+const countSpawnCalls = (source) => (source.match(/\bspawn\s*\(/g) ?? []).length;
+const processSource = existsSync(join("src", PROCESS_FILE)) ? readFileSync(join("src", PROCESS_FILE), "utf8") : "";
+const processSection = processSource.includes(PROCESS_START) && processSource.includes(PROCESS_END)
+  ? processSource.split(PROCESS_START)[1].split(PROCESS_END)[0]
+  : "";
+if (processSource) {
+  assert.ok(processSection.includes("spawn"), `${PROCESS_FILE} must own the spawn boundary`);
+  assert.ok(
+    /from\s+["']node:child_process["']/.test(processSource),
+    `${PROCESS_FILE} must import spawn from node:child_process (a boundary call without the import is a runtime ReferenceError)`,
+  );
+  assert.equal(
+    countSpawnCalls(processSource), countSpawnCalls(processSection),
+    "spawn may only be called inside the marked process boundary section",
   );
 }
 /** Recursive `src/**` scan: every TypeScript file under src, at any depth. */

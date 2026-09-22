@@ -59,7 +59,7 @@ ctx(last) ██░░░░░░░░ 45% 90k/200k · 全会话* ↻ ↑61k �
 
 ## 提供商额度支持（实验性，默认关闭）
 
-`quota.enabled: true` 为具备已验证只读额度接口的提供商增加额度行。已实现两类适配器：
+`quota.enabled: true` 为具备已验证只读额度接口的提供商增加额度行。已实现三类适配器：
 
 - **GLM（Z.ai / 智谱）国内站套餐** —— 两个经账号验证的查询模式：
 
@@ -74,7 +74,7 @@ ctx(last) ██░░░░░░░░ 45% 90k/200k · 全会话* ↻ ↑61k �
 ```
 
 - 该行以**额度身份**标注（`GLM 个人` / `GLM Team` / `DeepSeek` / `硅基流动`，本地化），与上下文占用 `上下文(上次)` 明确区分；GLM 显示 5 小时与周窗口（服务端百分比的补数作为剩余），余额适配器显示账户总余额（服务端原值十进制文本与币种）；工具池、分项余额、精确数量、重置时间与故障详情放在 `/hud quotas`。
-- **验证基础**：GLM 两个查询模式在调研轮已用真实账号验证并与控制台对照（`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8）；本实现对个人凭据的实时端到端记录见 `docs/quota-live-e2e.json`（HUD 输出与同分钟原始查询交叉核对）。团队实时 E2E 按所有者决定沿用调研记录；未验证候选 —— `queryMode: "personal"`（type=1）与 `region: "global"` —— 仅保留配置诊断，不发送请求（`needs-verification`）。团队失败不回退个人查询。DeepSeek/硅基流动余额适配器按官方文档契约实现（`GET /user/balance`、`GET /v1/user/info`，Bearer 认证）：金额保留服务端十进制原文，不从分项重新加总（总额永远用服务端值）；硅基流动三个余额字段的含义按官方 openapi 示例归一化，币种按文档计费币种 CNY；真实账号端到端验证待完成（见方案完成度表）。凭据解析出的 baseUrl 指向其他源（中转）时拒绝查询（`needs-verification`），中转密钥永不发往官方域名。
+- **验证基础**：GLM 两个查询模式在调研轮已用真实账号验证并与控制台对照（`docs/GLM-PLAN-SCOPES.zh-CN.md` §6–8）；本实现对个人与团队凭据的实时端到端记录均见 `docs/quota-live-e2e.json`（HUD 输出与同分钟原始查询交叉核对；团队运行的作用域值仅运行时提供、未持久化）。Codex 订阅适配器按 codex-cli 0.155.1 生成的 App Server 协议实现，真实账号只读 E2E 已记录（`quota-live-e2e.json` `codex` 节：HUD 输出与独立探针同分钟一致；未验证项：其他 planType、真实 secondary 5h 窗、未登录态、≠0.155.1 版本）。`queryMode: "personal"`（type=1）候选已移出范围（所有者 2026-09-22 决定），配置加载时直接拒绝；余下未验证候选 —— `region: "global"` —— 仅保留配置诊断，不发送请求（`needs-verification`）。团队失败不回退个人查询。DeepSeek 余额适配器按官方文档契约实现（`GET /user/balance`，Bearer 认证）：金额保留服务端十进制原文、从不重新加总，真实账号端到端已记录在 `docs/quota-live-e2e.json`（单一 CNY 账户一次读数；USD 品种仅由官方样本注入测试覆盖）。硅基流动适配器按官方 openapi 示例实现，币种按文档计费币种 CNY；真实账号验证保持待实测（无官方 key，所有者 2026-09-22 决定）。凭据解析出的 baseUrl 指向其他源（中转）时拒绝查询（`needs-verification`），中转密钥永不发往官方域名。
 - **安全边界**：固定源 HTTPS GET（GLM `https://open.bigmodel.cn`；DeepSeek `https://api.deepseek.com`；硅基流动 `https://api.siliconflow.cn`）、5 秒超时、256 KiB 响应上限、拒绝一切重定向、不读 cookie、不发模型请求探测；凭据在查询时由 Pi 自己的 provider 认证解析，不写入 HUD 配置或缓存（仅保留不可逆指纹）；诊断全部脱敏（无 token、headers、原始响应）。
 - **调度**：仅事件驱动（首次启用、provider/身份切换、`agent_settled`、手动刷新）；5 分钟 TTL 到期不主动联网；手动刷新遵守 ≥30 秒冷却与服务端 Retry-After；全局 ≤2 并发、每身份单飞；关闭、退出、身份切换后用 generation token 丢弃晚到结果。
 - **命令**：`/hud quota on|off`（内存生效，off 立即取消任务）、`/hud quota refresh`、`/hud quotas`（缓存状态、来源、时间与不可用原因，不含凭据）。多个 profile 匹配当前模型时显示 `ambiguous-profile`，不按列表顺序选择。MiniMax/Codex/Gemini 的适配器名仅为前向兼容保留，查询时报告 `unsupported-adapter` 且不触网。
@@ -146,7 +146,9 @@ pi -e /absolute/path/to/pi-hud/index.ts
 | 字段 | 角色 | 深色终端柔和色 | 浅色终端加深色 | `theme` 色板 token |
 | --- | --- | --- | --- | --- |
 | 模型 | `model` | `#e5c890` | `#df8e1d` | `accent` |
-| thinking 等级 | `thinking` | `#d8c39a` | `#c08a2e` | `thinkingText` |
+| thinking 等级（自定义/未知值） | `thinking` | `#d8c39a` | `#c08a2e` | `thinkingText` |
+| thinking 关/极低/低/中 | `thinkOff`、`thinkMinimal`、`thinkLow`、`thinkMedium` | `#8087a2`、`#f4dbd6`、`#91d7e3`、`#ed8796` | `#7c7f93`、`#dc8a78`、`#04a5e5`、`#ea76cb` | `thinkingOff`、`thinkingMinimal`、`thinkingLow`、`thinkingMedium` |
+| thinking 高/超高/最高（彩虹） | `thinkHigh`、`thinkXhigh`、`thinkMax` | 逐字符彩虹 | 逐字符彩虹 | 固定彩虹（宿主无对应 token） |
 | 项目/路径 | `path` | `#a6d189` | `#40a02b` | `success` |
 | Git 分支 | `git` | `#8caaee` | `#1e66f5` | `mdLink` |
 | 阶段/当前活动 | `phase` | `#ca9ee6` | `#8839ef` | `customMessageLabel` |
@@ -156,6 +158,10 @@ pi -e /absolute/path/to/pi-hud/index.ts
 | 完成/等待/失败 | `success`、`warning`、`error` | `#a6d189`、`#f9e2af`、`#e78284` | `#40a02b`、`#9a6700`、`#d20f39` | `success`、`warning`、`error` |
 
 `palette: pastel`（默认）使用上述深色终端候选值；当宿主主题的正文色表明是浅色背景时，自动改用同色系的加深色。`palette: theme` 使用宿主主题 token，让 HUD 跟随用户主题。`palette: mono` 与 `color: false` 输出纯文本；`ascii: true` 把 `·`、`█`、`░`、`✓`、`●`、`↑`、`↓`、`…` 换成 ASCII 符号（中断标记 `~` 本身是 ASCII），但中文标签照常显示。完整角色表由渲染器生成在 [preview.txt](docs/preview.txt)。
+
+### thinking 等级字段
+
+thinking 等级（来自 `ctx.thinkingLevel`，由 `thinking_level_select` 事件保持最新）以紧凑的 `think:` 字段呈现：`think:off`、`think:min`、`think:low`、`think:med`、`think:high`、`think:xhi`、`think:max`。已知等级各有专属颜色 —— `off` 暗灰、`minimal` 暖白、`low` 天蓝、`medium` 粉色，相邻等级交替色系以便区分 —— 与宿主 thinking 边框的递进（`palette: theme` 下映射 `thinkingOff`…`thinkingMax` token）一致。三个高档（`high`、`xhigh`、`max`）用 HUD 自己的 Catppuccin 色相逐字符渲染彩虹（淡紫→粉→黄→绿→青→蓝循环，分隔符不消耗色相），并以饱和度阶梯区分档位——`high` 柔和、`xhigh` 加浓、`max` 近霓虹，致敬 pi-powerline-footer 的 ultrathink 效果；`theme` 色板下同样使用这套固定循环（宿主主题没有彩虹 token）。256 色终端逐字符就近降级；`mono`/`color: false` 保持纯文本。自定义或未知等级字符串回退到普通 `thinking` 角色并显示原文，`showThinking: false` 隐藏该字段。着色只加前缀、不改宽度：颜色永远作用在已排好版的标签上。
 
 ## 数据的真实含义
 

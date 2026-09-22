@@ -1,11 +1,14 @@
 {
   "recordedAt": "2026-09-21",
-  "purpose": "Real-account GLM quota E2E evidence (phase 1 slice): HUD extension end-to-end against the live personal credential, plus a same-minute raw read-only API query for cross-checking. The console-side comparison basis is docs/GLM-PLAN-SCOPES.zh-CN.md §6-7 (2026-09-19, percentages matched the personal console).",
+  "deepseekRecordedAt": "2026-09-22",
+  "teamRecordedAt": "2026-09-22",
+  "codexRecordedAt": "2026-09-22",
+  "purpose": "Real-account quota E2E evidence: GLM personal (phase 1), GLM team (completed 2026-09-22 from live-provided scope values) and the DeepSeek balance adapter (slice 2), each as HUD extension end-to-end against the live credential plus a same-minute raw read-only API query for cross-checking. The GLM console-side comparison basis is docs/GLM-PLAN-SCOPES.zh-CN.md §6-8 (2026-09-19); DeepSeek is compared against its own raw API response (the balance endpoint is the authoritative source; no separate console screenshot was taken).",
   "environment": {
     "piSdk": "0.85.1 (isolated .tmp/sdk)",
-    "host": "real Pi TUI (PTY), --no-extensions, model zai-coding-cn/glm-4.7",
-    "credentialSource": "user-level auth.json (zai-coding-cn api_key), resolved by the host at query time; never printed or stored by the HUD",
-    "queryEndpoint": "GET https://open.bigmodel.cn/api/monitor/usage/quota/limit (read-only; no model requests)"
+    "host": "real Pi TUI (PTY), --no-extensions, model zai-coding-cn/glm-4.7 (GLM personal) / zai-coding-team/glm-5.3 (GLM team) / deepseek/deepseek-v4-flash (DeepSeek)",
+    "credentialSource": "GLM personal: user-level auth.json (zai-coding-cn api_key). GLM team: $ZAI_API_KEY_TEAM env reference in the user's models.json provider, resolved by the host at query time. DeepSeek: DEEPSEEK_API_KEY env var (the auth.json deepseek entry is empty, so the provider's env fallback applies). All resolved by the host; never printed or stored by the HUD",
+    "queryEndpoint": "GET https://open.bigmodel.cn/api/monitor/usage/quota/limit (GLM personal) / ?type=2 + bigmodel-organization/bigmodel-project (GLM team) / GET https://api.deepseek.com/user/balance (DeepSeek); all read-only; no model requests"
   },
   "personalLegacy": {
     "e2e": {
@@ -35,7 +38,86 @@
     }
   },
   "team": {
-    "status": "live E2E pending the account's organization/project values (deliberately not stored by the research round); the verified team request shape, real team query record and console comparison live in docs/GLM-PLAN-SCOPES.zh-CN.md §7-8 (2026-09-19, type=2 + bigmodel-organization/bigmodel-project, remaining kept as the server value with the 876/877 discrepancy documented)",
-    "runtimeCoverage": "team path covered by dependency-injected tests: type=2 URL and scope headers, host-header scope completion, scope conflict stop, needs-scope refusal, no personal fallback, identity isolation from the personal profile"
+    "e2e": {
+      "recordedAt": "2026-09-22",
+      "launch": "node dist/bundle/cli.js --no-session --no-extensions --model zai-coding-team/glm-5.3 -e index.ts (PTY 140x40, scripts/pi-quota-e2e.py team with E2E_TEAM_ORG/E2E_TEAM_PROJECT provided live; values deliberately not persisted — redacted here as org-7447…311 / proj_7f5A…472)",
+      "profile": { "id": "glm-team", "providerId": "zai-coding-team", "adapter": "zai", "source": "pi", "region": "cn", "plan": "team", "queryMode": "team" },
+      "hudRow": "[GLM-5.3 (Team)] · think:max · zai-coding-team · <tmp cwd> · GLM Team · 5h 84% · wk 20%",
+      "hudQuotasStatus": "ready",
+      "planLabel": "max",
+      "buckets": [
+        { "id": "CREDIT_LIMIT:3:5", "window": "5hour", "limit": 35000, "used": 5639, "remaining": 29360, "usedPercent": 16, "resetAtIso": "2026-09-22T06:06:36.786Z" },
+        { "id": "CREDIT_LIMIT:6:1", "window": "1week", "limit": 155000, "used": 124038, "remaining": 30961, "usedPercent": 80, "resetAtIso": "2026-09-24T09:14:24.950Z" }
+      ],
+      "counters": { "checks": 1, "authResolutions": 1, "requests": 1, "published": 1, "discarded": 0 },
+      "commandsVerified": [ "/hud quota off (ack + tasks cancelled)", "/hud quota on (ack)", "/hud quota refresh (ack + loading marker, row restored)" ],
+      "credentialLeakCheck": "no key material or raw org/project values appear in the captured PTY output or /hud quotas JSON (explicit substring checks; /hud quotas exposes only organizationConfigured/projectConfigured booleans)"
+    },
+    "rawSameMinuteQuery": {
+      "e2eFetchedAt": "2026-09-22T06:01:04.212Z",
+      "rawFetchedAt": "2026-09-22T06:02:02Z (58 s later)",
+      "httpStatus": 200,
+      "body": { "code": 200, "success": true, "level": "max", "limits": [
+        { "type": "CREDIT_LIMIT", "unit": 3, "number": 5, "usage": 35000, "currentValue": 5679, "remaining": 29320, "percentage": 16, "nextResetTime": 1790057196786 },
+        { "type": "CREDIT_LIMIT", "unit": 6, "number": 1, "usage": 155000, "currentValue": 124078, "remaining": 30921, "percentage": 80, "nextResetTime": 1790241264950 } ] },
+      "crossCheck": "Field mapping verified live: the raw `usage` field is the LIMIT (35000/155000), not used — the adapter correctly maps currentValue→used and takes the server `remaining` verbatim (never re-derived), exactly the §9 synthetic-fixture trap class. Both reset timestamps match to the millisecond. Percentages map exactly (raw percentage 16/80 → HUD 5h 84% / wk 20% remaining). The 58 s gap shows +40 credits consumed in both windows simultaneously (5639→5679, 124038→124078; remaining 29360→29320, 30961→30921) — live consumption counted consistently across the 5h and week pools, not a mapping error. planLabel max = level max. An initial raw attempt that literalized the models.json `$ZAI_API_KEY_TEAM` reference as the key got a business 401 (token expired or incorrect) — operator error before resolution, unrelated to the adapter; the E2E itself never saw a 401."
+    },
+    "runtimeCoverage": "dependency-injected tests additionally cover: host-header scope completion, scope conflict stop, needs-scope refusal, no personal fallback, identity isolation from the personal profile"
+  },
+  "deepseek": {
+    "e2e": {
+      "launch": "node dist/bundle/cli.js --no-session --no-extensions --model deepseek/deepseek-v4-flash -e index.ts (PTY 140x40, scripts/pi-quota-e2e.py deepseek)",
+      "profile": { "id": "deepseek-balance", "providerId": "deepseek", "adapter": "deepseek", "source": "pi" },
+      "hudRow": "[DeepSeek V4 Flash] · think:max · deepseek · <tmp cwd> · DeepSeek · ¥66.90",
+      "hudQuotasStatus": "ready",
+      "hudQuotasBalances": [
+        { "amountText": "66.90", "currency": "CNY", "scope": "account" },
+        { "amountText": "0.00", "currency": "CNY", "scope": "granted" },
+        { "amountText": "66.90", "currency": "CNY", "scope": "topped-up" }
+      ],
+      "counters": { "checks": 1, "authResolutions": 1, "requests": 1, "published": 1, "discarded": 0 },
+      "commandsVerified": [ "/hud quota off (ack + tasks cancelled)", "/hud quota on (ack)", "/hud quota refresh (ack + loading marker, row restored)" ],
+      "credentialLeakCheck": "no key material appears in the captured PTY output or /hud quotas JSON (explicit substring check of the live key against the full captured result; 0 occurrences)"
+    },
+    "rawSameMinuteQuery": {
+      "e2eFetchedAt": "2026-09-22T05:54:45.930Z (value ¥66.90)",
+      "rawFetchedAt": "~2026-09-22T05:55:17Z (32 s later, value 66.85)",
+      "httpStatus": 200,
+      "body": { "is_available": true, "balance_infos": [{ "currency": "CNY", "total_balance": "66.85", "granted_balance": "0.00", "topped_up_balance": "66.85" }] },
+      "crossCheck": "The HUD row (¥66.90) and the /hud quotas balances match the E2E-time server value exactly: account/granted/topped-up kept as three separate exact-text items, never re-summed, the total being the server's own total_balance. The raw query 32 s later returned 66.85 — a live 0.05 CNY consumption on the account between the two reads, consistent with real-time billing rather than a mapping error; both values are recorded verbatim as sent. is_available=true was returned and (per the adapter contract) intentionally not displayed."
+    }
+  },
+  "siliconflow": {
+    "status": "live E2E not attempted this round (owner decision 2026-09-22: no official API key available); the adapter stays implemented-per-contract with real-account verification explicitly pending — no support claim, and the field-meaning/CNY inferences stay marked unverified"
+  },
+  "codex": {
+    "e2e": {
+      "recordedAt": "2026-09-22",
+      "launch": "node dist/bundle/cli.js --no-session --no-extensions --model openai-codex/gpt-6-astra -e index.ts (PTY 140x40, scripts/pi-quota-e2e.py codex; egress-proxy env passed through generically from the parent shell — the subprocess inherits the host environment)",
+      "profile": { "id": "codex-main", "providerId": "openai-codex", "adapter": "codex", "source": "codex-app-server" },
+      "protocolVersion": "codex-cli 0.155.1 (upstream pinned; schemas generated by `codex app-server generate-json-schema`)",
+      "hudRow": "[GPT-6 Astra] · think:max · openai-codex · <tmp cwd> · Codex · wk 21%",
+      "hudQuotasStatus": "ready",
+      "planLabel": "prolite",
+      "buckets": [
+        { "id": "codex:primary", "window": "1week", "usedPercent": 79, "remainingPercent": 21, "resetAtIso": "2026-09-26T13:57:31.000Z" }
+      ],
+      "counters": { "checks": 1, "authResolutions": 0, "requests": 1, "published": 1, "discarded": 0 },
+      "commandsVerified": [ "/hud quota off (ack + tasks cancelled)", "/hud quota on (ack)", "/hud quota refresh (ack + loading marker, row restored)" ],
+      "noHostAuth": "authResolutions stayed 0 — the codex source reads no Pi credential; the subprocess uses the local codex login",
+      "credentialLeakCheck": "no accountId or email material appears in the captured PTY output or /hud quotas JSON (explicit substring checks)"
+    },
+    "rawSameMinuteQuery": {
+      "e2eFetchedAt": "2026-09-22T06:42:59.429Z",
+      "rawFetchedAt": "2026-09-22T06:43:28Z (29 s later)",
+      "method": "standalone read-only app-server probe (initialize → initialized → account/rateLimits/read; no thread/turn, no model request)",
+      "result": { "planType": "prolite", "primary": { "usedPercent": 79, "windowDurationMins": 10080, "resetsAt": 1790431051 }, "secondary": null, "ordinaryUsageAllowed": true, "rateLimitResetCreditsAvailable": 2 },
+      "crossCheck": "HUD wk 21% is exactly the complement of the server usedPercent 79; resetsAt 1790431051 (unix seconds) maps to the bucket's 2026-09-26T13:57:31.000Z reset; planLabel prolite matches planType; both reads identical within 29 s. The account is the same one Pi's openai-codex OAuth uses (matching accountId prefix observed during research; the HUD itself does not read or verify it — recorded here as research context, not an adapter feature)."
+    },
+    "protocolFindings": [
+      "closing stdin immediately after the requests is a shutdown signal: the child exits 0 without answering — the driver keeps stdin open and kills after the answer (found live, covered by a unit test)",
+      "the server pushes unsolicited notifications (remoteControl/status/changed) which the reader skips by id matching",
+      "a missing node:child_process import in the driver surfaced only at runtime (spawn is not defined) — check.mjs now asserts the import exists alongside the spawn-boundary confinement"
+    ]
   }
 }

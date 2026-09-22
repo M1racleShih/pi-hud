@@ -260,8 +260,9 @@ test("zaiPrepare builds the two verified request shapes and refuses unverified m
   assert.equal(team.headers["bigmodel-project"], "proj-synth");
 
   // Unverified candidates never send requests.
-  assert.deepEqual(zaiPrepare({ profile: { ...personalProfile, queryMode: "personal" }, auth: { apiKey: "k" }, scope: { organizationId: null, projectId: null, conflict: false } }).issue?.code, "needs-verification");
   assert.deepEqual(zaiPrepare({ profile: { ...personalProfile, region: "global" }, auth: { apiKey: "k" }, scope: { organizationId: null, projectId: null, conflict: false } }).issue?.code, "needs-verification");
+  // The dropped type=1 candidate is rejected at config load (keep-previous-on-reject), never reaching the adapter.
+  assert.throws(() => normalizeQuota({ profiles: [{ ...personalProfile, queryMode: "personal" }] }), /invalid plan\/queryMode combination personal\/personal/);
   // Missing key and missing scope refuse before any network.
   assert.deepEqual(zaiPrepare({ profile: personalProfile, auth: null, scope: { organizationId: null, projectId: null, conflict: false } }).issue?.code, "needs-auth");
   assert.deepEqual(zaiPrepare({ profile: teamProfile, auth: { apiKey: "k" }, scope: { organizationId: "org-synth", projectId: null, conflict: false } }).issue?.code, "needs-scope");

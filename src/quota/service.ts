@@ -32,18 +32,24 @@ import type { QuotaHostAuth, QuotaIdentity, QuotaIssue, QuotaIssueCode, QuotaSna
 import { QUOTA_ISSUE_HIDES_VALUES, quotaIdentityKey } from "./types.ts";
 import { quotaFetch, globalQuotaFetch } from "./transport.ts";
 import type { QuotaFetchLike, QuotaTransportResult } from "./transport.ts";
+import { runCodexRateLimitsQuery } from "./codex-process.ts";
+import type { CodexProcessOptions } from "./codex-process.ts";
 import { zaiParse, zaiPrepare, ZAI_ORIGINS } from "./adapters/zai.ts";
 import { deepseekParse, deepseekPrepare, DEEPSEEK_QUOTA_ORIGIN } from "./adapters/deepseek.ts";
 import { siliconflowParse, siliconflowPrepare, SILICONFLOW_QUOTA_ORIGIN } from "./adapters/siliconflow.ts";
+import { codexParse, codexPrepare, CODEX_QUOTA_ORIGIN } from "./adapters/codex.ts";
 
 /** The implemented adapter registry. Structural prepare/parse shapes keep every
  *  adapter data-only; a name outside this table reports `unsupported-adapter`
  *  without any request (the remaining plan adapters stay diagnostics-only). */
 interface QuotaAdapterImpl {
   usesScope: boolean;
+  /** Process adapters resolve no host credential: the subprocess owns its login,
+   *  so the identity tag stays stable across Pi-side token rotation. */
+  usesHostAuth: boolean;
   originFor: (profile: QuotaProfile) => string;
   prepare: (input: { profile: QuotaProfile; auth: QuotaHostAuth | null; scope: { organizationId: string | null; projectId: string | null; conflict: boolean } }) =>
-    { kind: "request"; url: string; headers: Record<string, string> } | { kind: "issue"; issue: QuotaIssue };
+    { kind: "request"; url: string; headers: Record<string, string> } | { kind: "process"; command: string; args: readonly string[] } | { kind: "issue"; issue: QuotaIssue };
   parse: (status: number, headers: { get(name: string): string | null } | null, body: string, context: { now: number }) =>
     { kind: "snapshot"; snapshot: import("./types.ts").QuotaSnapshotData } | { kind: "issue"; issue: QuotaIssue };
 }
@@ -53,21 +59,31 @@ const NO_SCOPE = Object.freeze({ organizationId: null, projectId: null, conflict
 const ADAPTERS: Readonly<Record<string, QuotaAdapterImpl>> = Object.freeze({
   zai: {
     usesScope: true,
+    usesHostAuth: true,
     originFor: (profile) => ZAI_ORIGINS[profile.region ?? "cn"] ?? ZAI_ORIGINS.cn,
     prepare: zaiPrepare,
     parse: zaiParse,
   },
   deepseek: {
     usesScope: false,
+    usesHostAuth: true,
     originFor: () => DEEPSEEK_QUOTA_ORIGIN,
     prepare: deepseekPrepare,
     parse: deepseekParse,
   },
   siliconflow: {
     usesScope: false,
+    usesHostAuth: true,
     originFor: () => SILICONFLOW_QUOTA_ORIGIN,
     prepare: siliconflowPrepare,
     parse: siliconflowParse,
+  },
+  codex: {
+    usesScope: false,
+    usesHostAuth: false,
+    originFor: () => CODEX_QUOTA_ORIGIN,
+    prepare: codexPrepare,
+    parse: codexParse,
   },
 });
 
@@ -87,12 +103,25 @@ export type QuotaTrigger = "enable" | "identity" | "settled" | "manual";
 /** Auth resolver injected by the controller (host `modelRegistry.getApiKeyAndHeaders`). */
 export type QuotaAuthResolver = (model: { provider: string; id: string }) => Promise<QuotaHostAuth | null>;
 
+/** Process transport runner (codex app-server); injectable for tests. */
+export type QuotaProcessRunner = (spec: { command: string; args: readonly string[] }, options: CodexProcessOptions) => Promise<QuotaTransportResult>;
+
+/** The default process runner drives the codex app-server protocol; the spec is
+ *  validated so an unknown command can never silently spawn something else. */
+const defaultRunProcess: QuotaProcessRunner = async (spec, options) => {
+  if (spec.command !== "codex" || spec.args.length !== 1 || spec.args[0] !== "app-server") {
+    return { kind: "network", reason: "spawn-error" };
+  }
+  return await runCodexRateLimitsQuery(options);
+};
+
 export interface QuotaServiceOptions {
   now?: () => number;
   setTimer?: SetTimer;
   clearTimer?: ClearTimer;
   fetch?: QuotaFetchLike;
   resolveAuth?: QuotaAuthResolver;
+  runProcess?: QuotaProcessRunner;
   onPublish?: () => void;
 }
 
@@ -135,6 +164,7 @@ export class QuotaService {
   declare readonly clearTimer: ClearTimer;
   declare readonly fetchLike: QuotaFetchLike;
   declare resolveAuth: QuotaAuthResolver;
+  declare runProcess: QuotaProcessRunner;
   declare onPublish: () => void;
   declare config: QuotaConfig | null;
   declare model: { provider: string; id: string } | null;
@@ -156,6 +186,7 @@ export class QuotaService {
     this.clearTimer = options.clearTimer ?? (clearTimeout as unknown as ClearTimer);
     this.fetchLike = options.fetch ?? globalQuotaFetch;
     this.resolveAuth = options.resolveAuth ?? (async () => null);
+    this.runProcess = options.runProcess ?? defaultRunProcess;
     this.onPublish = options.onPublish ?? (() => {});
     this.config = null;
     this.model = null;
@@ -280,12 +311,16 @@ export class QuotaService {
       }
       this.modelStatus = { kind: "none" };
       // One auth resolution per merged check (§10). The raw key stays in this frame.
-      this.counters.authResolutions++;
+      // Process adapters (codex) resolve no host credential: the subprocess owns
+      // its login, and the identity tag must not rotate with Pi-side OAuth tokens.
       let auth: QuotaHostAuth | null = null;
-      try {
-        auth = await this.resolveAuth(this.model);
-      } catch {
-        auth = null;
+      if (impl.usesHostAuth) {
+        this.counters.authResolutions++;
+        try {
+          auth = await this.resolveAuth(this.model);
+        } catch {
+          auth = null;
+        }
       }
       if (generationAtStart !== this.generation || !this.enabled) {
         // A configure/identity change landed during the auth resolution; this check
@@ -365,12 +400,18 @@ export class QuotaService {
     this.publishCurrent();
     let result: QuotaTransportResult;
     try {
-      result = await quotaFetch(this.fetchLike, prepared.url, prepared.headers, {
-        timeoutMs: this.config?.timeoutMs ?? 5_000,
-        maxBodyBytes: QUOTA_LIMITS.maxBodyBytes,
-        setTimer: this.setTimer,
-        clearTimer: this.clearTimer,
-      });
+      result = prepared.kind === "process"
+        ? await this.runProcess(prepared, {
+            timeoutMs: this.config?.timeoutMs ?? 5_000,
+            setTimer: this.setTimer,
+            clearTimer: this.clearTimer,
+          })
+        : await quotaFetch(this.fetchLike, prepared.url, prepared.headers, {
+            timeoutMs: this.config?.timeoutMs ?? 5_000,
+            maxBodyBytes: QUOTA_LIMITS.maxBodyBytes,
+            setTimer: this.setTimer,
+            clearTimer: this.clearTimer,
+          });
     } catch {
       result = { kind: "network", reason: "Error" };
     } finally {
@@ -612,9 +653,16 @@ const transportIssue = (result: QuotaTransportResult): { kind: "issue"; issue: Q
     case "timeout": return { kind: "issue", issue: { code: "timeout", retryable: true, retryAt: null, detail: "request timeout" } };
     case "redirect": return { kind: "issue", issue: { code: "protocol-error", retryable: false, retryAt: null, detail: `redirect refused (${result.status})` } };
     case "oversized": return { kind: "issue", issue: { code: "protocol-error", retryable: false, retryAt: null, detail: "response body exceeds 256 KiB" } };
-    case "network": return { kind: "issue", issue: { code: "network-error", retryable: true, retryAt: null, detail: "network failure" } };
+    case "network": return { kind: "issue", issue: { code: "network-error", retryable: true, retryAt: null, detail: networkFailureDetail(result.reason) } };
     default: return { kind: "issue", issue: { code: "http-error", retryable: true, retryAt: null, detail: `HTTP ${result.status}` } };
   }
+};
+
+const networkFailureDetail = (reason: string): string => {
+  if (reason === "spawn-not-found") return "codex executable not found on PATH";
+  if (reason === "spawn-error") return "codex process could not start";
+  if (reason === "process-exit") return "codex process exited before answering";
+  return "network failure";
 };
 
 const planKeyFromIdentity = (identity: QuotaIdentity): string =>

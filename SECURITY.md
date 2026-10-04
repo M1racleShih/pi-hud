@@ -8,4 +8,4 @@ Do not publish API tokens, transcripts, command contents, sensitive basenames, p
 
 This delivery has no pre-created GitHub repository or private reporting endpoint. After publishing the repository, its owner should enable GitHub private vulnerability reporting. Until then, report privately to the maintainer through an established channel rather than creating a public issue with exploit details or credentials. No fictitious email/contact address is supplied.
 
-Supported integration target for this initial delivery: Pi 0.85.1. Host upgrades require contract, loader, lifecycle and performance revalidation; there is no claim of universal forward compatibility.
+Supported integration target: Pi 1.0.2 (revalidated from the initial 0.85.1 delivery through 0.87.1 and 0.99.1). Host upgrades require contract, loader, lifecycle and performance revalidation; there is no claim of universal forward compatibility.

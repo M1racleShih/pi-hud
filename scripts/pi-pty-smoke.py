@@ -5,6 +5,7 @@ Requires the isolated .tmp/sdk install used by CI. This is NOT a streaming
 performance A/B test. It checks real widget/footer mounting, surface ownership,
 native-footer restoration, extension status updates, commands and resizing.
 """
+import argparse
 import errno
 import fcntl
 import json
@@ -22,11 +23,14 @@ import time
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--fullscreen", action="store_true")
+    args = parser.parse_args()
     root = pathlib.Path(__file__).resolve().parent.parent
     sdk = root / ".tmp/sdk/node_modules/@earendil-works/pi-coding-agent"
     metadata = json.loads((sdk / "package.json").read_text())
-    if metadata["version"] != "0.85.1":
-        raise RuntimeError("Expected Pi 0.85.1")
+    if metadata["version"] != "1.0.2":
+        raise RuntimeError("Expected Pi 1.0.2")
     binary = metadata["bin"]
     cli = sdk / (binary if isinstance(binary, str) else binary["pi"])
     node = shutil.which("node")
@@ -48,7 +52,7 @@ def main() -> None:
             os.execve(node, [node, str(cli), "--no-session", "--no-extensions",
                             "-e", str(root / "index.ts"),
                             "-e", str(root / "examples/bridge-demo.ts"),
-                            "-e", str(root / "examples/status-demo.ts")], env)
+                            "-e", str(root / "examples/status-demo.ts")] + (["--tui-mode", "fullscreen"] if args.fullscreen else []), env)
         alive = True
         seen = bytearray()
 

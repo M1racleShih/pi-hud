@@ -186,7 +186,12 @@ function streamFixture(model, context, options) {
   const signal = options?.signal; // the host aborts in-flight requests through this
   const n = ++calls;
   const usage = usageFor(n);
-  const isSummary = typeof context.systemPrompt === "string" && context.systemPrompt.startsWith(SUMMARIZATION_MARKER);
+  // Pi 0.99 normalizes systemPrompt into role=system transcript messages.
+  const systemTexts = [context.systemPrompt, ...context.messages
+    .filter((message) => message.role === "system")
+    .map((message) => typeof message.content === "string" ? message.content :
+      message.content.filter((block) => block.type === "text").map((block) => block.text).join(""))];
+  const isSummary = systemTexts.some((text) => typeof text === "string" && text.startsWith(SUMMARIZATION_MARKER));
   const script = isSummary ? { kind: "text", text: "FIXTURE-SUMMARY" } : scriptFor(context);
   if (script.kind === "filler") {
     // Reported context tokens must exceed pi's keepRecentTokens for compaction to have

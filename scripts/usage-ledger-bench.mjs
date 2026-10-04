@@ -1,7 +1,7 @@
 /**
  * B2b long-history session-ledger benchmark (single size/shape per process).
  *
- * Measures, for one (size, shape) fixture against the REAL pinned Pi 0.85.1
+ * Measures, for one (size, shape) fixture against the REAL pinned Pi 1.0.2
  * SessionManager and the REAL `SessionUsageLedger`:
  *
  *   fixture construction | host manager load | getEntries sync copy   (separately)

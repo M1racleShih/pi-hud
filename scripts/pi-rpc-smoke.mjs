@@ -6,7 +6,7 @@ import { spawn } from "node:child_process";
 
 const sdk = resolve(".tmp/sdk/node_modules/@earendil-works/pi-coding-agent");
 const metadata = JSON.parse(readFileSync(join(sdk, "package.json"), "utf8"));
-assert.equal(metadata.version, "0.85.1");
+assert.equal(metadata.version, "1.0.2");
 const bin = join(sdk, typeof metadata.bin === "string" ? metadata.bin : metadata.bin.pi);
 mkdirSync(".tmp", { recursive: true });
 const work = mkdtempSync(resolve(".tmp/pi-rpc-"));
@@ -53,7 +53,7 @@ try {
     child.stdin.on("error", finish);
     child.stdin.write('{"id":"hud-commands","type":"get_commands"}\n{"id":"hud-state","type":"get_state"}\n');
   });
-  console.log("PASS: real Pi 0.85.1 loads index.ts, registers /hud, serves JSON RPC with no HUD UI output");
+  console.log("PASS: real Pi 1.0.2 loads index.ts, registers /hud, serves JSON RPC with no HUD UI output");
 } finally {
   child.kill("SIGTERM");
   if (child.exitCode === null && child.signalCode === null) await new Promise((done) => {

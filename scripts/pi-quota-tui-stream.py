@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Real-TUI quota on/off streaming-interaction verification (phase quota A).
 
-Drives the real Pi 0.85.1 TUI with the deterministic in-process fixture provider
+Drives the real Pi 1.0.2 TUI with the deterministic in-process fixture provider
 (zero network, zero credentials, zero billing) and the working-tree HUD with the
 quota feature ENABLED in config. The configured profile deliberately matches no
 provider, so the quota row shows the `no quota source` marker and no network task

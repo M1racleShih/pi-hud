@@ -17,11 +17,11 @@ B2 增加显式选择的 `usageScope: observed | session`，默认 `observed`；
 
 ## 已核对的 SDK 事实
 
-以下来自本机安装的 `@earendil-works/pi-coding-agent@0.85.1` 实际发布包，而非对旧规划的沿用。路径相对该包；行号是此版本定位提示，符号名为主要依据。
+以下来自本机安装的 `@earendil-works/pi-coding-agent` 实际发布包（0.85.1 首次核对，2026-09-24 对 0.87.1 复核并补充新事实），而非对旧规划的沿用。路径相对该包；行号是首次核对版本的定位提示，符号名为主要依据。
 
 | 来源 | 确认结果 | 对方案的影响 |
 | --- | --- | --- |
-| `dist/modes/interactive/components/footer.js:77`，`render`；`dist/core/usage-totals.js` | 遍历全部 entries，累计 assistant、带 usage 的 toolResult、带 usage 的 compaction/branch_summary；四项 token 独立相加，cost 取 `usage.cost.total` | 不可用当前 branch 代替全会话；不把缓存再计入 input |
+| `dist/modes/interactive/components/footer.js:77`，`render`；`dist/core/usage-totals.js` | 遍历全部 entries，累计 assistant、带 usage 的 toolResult、带 usage 的 compaction/branch_summary；四项 token 独立相加，cost 取 `usage.cost.total`。**0.87.1 复核**：新增第五类 —— 独立 `usage` 条目（`type: "usage"`，Pi 0.86+ 缓存预热 `appendUsage("cache_warm", …)` 写入）同样无条件折入 footer 总额与 `/session` 的 `getUsageCostBreakdown` | 不可用当前 branch 代替全会话；不把缓存再计入 input；**账本必须折算 usage 条目**（Pi 0.86+），否则 cache warm 后 sess* 与原生 footer 分歧 |
 | `dist/core/session-manager.js:995`，`getEntries` | 对 fileEntries 执行 filter，返回不含 header 的新浅数组 | 每次调用都是 O(N)，即使随后只处理数组尾部 |
 | 同文件 `getEntry`、`getLeafId`、`getSessionId` | 分别使用 Map 查询或返回标量；都在 `ReadonlySessionManager` 公共类型中 | 可用游标追踪正常追加，无需每轮全量数组 |
 | 同文件 `_appendEntry`、`appendMessage` | 先更新内存数组、索引、leaf，再调用持久化；message entry 的 id 是追加时生成的 | message_end payload 不是带最终 entry id 的追加通知；内存账本与文件落盘成功不是同一个保证 |
@@ -191,7 +191,7 @@ footer.js             05cc0ab96cbdacf15a34f4e2a9a3ee0395abaeaac638c1c153632cb0be
 /goal 实现 pi-hud 第三阶段 B2：显式可选的全会话用量账本。
 
 先读 docs/HANDOFF.zh-CN.md 和 docs/SESSION-USAGE-CONTRACT.zh-CN.md，
-核对当前代码、工作区改动和固定 Pi 0.85.1 SDK；按 B1 契约实现。
+核对当前代码、工作区改动和固定 Pi 0.87.1 SDK；按 B1 契约实现。
 
 新增 usageScope: observed|session，默认 observed；保持 widget 默认。
 session 覆盖当前 manager 全部 entries 的 assistant、带 usage 的 toolResult、

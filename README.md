@@ -89,7 +89,7 @@ Configuration lives in the same `pi-hud.json` (`quota.profiles`, ≤16; organiza
 
 ## Install
 
-Target host: **Pi 0.85.1**, package `@earendil-works/pi-coding-agent`, with **Node.js 22.19.0 or newer**. The integration was source-reviewed against that release. Older `@mariozechner` releases are not claimed compatible.
+Target host: **Pi 1.0.2**, package `@earendil-works/pi-coding-agent`, with **Node.js 22.19.0 or newer**. The integration was source-reviewed against that release. Older `@mariozechner` releases are not claimed compatible.
 
 Unzip the delivery and keep the `pi-hud` directory in a stable location. From a terminal, register its **absolute** path:
 

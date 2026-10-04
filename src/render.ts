@@ -324,7 +324,7 @@ export function tasksField(snapshot: HudSnapshot, words: HudWords): HudField | n
 export function costField(snapshot: HudSnapshot, config: HudConfig, words: HudWords): HudField | null {
   if (!config.showCost) return null;
   if (config.usageScope === "session" && snapshot.sessionUsage) return sessionCostField(snapshot.sessionUsage, config, words);
-  const value = snapshot.costReports ? `$${snapshot.cost.toFixed(3)}${snapshot.costReports < snapshot.usageReports ? "+?" : ""}` : "?";
+  const value = snapshot.costReports ? `${config.costUnit}${snapshot.cost.toFixed(3)}${snapshot.costReports < snapshot.usageReports ? "+?" : ""}` : "?";
   return field(60, [seg("label", `${words.cost} `), seg("body", value)]);
 }
 
@@ -347,7 +347,7 @@ export function sessionCostField(view: SessionUsageView, config: HudConfig, word
   if (view.limited) marks.push("limited*");
   const markWarns = (view.fieldsIncomplete && !view.costMissing) || view.limited;
   if (marks.length) segments.push(seg(markWarns ? "warning" : "label", `${marks.join(" ")} `));
-  const value = view.costKnown ? `$${view.cost.toFixed(3)}${view.costMissing ? "+?" : ""}` : "?";
+  const value = view.costKnown ? `${config.costUnit}${view.cost.toFixed(3)}${view.costMissing ? "+?" : ""}` : "?";
   segments.push(seg("body", value));
   return field(60, segments);
 }

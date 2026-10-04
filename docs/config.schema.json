@@ -75,6 +75,12 @@
       "type": "boolean",
       "default": true
     },
+    "costUnit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4,
+      "description": "Cost value prefix; \"$\" for currency or a custom unit label such as \"Mcr\" (million Credits)."
+    },
     "showThinking": {
       "type": "boolean",
       "default": true
@@ -142,7 +148,12 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "providerId", "adapter", "source"],
+            "required": [
+              "id",
+              "providerId",
+              "adapter",
+              "source"
+            ],
             "properties": {
               "id": {
                 "type": "string",
@@ -156,24 +167,43 @@
                 "description": "Exact Pi provider id; never matched by prefix."
               },
               "adapter": {
-                "enum": ["zai", "minimax", "codex", "gemini-cli", "deepseek", "siliconflow"]
+                "enum": [
+                  "zai",
+                  "minimax",
+                  "codex",
+                  "gemini-cli",
+                  "deepseek",
+                  "siliconflow"
+                ]
               },
               "source": {
-                "enum": ["pi", "codex-app-server"]
+                "enum": [
+                  "pi",
+                  "codex-app-server"
+                ]
               },
               "enabled": {
                 "type": "boolean",
                 "default": true
               },
               "region": {
-                "enum": ["cn", "global"],
+                "enum": [
+                  "cn",
+                  "global"
+                ],
                 "description": "Required for zai/minimax. global stays unverified for GLM and reports needs-verification without requests."
               },
               "plan": {
-                "enum": ["personal", "team"]
+                "enum": [
+                  "personal",
+                  "team"
+                ]
               },
               "queryMode": {
-                "enum": ["personal-legacy", "team"],
+                "enum": [
+                  "personal-legacy",
+                  "team"
+                ],
                 "description": "personal-legacy and team are account-verified. The type=1 `personal` candidate was dropped from scope (owner decision 2026-09-22) and is rejected at load."
               },
               "organizationId": {
@@ -190,7 +220,11 @@
                 "type": "array",
                 "minItems": 1,
                 "maxItems": 16,
-                "items": { "type": "string", "minLength": 1, "maxLength": 160 },
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
                 "description": "Optional exact model ids narrowing this profile within the provider."
               },
               "origin": {

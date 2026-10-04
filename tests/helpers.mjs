@@ -84,9 +84,10 @@ export const toolResultEntry = (n) => ({ role: "toolResult", toolCallId: "t", to
 
 /**
  * Independent oracle for the native footer's aggregation rule (assistant, toolResult with
- * usage, compaction/branch_summary with usage; four token fields and cost.total summed
- * separately). Written against the SDK's footer.js/usage-totals.js behaviour, not against
- * the ledger's reducer, so agreement is evidence and not a tautology.
+ * usage, compaction/branch_summary with usage, and standalone `usage` records — the latter
+ * appear from Pi 0.86's cache warming; four token fields and cost.total summed separately).
+ * Written against the SDK's footer.js/usage-totals.js behaviour, not against the ledger's
+ * reducer, so agreement is evidence and not a tautology.
  */
 export function oracleTotals(entries) {
   const totals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, records: 0 };
@@ -95,7 +96,7 @@ export function oracleTotals(entries) {
     if (entry.type === "message" && entry.message) {
       if (entry.message.role === "assistant") u = entry.message.usage;
       else if (entry.message.role === "toolResult" && entry.message.usage) u = entry.message.usage;
-    } else if ((entry.type === "compaction" || entry.type === "branch_summary") && entry.usage) u = entry.usage;
+    } else if ((entry.type === "compaction" || entry.type === "branch_summary" || entry.type === "usage") && entry.usage) u = entry.usage;
     if (!u) continue;
     totals.input += u.input; totals.output += u.output;
     totals.cacheRead += u.cacheRead; totals.cacheWrite += u.cacheWrite;

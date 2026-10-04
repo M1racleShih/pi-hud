@@ -5,8 +5,9 @@
  * attachment actually saw. `usageScope: "session"` additionally builds this ledger from the
  * current SessionManager's *entire* entry list - all branches, pre-compaction messages,
  * already-reported error/aborted responses and summary records - matching the native
- * footer's four record categories (assistant, toolResult-with-usage, compaction,
- * branch_summary), never the current branch only.
+ * footer's record categories (assistant, toolResult-with-usage, compaction,
+ * branch_summary, and the standalone `usage` records Pi ≥ 0.86 appends for background
+ * requests such as cache warming), never the current branch only.
  *
  * Cost model follows the B1 contract exactly:
  * - the four token counters stay separate; cache is never folded into input;
@@ -15,8 +16,8 @@
  * - `cost.total` keeps the historically reported price; zero stays an explicit valid zero;
  *   unknown cost renders `?`, partially known renders `<known>+?`;
  * - a toolResult without usage is simply out of the native scope (never an unknown charge);
- * - a compaction/branch_summary without usage keeps the known token subtotals and marks
- *   the cost incomplete; an assistant without usage marks the data incomplete;
+ * - a compaction/branch_summary/usage record without usage keeps the known token subtotals
+ *   and marks the cost incomplete; an assistant without usage marks the data incomplete;
  * - saturated sums (MAX_SAFE_INTEGER) set `limited` instead of pretending precision.
  *
  * Acquisition is event-driven and cancelable: a baseline is built from one `getEntries()`
@@ -77,7 +78,7 @@ export interface SessionUsageView {
   missingCacheWrite: number;
   /** Assistant records without (valid) usage: the data is incomplete, not zero spend. */
   assistantMissingUsage: number;
-  /** compaction/branch_summary records without usage: cost incomplete, tokens kept. */
+  /** compaction/branch_summary/usage records without usage: cost incomplete, tokens kept. */
   summaryMissingUsage: number;
   /** A token or cost sum saturated at MAX_SAFE_INTEGER. */
   limited: boolean;
@@ -196,8 +197,10 @@ function accumulateUsage(usage: UsageLike, totals: SessionTotals): void {
 }
 
 /**
- * Aggregate one session entry under the native footer's four-category rule, extended with
- * the B1 missing-data semantics. Returns whether the entry was in scope at all.
+ * Aggregate one session entry under the native footer's category rule (assistant,
+ * toolResult-with-usage, compaction, branch_summary, standalone `usage` records — the
+ * latter appear from Pi 0.86's cache warming and similar background requests), extended
+ * with the B1 missing-data semantics. Returns whether the entry was in scope at all.
  */
 export function aggregateEntry(entry: SessionEntryLike | undefined | null, totals: SessionTotals): boolean {
   if (!object(entry)) { totals.examined++; return false; }
@@ -218,12 +221,12 @@ export function aggregateEntry(entry: SessionEntryLike | undefined | null, total
     accumulateUsage(usage, totals);
     return true;
   }
-  if (type === "compaction" || type === "branch_summary") {
+  if (type === "compaction" || type === "branch_summary" || type === "usage") {
     totals.examined++;
     const usage = entry.usage;
     if (!object(usage)) {
-      // Summary records without usage keep the known token subtotals, mark the cost
-      // incomplete and are counted in diagnostics; never guessed into a charge.
+      // Summary or standalone usage records without usage keep the known token subtotals,
+      // mark the cost incomplete and are counted in diagnostics; never guessed into a charge.
       totals.summaryMissingUsage++;
       totals.costMissing++;
       return true;

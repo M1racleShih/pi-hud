@@ -79,6 +79,8 @@ export interface HudConfig {
   color: boolean;
   ascii: boolean;
   showCost: boolean;
+  /** Cost value prefix; "$" for currency or a custom unit label such as "Mcr" (M Credits). */
+  costUnit: string;
   showThinking: boolean;
   /** Show the `spd*` generation-speed field (measurement always runs; see docs/TOKEN-SPEED.zh-CN.md). */
   showSpeed: boolean;
@@ -112,6 +114,7 @@ export const DEFAULT_CONFIG: Readonly<HudConfig> = Object.freeze({
   color: true,
   ascii: false,
   showCost: true,
+  costUnit: "$",
   showThinking: true,
   showSpeed: true,
   git: Object.freeze({ enabled: false, ttlMs: 30_000, timeoutMs: 500 }),
@@ -287,6 +290,10 @@ export function normalizeConfig(input: unknown = {}): Readonly<HudConfig> {
   for (const key of ["enabled", "color", "ascii", "showCost", "showThinking", "showSpeed"]) {
     if (typeof result[key] !== "boolean") throw new Error(`${key} must be boolean`);
   }
+  if (typeof result.costUnit !== "string") throw new Error("costUnit must be a string");
+  const costUnit = result.costUnit.trim();
+  if (costUnit.length < 1 || costUnit.length > 4) throw new Error("costUnit must be 1-4 characters after trimming");
+  result.costUnit = costUnit;
   for (const [key, values] of [
     ["preset", ["minimal", "balanced", "full"]],
     ["surface", ["widget", "footer"]],

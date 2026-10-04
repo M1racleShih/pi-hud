@@ -46,7 +46,7 @@ export interface HudWidget {
 export interface PiUi {
   theme?: HudTheme;
   setWidget(key: string, factory?: ((tui: WidgetTui, theme: HudTheme) => HudWidget) | undefined, options?: { placement: string }): void;
-  /** Present on Pi 0.85.1; optional so a limited host can fall back to the widget surface. */
+  /** Present since Pi 0.85.1 and revalidated through 1.0.2; optional so a limited host can fall back to the widget surface. */
   setFooter?(factory?: ((tui: WidgetTui, theme: HudTheme, footerData: FooterDataLike) => HudFooterComponent) | undefined): void;
   notify(message: string, type?: string): void;
 }
@@ -632,7 +632,7 @@ export class HudController {
   inspect() {
     const statuses = this.footerData?.getExtensionStatuses?.();
     return {
-      version: "0.1.0", targetPi: "0.85.1", enabled: this.enabled,
+      version: "0.1.0", targetPi: "1.0.2", enabled: this.enabled,
       mode: this.ctx?.mode ?? "inactive", preset: this.config.preset,
       surface: this.config.surface, surfaceEffective: this.effectiveSurface(),
       usageScope: this.config.usageScope,

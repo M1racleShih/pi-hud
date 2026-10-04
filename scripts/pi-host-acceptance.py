@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """B2b real-Pi-host acceptance for the session usage ledger and footer coexistence.
 
-Drives the REAL Pi 0.85.1 TUI in a disposable PTY with:
+Drives the REAL Pi 1.0.2 TUI in a disposable PTY with:
   - the deterministic in-process fixture provider (tests/fixtures/fixture-provider.ts,
     zero network, zero credentials, zero billing),
   - the HUD under test (index.ts) with usageScope: session,
@@ -86,6 +86,12 @@ class PiHost:
         if offline:
             env["PI_OFFLINE"] = "1"
         args = [NODE, str(SDK / "dist/bundle/cli.js"), "--no-extensions"]
+        # Regular mode is pinned explicitly: Pi 1.0+ defaults to fullscreen, whose
+        # chat viewport paints only visible rows, so the long /hud status JSON
+        # dump scrolls out of the captured screen. Regular scrollback keeps the
+        # ledger assertions deterministic (fullscreen mounting is covered by
+        # pi-pty-smoke.py --fullscreen).
+        args += ["--tui-mode", "regular"]
         for extension in extensions:
             args += ["-e", str(extension)]
         if provider:
@@ -180,13 +186,15 @@ class PiHost:
             self.seen.extend(data)
             if marker in self.plain():
                 return self.plain()
-        raise RuntimeError(f"timed out waiting for {marker!r}; tail={self.plain()[-300:]!r}")
+        raise RuntimeError(f"timed out waiting for {marker!r}; tail={self.plain()[-3000:]!r}")
 
     def status_totals(self):
         """Send /hud status and regex-extract the published ledger totals."""
         self.seen.clear()  # parse ONLY this command's popup; the buffer keeps old ones
         self.send(b"/hud status\r")
-        self.wait_for(b'"totals"', timeout=15)
+        # Plain-text matching: the host's notify popup syntax-highlights JSON,
+        # inserting SGR runs between quote and key tokens (Pi 1.0.2).
+        self.wait_for_plain('"totals"', timeout=15)
         self.pump(0.6)
         text = self.plain()
         match = TOTALS_PATTERN.search(text)
@@ -377,6 +385,7 @@ def scenario_compact_twice(directory):
     # makes the pinned SDK's find(summary === summary) select an OLD entry for the
     # session_compact event - the ledger must still count the new one exactly once.
     session_file = build_session(directory, 300, "linear", same_summary=True)
+    initial_compactions = [json.loads(line) for line in session_file.read_text().splitlines() if json.loads(line).get("type") == "compaction"]
     host = PiHost(directory, [HUD, PROVIDER], {"preset": "full", "usageScope": "session", "surface": "footer"}, session_file=session_file)
     try:
         host.wait_for(b"sess*", timeout=30)
@@ -404,15 +413,17 @@ def scenario_compact_twice(directory):
         second = wait_ledger_growth(host, first["input"])
         oracle = file_oracle(session_file)
         compare_totals("compact-twice", second, oracle)
-        # Both live compactions carry the SAME fixture summary text; the fixture's own
-        # compaction entries use different random summaries, so this counts exactly the
-        # same-summary pair (the SDK's session_compact find() selects the older one -
-        # the ledger must still count both exactly once, which the oracle match proves).
-        same_summary = sum(1 for line in session_file.read_text().splitlines()
-                           if '"summary":"FIXTURE-SUMMARY"' in line)
-        record("compact-twice", same_summary >= 12 and second["input"] > first["input"] > before["input"], {
-            "note": "two live /compact runs with the same summary; both counted exactly once",
-            "sameSummaryEntries": same_summary,
+        # The first live summary duplicates the resumed summary, exercising the
+        # old-entry lookup hazard. Newer Pi may wrap the second summary with a
+        # split-turn checkpoint; verify both new entries and their fixture content
+        # instead of assuming an exact summary count from the seeded history.
+        compactions = [json.loads(line) for line in session_file.read_text().splitlines() if json.loads(line).get("type") == "compaction"]
+        new_compactions = compactions[len(initial_compactions):]
+        correct_summaries = len(new_compactions) == 2 and new_compactions[0]["summary"] == "FIXTURE-SUMMARY" and new_compactions[1]["summary"].startswith("FIXTURE-SUMMARY")
+        record("compact-twice", correct_summaries and second["input"] > first["input"] > before["input"], {
+            "note": "two live /compact runs, duplicate first summary and optional split-turn wrapper; both counted exactly once",
+            "newCompactions": len(new_compactions),
+            "summaries": [entry["summary"] for entry in new_compactions],
             "before": before["input"], "afterFirst": first["input"], "afterSecond": second["input"],
             "oracle": {k: oracle[k] for k in ("input", "usageRecords")},
             "rebuilds": second.get("rebuilds"),
@@ -672,12 +683,13 @@ def main() -> int:
         "durationSeconds": round(time.time() - started, 1),
         "environment": {
             "node": subprocess.run([NODE, "--version"], capture_output=True, text=True).stdout.strip(),
-            "pi": "0.85.1 (isolated .tmp/sdk)",
+            "pi": "1.0.2 (isolated .tmp/sdk)",
             "provider": "deterministic in-process fixture (zero network/billing)",
         },
         "results": RESULTS,
     }
     if args.json:
+        pathlib.Path(args.json).parent.mkdir(parents=True, exist_ok=True)
         pathlib.Path(args.json).write_text(json.dumps(record_out, indent=2, default=str) + "\n")
     print(json.dumps({"passed": passed, "scenarios": len(RESULTS)}, indent=2))
     return 0 if passed else 1

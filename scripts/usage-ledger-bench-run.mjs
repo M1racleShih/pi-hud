@@ -56,7 +56,7 @@ const record = {
   },
   methodology: [
     "One child process per (size, shape) with --expose-gc so per-cell heap attribution is not polluted by earlier cells.",
-    "Real pinned Pi 0.85.1 SessionManager (inMemory) loaded from the same seeded op stream the plain fixture derives from; fixture build, manager load and HUD attach are timed separately.",
+    "Real pinned Pi 1.0.2 SessionManager (inMemory) loaded from the same seeded op stream the plain fixture derives from; fixture build, manager load and HUD attach are timed separately.",
     "External pause probe: a setImmediate loop measures the gap between iterations (approximates the longest uninterruptible pause including GC); the same probe over an idle window is reported as its noise floor. It also samples heapUsed/rss every 32 iterations.",
     "CPU deltas include the probe; attach.netCpuMs subtracts the measured idle probe rate. Wall times include yield waits by design (the contract distinguishes yield-inclusive total time from the max pause).",
     "Every phase asserts the published totals against the independent fixture oracle before its timing is recorded; steady-state phases additionally assert zero new getEntries calls.",

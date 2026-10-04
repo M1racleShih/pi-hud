@@ -21,7 +21,7 @@
 
 ## 显示位置：footer（默认）与 widget
 
-`surface` 决定 HUD 画在哪里。默认 `footer`：使用 Pi 0.85.1 的正式 `ctx.ui.setFooter` 槽位替换内置 footer，并且**不再挂载 HUD widget**，从而消除模型、上下文、费用的重复显示。设 `surface: "widget"`（或执行 `/hud surface widget`）可回到被动 widget 模式，原生 footer 原样保留：
+`surface` 决定 HUD 画在哪里。默认 `footer`：使用 Pi 1.0.2 的正式 `ctx.ui.setFooter` 槽位替换内置 footer，并且**不再挂载 HUD widget**，从而消除模型、上下文、费用的重复显示。设 `surface: "widget"`（或执行 `/hud surface widget`）可回到被动 widget 模式，原生 footer 原样保留：
 
 ```text
 [Example Model] · high · demo · ~/opensource/pi-hud · git:main* · Compare HUDs
@@ -83,7 +83,7 @@ ctx(last) ██░░░░░░░░ 45% 90k/200k · 全会话* ↻ ↑61k �
 
 ## 安装
 
-目标版本：**Pi 0.85.1**，包名 `@earendil-works/pi-coding-agent`，**Node.js ≥ 22.19.0**。接口已按该发布版源码核对；不宣称兼容旧版 `@mariozechner` 包。
+目标版本：**Pi 1.0.2**，包名 `@earendil-works/pi-coding-agent`，**Node.js ≥ 22.19.0**。接口已按该发布版源码核对；不宣称兼容旧版 `@mariozechner` 包。
 
 解压后，把 `pi-hud` 目录放到准备长期保留的位置，使用它的**绝对路径**安装：
 

@@ -36,7 +36,7 @@ export const MAX_STATUS_TEXT = 64;
 /** Hard cap for the whole footer: four body rows plus two status rows. */
 export const MAX_FOOTER_ROWS = 6;
 
-/** Read-only host footer data surface (Pi 0.85.1 `ReadonlyFooterDataProvider`). */
+/** Read-only host footer data surface (Pi 0.85.1–1.0.2 `ReadonlyFooterDataProvider`). */
 export interface FooterDataLike {
   getGitBranch(): string | null;
   onBranchChange(callback: () => void): () => void;

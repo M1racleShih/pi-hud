@@ -1,6 +1,6 @@
 /**
  * Surface lifecycle, ownership and data-adaptation tests for the optional footer.
- * The fake host mirrors Pi 0.85.1: `setFooter` is a single replacement slot that disposes
+ * The fake host mirrors Pi 0.85.1-1.0.2: `setFooter` is a single replacement slot that disposes
  * the previously installed component before running the next factory, and `setStatus`
  * mutates one Map in place and then asks the TUI to render.
  */

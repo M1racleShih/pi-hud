@@ -14,10 +14,12 @@
  *
  * Host-safety note: Pi 0.85.1's native footer aggregates every assistant entry with
  * `addUsageToTotals(entry.message.usage)` and crashes when an assistant message has no
- * usage object (real provider sessions always fill it). The written file therefore
- * injects deterministic usage into the fixture's deliberate assistant-without-usage
- * records; the HUD's missing-data paths stay covered by the in-process fixtures,
- * unit tests and the pinned-SDK oracle, which never run the native footer.
+ * usage object (real provider sessions always fill it); 0.86+ additionally folds every
+ * standalone `usage` entry (cache warming) the same unconditional way. The written file
+ * therefore injects deterministic usage into the fixture's deliberate
+ * assistant-without-usage records; the HUD's missing-data paths stay covered by the
+ * in-process fixtures, unit tests and the pinned-SDK oracle, which never run the native
+ * footer.
  */
 import { writeFileSync } from "node:fs";
 import { buildFixture, usageFor } from "./usage-fixtures.mjs";

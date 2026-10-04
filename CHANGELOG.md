@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Pi 0.99.1 → 1.0.2 compatibility
+
+- Revalidate against Pi 1.0.2 (through the 1.0.0 fullscreen-by-default change): SDK contract type checks, usage oracle, 356 local tests, performance gates, RPC smoke, regular/fullscreen PTY smoke and all 9 real-host acceptance scenarios pass; no HUD runtime API incompatibility. Target pins (`targetPi`, gate scripts, README/SECURITY, upstream lock) updated to 1.0.2.
+- Acceptance harness fixes for the 1.0.x host: pin `--tui-mode regular` (the fullscreen chat viewport paints only visible rows, hiding the long `/hud status` JSON dump from the captured screen) and match JSON markers on ANSI-stripped text (the 1.0.2 status renderer inserts SGR runs inside `"key"` tokens).
+- Revalidate SDK event/UI/theme/auth/usage contracts, RPC, regular/fullscreen PTY smoke and all 9 real-host acceptance scenarios against Pi 0.99.1; update target diagnostics and development pins.
+- Fix the offline fixture provider's summary detection for normalized role=system transcript messages. Update compaction acceptance to verify exactly two new entries, the duplicate first summary and the optional split-turn wrapper, rather than a hard-coded seeded summary count.
+- Create acceptance report directories automatically. HUD production behavior needed no API compatibility changes.
+
+
+## 0.2.1 — 2026-09-24
+
+### Pi 0.87.1 adaptation: session ledger folds standalone `usage` records; pins revalidated
+
+Upgraded the pinned host from 0.85.1 to 0.87.1 after a source review of the 0.85.1→0.87.1 delta ([upstream-lock.json](docs/upstream-lock.json), tag commit `f07218c`). The breaking-looking 0.87.0 changes were verified harmless for the HUD: `turn_end` only **gained** required boundary fields (`messageEntryId`/`toolResultEntryIds`, read-only here), `ContextEditEntry` falls through the ledger's type whitelist into the out-of-scope branch (and the native footer still sums raw entries, so the mirror stays aligned), cache warming drives `models.streamSimple` directly and never emits `message_start`/`message_update`/`message_end`, so `obs*` counters and the `spd*` bridge are never polluted by warm requests. The one real semantic gap: since 0.86.0 the host appends standalone **`usage` entries** (cache warming's `appendUsage("cache_warm", …)`) and both the native footer and `/session`'s `getUsageCostBreakdown` fold **every** usage entry into the session totals — which the ledger's `message`/`compaction`/`branch_summary` whitelist silently skipped, so `usageScope: "session"` totals would drift from the replaced native footer after the first warm. `aggregateEntry` now folds `type: "usage"` records (any `kind`, mirroring the host's kind-agnostic fold) with the same missing-data semantics (a usage record without a usable usage object keeps known token subtotals and marks cost incomplete via the existing `summaryMissingUsage` diagnostics); idle-time warm appends emit no extension event but the next `turn_end`/`agent_settled` incremental reconcile walks through them like any append. Both independent oracle reducers (`tests/helpers.mjs`, `scripts/usage-fixtures.mjs`) grew the same category so agreement remains evidence, and the oracle-agreement fixture now includes cache_warm records with and without usage. Pins upgraded to 0.87.1: `.tmp/sdk` install ([DEVELOPMENT.md](docs/DEVELOPMENT.md)), `sdk-check` (assert + new contract pins for the `usage`/`context_edit` entry types, the turn_end boundary fields and the 0.86 `pi.on` unsubscribe return), RPC/PTY/quota/live-scenario smoke version checks, `targetPi` in `/hud status`, README/SECURITY target statements, and the usage-contract doc records the 0.87.1 footer fact. 356 tests green (+1); verify/package:check/sdk-check/RPC/PTY/oracle gates all re-run against 0.87.1.
+
 ## 0.2.0 — 2026-09-22
 
 ### provider quota slice 3: Codex subscription adapter (default off)

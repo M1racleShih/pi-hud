@@ -2,7 +2,7 @@
 """B2b automated live-TUI streaming / tool / keyboard A/B (PERFORMANCE.md protocol).
 
 Alternates the HUD on/off (PI_HUD_DISABLE=1 for the off side) across >= 20 paired
-trials per profile in the REAL Pi 0.85.1 TUI, driven through a PTY with the
+trials per profile in the REAL Pi 1.0.2 TUI, driven through a PTY with the
 deterministic in-process fixture provider (zero network, credentials or billing)
 and an isolated disposable HOME/workspace.
 
@@ -734,7 +734,7 @@ def main() -> int:
             "completionMarker": "«END» (one atomic delta)",
         },
         "environment": {
-            "pi": "0.85.1 (isolated .tmp/sdk)", "provider": "deterministic in-process fixture",
+            "pi": "1.0.2 (isolated .tmp/sdk)", "provider": "deterministic in-process fixture",
             "methodology": "render-frame intervals are pi-tui frame gaps during streaming, NOT provider token gaps; "
                            "during-stream control-key numbers are redraw latency (next frame), printable echoes are char-verified; "
                            "toolVisibleMs is Enter -> the transcript tool row; toolTurnMs is Enter -> follow-up reply",

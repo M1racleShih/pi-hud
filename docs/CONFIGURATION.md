@@ -20,6 +20,7 @@ Resolution order: absolute `PI_HUD_CONFIG`; otherwise `pi-hud.json` beneath abso
 | `color` | `true` | boolean; `false` disables all styling regardless of `palette` |
 | `ascii` | `false` | boolean; ASCII symbols/ellipsis, not translation of arbitrary model names or labels |
 | `showCost` | `true` | boolean |
+| `costUnit` | `"$"` | string, 1–4 characters after trimming; prefix shown before the cost value. Keep `"$"` for currency, or set a custom unit when model `cost` rates carry another quantity — e.g. `"Mcr"` when rates are million-Credits per million tokens (subscription plans such as Xiaomi MiMo Token Plan deduct Credits, not currency) |
 | `showThinking` | `true` | boolean |
 | `showSpeed` | `true` | boolean; hide the `spd*` field without stopping the measurement |
 | `git.enabled` | `false` | boolean |

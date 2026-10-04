@@ -4,12 +4,13 @@
  * Unlike `tests/usage.test.mjs` (in-repo fixtures + an independent reducer), this script
  * runs the ledger against the REAL pinned `SessionManager` from the isolated
  * `.tmp/sdk` install and compares the published totals with the SDK's own
- * `createUsageTotals`/`addUsageToTotals` under the native footer's four-category rule.
+ * `createUsageTotals`/`addUsageToTotals` under the native footer's category rule
+ * (including the standalone `usage` records Pi 0.86+ appends for cache warming).
  * It transcribes the B1 probe (`.tmp/sdk/b1-probe.mjs`) into a reproducible check and
  * adds the B2a lifecycle matrix. Requires the network-enabled pinned environment:
  *
  *   npm install --prefix .tmp/sdk --ignore-scripts --no-audit --no-fund --save-exact \
- *     @earendil-works/pi-coding-agent@0.85.1
+ *     @earendil-works/pi-coding-agent@1.0.2
  *   node scripts/usage-oracle-check.mjs
  *
  * No network, model, provider credentials or file persistence are involved: every manager
@@ -33,13 +34,16 @@ const toolResult = (n) => ({
   timestamp: 0, usage: usage(n),
 });
 
-/** The SDK's own aggregation over its own scoping rule: the strongest available oracle. */
+/** The SDK's own aggregation over its own scoping rule: the strongest available oracle.
+ *  Mirrors the 1.0.2 native footer exactly: assistant, toolResult-with-usage,
+ *  compaction/branch_summary-with-usage, and every standalone `usage` record
+ *  (cache warming) regardless of kind. */
 function sdkOracle(manager) {
   const totals = createUsageTotals();
   for (const entry of manager.getEntries()) {
     let u;
     if (entry.type === "message" && ["assistant", "toolResult"].includes(entry.message.role)) u = entry.message.usage;
-    else if (["compaction", "branch_summary"].includes(entry.type)) u = entry.usage;
+    else if (["compaction", "branch_summary", "usage"].includes(entry.type)) u = entry.usage;
     if (u) addUsageToTotals(totals, u);
   }
   return totals;
@@ -98,6 +102,16 @@ const compare = (label, ledger, manager) => {
   compare("after increment", ledger, manager);
   const diag = ledger.inspect();
   assert.equal(diag.hostCalls.getEntries, 1, "increments never call getEntries");
+  // Pi 0.86+ cache warming appends standalone usage records with no extension event;
+  // the next incremental reconcile must fold them exactly like the native footer.
+  manager.appendUsage("cache_warm", "anthropic", "claude", usage(11));
+  manager.appendUsage("cache_warm", "anthropic", "claude", usage(13));
+  ledger.requestVerify();
+  await quiet(ledger);
+  compare("after cache warm", ledger, manager);
+  const warmView = ledger.view();
+  assert.equal(warmView.usageRecords, 9);
+  assert.equal(warmView.status, "ready");
   ledger.dispose();
 }
 
@@ -205,4 +219,4 @@ const compare = (label, ledger, manager) => {
   ledger.dispose();
 }
 
-console.log("PASS: pinned Pi 0.85.1 SessionManager oracle agrees with the session usage ledger");
+console.log("PASS: pinned Pi 1.0.2 SessionManager oracle agrees with the session usage ledger");

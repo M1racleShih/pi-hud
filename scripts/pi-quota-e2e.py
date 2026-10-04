@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Real-account quota E2E (read-only).
 
-GLM mode runs the real Pi 0.85.1 TUI with the user's real agent directory
+GLM mode runs the real Pi 1.0.2 TUI with the user's real agent directory
 (auth.json holds the zai-coding-cn personal credential). DeepSeek mode runs the
 same flow against Pi's built-in `deepseek` provider, whose key resolves from the
 DEEPSEEK_API_KEY environment variable at query time (the auth.json entry is
@@ -29,7 +29,7 @@ import termios
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SDK = ROOT / ".tmp/sdk/node_modules/@earendil-works/pi-coding-agent"
 METADATA = json.loads((SDK / "package.json").read_text())
-assert METADATA["version"] == "0.85.1", METADATA["version"]
+assert METADATA["version"] == "1.0.2", METADATA["version"]
 CLI = SDK / "dist/bundle/cli.js"
 NODE = shutil.which("node")
 

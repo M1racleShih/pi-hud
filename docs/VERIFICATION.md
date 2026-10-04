@@ -426,3 +426,49 @@ Design: [PROVIDER-LIMITS-PLAN.zh-CN.md](PROVIDER-LIMITS-PLAN.zh-CN.md) §2 Codex
 | Protocol findings | Recorded in the evidence file: stdin-EOF-before-answer is a shutdown signal (driver keeps stdin open, kills after the answer — unit-tested); unsolicited notifications skipped by id; the missing-import runtime failure class is now a check.mjs assertion. |
 
 Explicitly **not verified** in this slice (kept out of any support claim): other plan types (the live account is `prolite`; free/go/plus/team and the edu/enterprise enums are covered by schema-derived handling only), accounts where `secondary` (the 5-hour window) is non-null (covered by synthetic tests only), a not-logged-in codex (the needs-auth mapping is pattern-based on error envelopes, not observed live), codex versions other than 0.155.1, the `credits`/`rateLimitResetCredits`/`ordinaryUsageAllowed` fields (read but not displayed), automatic verification that the local codex login matches Pi's openai-codex account (recorded as matching during research; the adapter does not claim it), and the MiniMax/Gemini adapters (still `unsupported-adapter` without requests).
+
+
+## Pi 0.99.1 compatibility revalidation
+
+The isolated `.tmp/sdk` host is now Pi 0.99.1. SDK contract type checks and the
+real SessionManager usage oracle pass; 356 local tests pass. Isolated RPC smoke
+and regular/fullscreen PTY smoke pass (mounting, status updates, surface ownership,
+off/on, theme/palette and resizing). All 9 real-host scenarios pass: 10k resume,
+live tool turn, two compactions, tree branching, model switch, fast session switch,
+both competing-footer orders, and final committed replacement usage.
+
+The initial compaction test failure was in the offline fixture: Pi now normalizes
+systemPrompt into role=system transcript messages. Summary detection now supports
+both forms. The assertion additionally permits Pi's split-turn wrapper while
+requiring exactly two new compactions, a duplicate first summary and full-history
+oracle agreement. No HUD runtime API incompatibility was found. The target version
+reported by `/hud status` was corrected to 0.99.1.
+
+Evidence: `artifacts/host-acceptance-0.99.1.json` records 9 passing scenarios,
+SDK lock hash and source provenance. These runs use deterministic local providers;
+no real credentials, external model requests or real-account quota calls were made.
+
+
+## Pi 1.0.2 compatibility revalidation
+
+Upgraded with Pi 1.0.0 → 1.0.2 (Pi made fullscreen the default TUI mode in 1.0.0).
+The isolated `.tmp/sdk` host is now Pi 1.0.2. SDK contract type checks and the real
+SessionManager usage oracle pass; 356 local tests and the performance gates pass.
+Isolated RPC smoke and regular/fullscreen PTY smoke pass (mounting, status updates,
+surface ownership, off/on, theme/palette and resizing). All 9 real-host scenarios
+pass after two harness fixes; no HUD runtime API incompatibility was found:
+
+- `pi-host-acceptance.py` now pins `--tui-mode regular`. Under the fullscreen
+  default the chat viewport paints only visible rows, so the long `/hud status`
+  JSON dump scrolls past the captured screen and its early keys (including
+  `"totals"`) never reach the PTY. Regular scrollback keeps the ledger assertions
+  deterministic; fullscreen mounting stays covered by `pi-pty-smoke.py
+  --fullscreen`.
+- `status_totals` matches its JSON markers on ANSI-stripped text: the 1.0.2
+  status renderer syntax-highlights JSON, inserting SGR runs between quote and
+  key tokens, so raw byte matching broke.
+
+The target version reported by `/hud status` is now 1.0.2. Evidence:
+`artifacts/host-acceptance-1.0.2.json` records 9 passing scenarios. These runs use
+deterministic local providers; no real credentials, external model requests or
+real-account quota calls were made.

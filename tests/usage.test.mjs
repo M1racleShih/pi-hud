@@ -53,6 +53,8 @@ test("aggregation agrees with an independent oracle over every in-scope record k
   manager.appendBranchSummary("branch-b"); // no usage
   manager.appendMessage(assistantEntry(5, { stopReason: "error" }));
   manager.appendMessage(assistantEntry(6, { stopReason: "aborted" }));
+  manager.append({ type: "usage", kind: "cache_warm", provider: "anthropic", model: MODEL, usage: usage(7) });
+  manager.append({ type: "usage", kind: "cache_warm", provider: "anthropic", model: MODEL }); // no usage: incomplete, in scope
   manager.append({ type: "custom", customType: "other-ext", data: {} });
   manager.append({ type: "thinking_level_change", thinkingLevel: "high" });
   const f = ledgerFixture({ manager });
@@ -68,7 +70,7 @@ test("aggregation agrees with an independent oracle over every in-scope record k
   assert.equal(view.usageRecords, oracle.records);
   assert.ok(Math.abs(view.cost - oracle.cost) < 1e-9);
   assert.equal(view.assistantMissingUsage, 0);
-  assert.equal(view.summaryMissingUsage, 2);
+  assert.equal(view.summaryMissingUsage, 3);
   assert.equal(view.missingInput, 0);
 });
 
@@ -123,6 +125,13 @@ test("assistant without usage is incomplete data; toolResult without usage is no
   }
   {
     const t = fresh();
+    aggregateEntry({ type: "usage", kind: "cache_warm" }, t);
+    assert.equal(t.summaryMissingUsage, 1, "a standalone usage record without usage marks the cost incomplete");
+    assert.equal(t.costMissing, 1);
+    assert.equal(t.usageRecords, 0);
+  }
+  {
+    const t = fresh();
     aggregateEntry({ type: "message", message: { role: "assistant", usage: { input: -1, output: NaN, cacheRead: Infinity, cacheWrite: 5, cost: { total: 0 } } } }, t);
     assert.equal(t.input, 0);
     assert.equal(t.missingInput, 1); assert.equal(t.missingOutput, 1); assert.equal(t.missingCacheRead, 1);
@@ -141,6 +150,25 @@ test("assistant without usage is incomplete data; toolResult without usage is no
     assert.equal(t.examined, 3);
   }
   void totals;
+});
+
+test("standalone usage records (cache warming, Pi >= 0.86) fold into the session totals", () => {
+  const t = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, usageRecords: 0, costKnown: 0, costMissing: 0, missingInput: 0, missingOutput: 0, missingCacheRead: 0, missingCacheWrite: 0, assistantMissingUsage: 0, summaryMissingUsage: 0, examined: 0, limited: false };
+  const inScope = aggregateEntry({ type: "usage", kind: "cache_warm", provider: "anthropic", model: "claude", usage: { input: 1000, output: 1, cacheRead: 500, cacheWrite: 0, cost: { total: 0.01 } } }, t);
+  assert.equal(inScope, true);
+  assert.equal(t.input, 1000);
+  assert.equal(t.cacheRead, 500);
+  assert.equal(t.cost, 0.01);
+  assert.equal(t.usageRecords, 1);
+  // Unknown kinds fold the same way: the native footer folds every usage entry regardless
+  // of kind, so the mirror must not special-case "cache_warm".
+  aggregateEntry({ type: "usage", kind: "future_kind", usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } } }, t);
+  assert.equal(t.input, 1001);
+  assert.equal(t.usageRecords, 2);
+  // A malformed usage object inside a usage entry keeps unknown fields unknown.
+  aggregateEntry({ type: "usage", kind: "cache_warm", usage: { input: "x", output: 2, cacheRead: 0, cacheWrite: 0, cost: { total: 0 } } }, t);
+  assert.equal(t.missingInput, 1);
+  assert.equal(t.output, 4);
 });
 
 test("saturated sums mark limited instead of pretending precision", () => {

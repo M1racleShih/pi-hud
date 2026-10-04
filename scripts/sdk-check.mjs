@@ -7,7 +7,7 @@ import { OBSERVED_EVENTS } from "../src/extension.ts";
 
 const root = resolve(".tmp/sdk");
 const sdk = join(root, "node_modules/@earendil-works/pi-coding-agent");
-assert.equal(JSON.parse(readFileSync(join(sdk, "package.json"), "utf8")).version, "0.85.1");
+assert.equal(JSON.parse(readFileSync(join(sdk, "package.json"), "utf8")).version, "1.0.2");
 mkdirSync(root, { recursive: true });
 writeFileSync(join(root, "package.json"), '{"private":true,"type":"module"}\n');
 const subscriptions = OBSERVED_EVENTS.map((name) => `pi.on(${JSON.stringify(name)}, (_event, ctx) => { terminalContext(ctx); });`).join("\n");
@@ -68,6 +68,13 @@ function terminalContext(ctx: ExtensionContext): void {
 }
 ${subscriptions}
 pi.on("session_info_changed", (event) => { const name: string | undefined = event.name; void name; });
+// Pi 0.86+: pi.on returns an unsubscribe function; the HUD keeps its handlers for the
+// extension lifetime, but the surface is pinned so a removal would be caught.
+const offHandler: () => void = pi.on("session_info_changed", () => {});
+void offHandler;
+// Pi 0.87: turn_end carries required boundary entry ids; the HUD reads only, so the
+// fields must stay present and assignable.
+pi.on("turn_end", (event) => { const entryId: string = event.messageEntryId; const resultIds: string[] = event.toolResultEntryIds; void entryId; void resultIds; void event.turnIndex; void event.message; void event.toolResults; });
 pi.on("message_end", (event) => {
   if (event.message.role !== "assistant") return;
   const usage = event.message.usage;
@@ -97,6 +104,17 @@ ledger.requestVerify();
 ledger.deactivate();
 declare const sessionEntry: SessionEntry;
 declare const usage: SdkUsage;
+// Pi 0.86/0.87 grew the SessionEntry union: standalone usage records (cache warming,
+// folded into the session ledger) and append-only context_edit records (structurally
+// ignored by the ledger). Both must stay assignable to the HUD's structural entry shape.
+type SdkUsageEntry = Extract<SessionEntry, { type: "usage" }>;
+type SdkContextEditEntry = Extract<SessionEntry, { type: "context_edit" }>;
+declare const sdkUsageEntry: SdkUsageEntry;
+declare const sdkContextEditEntry: SdkContextEditEntry;
+const usageEntryLike: SessionEntryLike = sdkUsageEntry;
+const contextEditLike: SessionEntryLike = sdkContextEditEntry;
+const usageEntryUsage = usageEntryLike.usage;
+void contextEditLike; void usageEntryUsage;
 const structuralEntry: SessionEntryLike = sessionEntry;
 const entryType: unknown = structuralEntry.type;
 const entryParent: unknown = structuralEntry.parentId;
@@ -136,4 +154,4 @@ const result = spawnSync(process.execPath, [join(root, "node_modules/typescript/
   "--allowImportingTsExtensions",
   join(root, "contract.ts"), join(root, "bridge-demo.ts"), join(root, "status-demo.ts")], { stdio: "inherit" });
 assert.equal(result.status, 0, "Pinned Pi SDK API-contract check failed");
-console.log("PASS: actual Pi 0.85.1 SDK event/UI/usage/bridge contracts and example types");
+console.log("PASS: actual Pi 1.0.2 SDK event/UI/usage/bridge contracts and example types");

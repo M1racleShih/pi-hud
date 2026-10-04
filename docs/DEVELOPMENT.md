@@ -45,7 +45,7 @@ npm run demo
 The SDK is isolated under ignored `.tmp/sdk`, not added to the shipped package's runtime dependencies:
 
 ```sh
-npm install --prefix .tmp/sdk --ignore-scripts --no-audit --no-fund --save-exact @earendil-works/pi-coding-agent@0.85.1 typescript@5.9.3 @types/node@22.19.19
+npm install --prefix .tmp/sdk --ignore-scripts --no-audit --no-fund --save-exact @earendil-works/pi-coding-agent@1.0.2 typescript@5.9.3 @types/node@22.19.19
 node scripts/sdk-check.mjs
 node scripts/usage-oracle-check.mjs
 node scripts/pi-rpc-smoke.mjs

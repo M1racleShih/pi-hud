@@ -160,8 +160,10 @@ export function buildFixture(size, shape, seed = 0x0b2b_5eed) {
 }
 
 /**
- * Independent oracle reducer over plain entries: the native footer's four-category
- * rule with four separate token fields and cost.total summed separately.
+ * Independent oracle reducer over plain entries: the native footer's category rule
+ * (assistant, toolResult with usage, compaction/branch_summary with usage, and standalone
+ * `usage` records from Pi 0.86's cache warming) with four separate token fields and
+ * cost.total summed separately.
  */
 export function oracleTotals(entries) {
   const totals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, usageRecords: 0, examined: 0 };
@@ -171,7 +173,7 @@ export function oracleTotals(entries) {
     if (entry.type === "message" && entry.message) {
       if (entry.message.role === "assistant") usage = entry.message.usage ?? null;
       else if (entry.message.role === "toolResult") usage = entry.message.usage ?? null;
-    } else if (entry.type === "compaction" || entry.type === "branch_summary") usage = entry.usage ?? null;
+    } else if (entry.type === "compaction" || entry.type === "branch_summary" || entry.type === "usage") usage = entry.usage ?? null;
     if (!usage) continue;
     totals.input += usage.input; totals.output += usage.output;
     totals.cacheRead += usage.cacheRead; totals.cacheWrite += usage.cacheWrite;

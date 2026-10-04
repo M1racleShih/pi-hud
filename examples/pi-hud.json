@@ -11,6 +11,7 @@
   "color": true,
   "ascii": false,
   "showCost": true,
+  "costUnit": "$",
   "showThinking": true,
   "showSpeed": true,
   "git": {

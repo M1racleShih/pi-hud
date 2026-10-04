@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Live-TUI protocol scenarios for the default-footer decision's condition 4.
 
-Drives the REAL Pi 0.85.1 TUI in a disposable PTY with the deterministic
+Drives the REAL Pi 1.0.2 TUI in a disposable PTY with the deterministic
 in-process fixture provider (zero network/credentials/billing), reusing the B2b
 host-acceptance harness (PiHost, file oracle, ledger waiters). Nothing from the
 real user account is read or written.
@@ -400,7 +400,7 @@ def main() -> int:
         "durationSeconds": round(time.time() - started, 1),
         "environment": {
             "node": subprocess.run([NODE, "--version"], capture_output=True, text=True).stdout.strip(),
-            "pi": "0.85.1 (isolated .tmp/sdk)",
+            "pi": "1.0.2 (isolated .tmp/sdk)",
             "provider": "deterministic in-process fixture (zero network/billing)",
         },
         "results": RESULTS,

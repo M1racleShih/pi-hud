@@ -87,7 +87,7 @@ class LiveHost(b2b.PiHost):
             "PI_HUD_CONFIG": str(self.config_path), "PI_OFFLINE": "1",
         }
         env.update(extra_env or {})
-        args = [NODE, str(SDK / "dist/bundle/cli.js"), "--no-extensions"]
+        args = [NODE, str(SDK / "dist/bundle/cli.js"), "--no-extensions", "--tui-mode", "regular"]
         for extension in extensions:
             args += ["-e", str(extension)]
         args += ["--provider", "fixture", "--model", "fixture-alpha"]
@@ -122,7 +122,7 @@ class LiveHost(b2b.PiHost):
         self.pump(0.3)
         self.seen.clear()
         self.send(b"/hud status\r")
-        self.wait_for(b'"totals"', timeout=15)
+        self.wait_for_plain('"totals"', timeout=15)
         self.pump(0.8)
         text = self.plain()
         matches = list(b2b.TOTALS_PATTERN.finditer(text))

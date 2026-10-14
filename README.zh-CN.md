@@ -173,6 +173,8 @@ thinking 等级（来自 `ctx.thinkingLevel`，由 `thinking_level_select` 事�
 
 **`速度*`（spd*）是最近一条已完成 assistant 消息的平均生成速率**：分子为 provider 上报的精确 `usage.output`，分母为该消息**第一个携带内容的流式 delta** 到 `message_end` 的墙钟窗口。分子无估算（不用 chars/4 之类的启发式），窗口不含 prefill/TTFT 等待与工具执行时间，并且**刻意不做流式实时速率**：没有滑动窗口、没有平滑、没有 spinner。出错/中止、缺 usage、未观察到首 token、窗口不足 50ms、以及模型已切换的迟到响应都会被丢弃并保留上一次有效值；重置与切换模型会清空，压缩则保留（它测量的是时间而非上下文）。完整算法、守卫与 O(1) 桥接成本分析见 [docs/TOKEN-SPEED.zh-CN.md](docs/TOKEN-SPEED.zh-CN.md)。
 
+`newapi` 的 SSE 可能集中到达，因此显示 **`吞吐*`**，使用 `before_provider_request` 到 `message_end` 的完整请求窗口（包含 TTFT）；其他 provider 继续使用生成窗口。详见[NewAPI 例外](docs/TOKEN-SPEED.zh-CN.md)。
+
 **`全会话*`（显式 `usageScope: "session"`）是当前 SessionManager 全部 entries 的账本。** assistant 消息、带 usage 的 toolResult、compaction 和 branch_summary 分别贡献四项 token 和记录中的 `cost.total`；出错/中止响应只要报告了 usage 就计入，重试不会重复计入同一记录。缺失或非法数值会把数据标为不完整（`+?`）而不是被静默丢弃；不带 usage 的 toolResult 只是口径外，不当作未知收费；无 usage 的摘要保留已知 token 小计并把费用标为不完整；饱和求和显示 `limited*`。`/hud reset` 只清观察计数，保留这本账。完整的范围、生命周期与缺失数据语义见 [契约](docs/SESSION-USAGE-CONTRACT.zh-CN.md)。
 
 **“估算*”来自 Pi 的 `usage.cost.total`，不是实际账单或套餐额度。** 缺失数据显示 `?`，部分已知显示 `+?`。历史调用、压缩模型调用、没有进入主助手事件流的子代理费用不会被悄悄算入。不会读取服务商凭据，也不会请求套餐额度接口。

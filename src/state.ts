@@ -97,6 +97,8 @@ export interface HudSnapshot {
    * Average generation speed of the most recent completed assistant message:
    * provider-reported `usage.output` divided by the wall-clock window from the first
    * content-bearing streaming delta to `message_end` (algorithm: docs/TOKEN-SPEED.zh-CN.md).
+   * NewAPI instead uses before_provider_request to message_end and publishes an end-to-end basis
+   * because its content deltas can arrive as a buffered burst.
    * `null` before the first measurement and after reset or a model switch; a discarded
    * measurement never overwrites the previous valid value.
    */
@@ -104,6 +106,8 @@ export interface HudSnapshot {
   /** Exact numerator/denominator of `speedRate`, kept for `/hud status` diagnostics. */
   speedTokens: number;
   speedMs: number;
+  /** NewAPI reports request throughput because its stream can be buffered. */
+  speedBasis: "generation" | "end-to-end";
   cost: number;
   usageReports: number;
   costReports: number;
@@ -159,6 +163,8 @@ export class HudState {
   declare speedRate: number | null;
   declare speedTokens: number;
   declare speedMs: number;
+  declare speedBasis: "generation" | "end-to-end";
+  declare requestStartedAt: number | null;
   declare streamArmed: boolean;
   declare firstTokenAt: number | null;
   declare cost: number;
@@ -201,6 +207,8 @@ export class HudState {
     this.speedMs = 0;
     this.streamArmed = false;
     this.firstTokenAt = null;
+    this.requestStartedAt = null;
+    this.speedBasis = "generation";
     this.cost = 0;
     this.usageReports = 0;
     this.costReports = 0;
@@ -222,10 +230,20 @@ export class HudState {
       this.speedRate = null;
       this.speedTokens = 0;
       this.speedMs = 0;
+      this.speedBasis = "generation";
+      this.streamArmed = false;
+      this.firstTokenAt = null;
+      this.requestStartedAt = null;
     }
     this.modelKey = key;
     this.model = safeText(model?.name || model?.id, 80) || "no model";
     this.contextWindow = number(model?.contextWindow);
+  }
+
+  /** Observe only the clock, never the request payload. Older hosts without this event
+   * cannot provide an honest NewAPI request window, so no throughput is published. */
+  requestStart(now: number): void {
+    this.requestStartedAt = this.modelKey.startsWith("newapi:") ? now : null;
   }
 
   /**
@@ -238,6 +256,7 @@ export class HudState {
     const changed = armed !== this.streamArmed || (armed && this.firstTokenAt !== null);
     this.streamArmed = armed;
     this.firstTokenAt = null;
+    if (!armed) this.requestStartedAt = null;
     return changed;
   }
 
@@ -312,6 +331,8 @@ export class HudState {
   private settleSpeed(message: MessageLike | undefined, now: number): boolean {
     const armed = this.streamArmed;
     const firstTokenAt = this.firstTokenAt;
+    const requestStartedAt = this.requestStartedAt;
+    this.requestStartedAt = null;
     this.streamArmed = false;
     this.firstTokenAt = null;
     if (message?.role !== "assistant" || !armed || firstTokenAt === null) return false;
@@ -324,8 +345,14 @@ export class HudState {
     // belongs to the old model and must not be displayed next to the new selection.
     const responseKey = `${safeText(message.provider, 64)}:${safeText(message.model, 100)}`;
     if (message.model && message.provider && responseKey !== this.modelKey) return false;
-    const elapsed = now - firstTokenAt;
-    if (elapsed < MIN_SPEED_WINDOW_MS) return false;
+    // NewAPI can buffer the entire SSE stream. Arrival time would measure the
+    // final network flush, not generation; report explicitly labelled request throughput.
+    const endToEnd = this.modelKey.startsWith("newapi:");
+    const windowStart = endToEnd ? requestStartedAt : firstTokenAt;
+    if (windowStart === null) return false;
+    const elapsed = now - windowStart;
+    if (!Number.isFinite(elapsed) || elapsed < MIN_SPEED_WINDOW_MS) return false;
+    this.speedBasis = endToEnd ? "end-to-end" : "generation";
     this.speedTokens = output;
     this.speedMs = elapsed;
     this.speedRate = output / (elapsed / 1_000);
@@ -495,7 +522,7 @@ export class HudState {
       interrupted: this.interrupted, dropped: this.dropped,
       input: this.input, output: this.output, cacheRead: this.cacheRead, cacheWrite: this.cacheWrite,
       cacheHit: this.cacheHit, cost: this.cost,
-      speedRate: this.speedRate, speedTokens: this.speedTokens, speedMs: this.speedMs,
+      speedRate: this.speedRate, speedTokens: this.speedTokens, speedMs: this.speedMs, speedBasis: this.speedBasis,
       usageReports: this.usageReports, costReports: this.costReports,
       compactions: this.compactions, lastTool: this.lastTool,
       runningAgents, agentErrors, agentLabel,

@@ -108,7 +108,7 @@ low-frequency events (enable, model_select, agent_settled, manual command)
 | Display | widget 1/2/3 rows, footer body 2/3/4 rows plus at most 2 status rows (6 total), at most 4096 columns accepted | Smaller widths clip safely; width zero returns empty row text. |
 | Row segments | `MAX_ROW_FIELDS` 12 fields, `MAX_ROW_SEGMENTS` 40 segments | Lower-priority fields are dropped, then the row is clipped at the right edge. |
 | Extension statuses | 8 entries displayed from an 8-entry sample, 64 characters each, 2 rows | Extra entries fold into `+N`; control/ANSI sequences are stripped; keys/texts are truncated. |
-| Token speed | 5 scalars (armed flag, first-token timestamp, rate, tokens, ms) | Per assistant message: one timestamp, then the bridge fuses; discarded samples never overwrite the previous value. |
+| Token speed | 7 scalars (armed flag, first-token timestamp, request timestamp, basis, rate, tokens, ms) | First-token bridge fuses after one sample; NewAPI uses the pre-request clock and an explicit end-to-end label; discarded samples preserve the previous value. |
 | Session usage ledger | one planned + one active task; baseline slices of 512 entries / ~2 ms; incremental walks capped at 2048 entries | A baseline keeps one shallow entries array for its duration and releases it afterwards; increments keep no per-record state; failures schedule one recovery rebuild, never a retry loop. |
 | Cached identity | cwd 72, provider 64, title 80, branch 32 characters | Truncated at the lifecycle boundary, never re-read during render. |
 | Tool activity | widget 1/2/3 rows, footer body row count independent of activity | Tool start, completion, failure and settling never change a selected preset's row count. |

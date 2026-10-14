@@ -21,6 +21,7 @@ export interface HudWords {
   session: string;
   /** Label for the last completed assistant message's average generation speed (`spd*`). */
   speed: string;
+  speedEndToEnd: string;
   stopped: string;
   other: string;
   /** Label of the opt-in provider-plan quota row (distinct from context usage). */
@@ -34,8 +35,8 @@ export interface HudWords {
 }
 
 export const LABELS: Record<HudLanguage, HudWords> = {
-  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", session: "sess*", speed: "spd*", stopped: "interrupted", other: "other", quotaPlan: "plan", quotaUnconfigured: "no quota source", quotaWeek: "wk", quotaStale: "stale" },
-  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", session: "全会话*", speed: "速度*", stopped: "已中断", other: "其他", quotaPlan: "套餐", quotaUnconfigured: "未配置额度来源", quotaWeek: "周", quotaStale: "过期" },
+  en: { context: "ctx(last)", ready: "ready", working: "working", waiting: "waiting", agents: "agents", tasks: "tasks", compact: "compactions*", cost: "est*", usage: "obs*", session: "sess*", speed: "spd*", speedEndToEnd: "spd(e2e)*", stopped: "interrupted", other: "other", quotaPlan: "plan", quotaUnconfigured: "no quota source", quotaWeek: "wk", quotaStale: "stale" },
+  "zh-CN": { context: "上下文(上次)", ready: "就绪", working: "工作中", waiting: "等待确认", agents: "代理", tasks: "任务", compact: "压缩*", cost: "估算*", usage: "观测*", session: "全会话*", speed: "速度*", speedEndToEnd: "吞吐*", stopped: "已中断", other: "其他", quotaPlan: "套餐", quotaUnconfigured: "未配置额度来源", quotaWeek: "周", quotaStale: "过期" },
 };
 
 /** Fixed layout bounds: a row can never grow past these counts, whatever the state. */
@@ -378,7 +379,7 @@ export function speedField(snapshot: HudSnapshot, config: HudConfig, words: HudW
   if (!config.showSpeed || snapshot.speedRate === null) return null;
   const unit = config.language === "zh-CN" ? "tok/s" : "t/s";
   const value = snapshot.speedRate > SPEED_DISPLAY_CAP ? `>${SPEED_DISPLAY_CAP}` : snapshot.speedRate.toFixed(1);
-  return field(28, [seg("label", `${words.speed} `), seg("body", `${value} ${unit}`)]);
+  return field(28, [seg("label", `${snapshot.speedBasis === "end-to-end" ? words.speedEndToEnd : words.speed} `), seg("body", `${value} ${unit}`)]);
 }
 
 /** Zero compactions or zero observed usage stay hidden instead of padding the row. */

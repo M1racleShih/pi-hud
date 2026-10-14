@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-14",
+  "version": "0.2.2",
+  "scope": "NewAPI request-throughput fix only; unfinished NewAPI quota support excluded",
+  "localVerification": {
+    "unitTests": 359,
+    "verify": "passed",
+    "packageCheck": "passed",
+    "sdk": "Pi 1.0.2 contract passed",
+    "rpcLoader": "passed",
+    "regularPty": "passed",
+    "microbenchmark": "performance-newapi-speed.json",
+    "fullscreenPty": "passed",
+    "liveProtocol": {
+      "scenarios": 5,
+      "passed": true,
+      "record": "newapi-speed-live-scenarios.json"
+    }
+  },
+  "liveProviderSamples": {
+    "host": "Pi 1.2.0 OpenAI Completions stream implementation",
+    "prompt": "Count from 1 to 50, separated by spaces. No explanation.",
+    "maxTokens": 128,
+    "samples": [
+      {
+        "model": "deepseek-flash",
+        "outputTokens": 99,
+        "requestMs": 1383,
+        "requestTokensPerSecond": 71.6
+      },
+      {
+        "model": "DeepSeek-V4-Flash-0731",
+        "outputTokens": 100,
+        "requestMs": 1431,
+        "requestTokensPerSecond": 69.9
+      }
+    ],
+    "basis": "end-to-end",
+    "limitations": "Single short sample per model. Includes TTFT and transport; not upstream generation speed. No live sample for deepseek-v4-pro."
+  }
+}

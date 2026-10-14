@@ -21,7 +21,7 @@ export const WIDGET_KEY = "pi-hud";
 export const BRIDGE_EVENT = "pi-hud:update";
 export const OBSERVED_EVENTS: readonly string[] = Object.freeze([
   "session_start", "session_shutdown", "session_info_changed", "agent_start", "agent_end", "agent_settled",
-  "turn_end", "message_start", "message_end", "tool_execution_start", "tool_execution_end", "session_compact",
+  "turn_end", "before_provider_request", "message_start", "message_end", "tool_execution_start", "tool_execution_end", "session_compact",
   "session_tree", "model_select", "thinking_level_select", "ui_prompt_start", "ui_prompt_end",
 ]);
 /**
@@ -213,6 +213,7 @@ export class HudController {
         case "agent_end": this.state!.phase = "settling"; break;
         case "agent_settled": this.state!.settle(); this.wantGit = true; this.ledger?.requestVerify(); this.quota?.notify("settled"); break;
         case "turn_end": this.ledger?.requestVerify(); changed = false; break;
+        case "before_provider_request": this.state!.requestStart(this.now()); changed = false; break;
         case "message_start": changed = this.state!.messageStart(event?.message); break;
         case "message_update":
           // High-frequency stream bridge: O(1) per delta, fuses after the first sample, and
@@ -672,7 +673,7 @@ export class HudController {
         scope: "since attach/reset", input: this.state?.input ?? 0, output: this.state?.output ?? 0,
         cacheRead: this.state?.cacheRead ?? 0, cacheWrite: this.state?.cacheWrite ?? 0,
         cacheHitRate: this.state?.cacheHit ?? null, cost: this.state?.cost ?? 0,
-        speed: this.state ? { rate: this.state.speedRate, tokens: this.state.speedTokens, ms: this.state.speedMs } : null,
+        speed: this.state ? { rate: this.state.speedRate, tokens: this.state.speedTokens, ms: this.state.speedMs, basis: this.state.speedBasis } : null,
       },
       sessionUsage: this.ledger?.inspect() ?? null,
       coverage: {
@@ -681,7 +682,7 @@ export class HudController {
           : "observed since attach/reset; NOT a full-session ledger (the native footer aggregates every session entry)",
         context: "last observed assistant snapshot, labelled ctx(last); not the host's live context estimate; identical scope in observed and session modes",
         cacheHit: "most recent valid assistant: cacheRead / (input + cacheRead + cacheWrite); ? when unknown; stays observed-scope even in session mode",
-        speed: "spd*: average generation speed of the last completed assistant message = reported usage.output / (first content-bearing delta -> message_end); discarded (keeping the previous value) on error/abort, missing usage, no observed first token, sub-50ms windows or a model mismatch; no live estimate while streaming",
+        speed: "NewAPI: spd(e2e)* is reported usage.output / (before_provider_request -> message_end), including TTFT because SSE may be buffered; other providers: spd* is average generation speed of the last completed assistant message = reported usage.output / (first content-bearing delta -> message_end); discarded (keeping the previous value) on error/abort, missing usage, no observed first token, sub-50ms windows or a model mismatch; no live estimate while streaming",
         sessionLedger: this.config.usageScope === "session"
           ? (this.ledger?.view() ? "full-session ledger active; status/rebuild/host-call diagnostics above" : "requested but unavailable; explicitly degraded to observed-labelled data")
           : "inactive; usageScope: session opts in",

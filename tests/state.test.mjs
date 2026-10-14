@@ -435,3 +435,38 @@ test("malformed stream events cannot arm, throw or fuse", () => {
   s.messageEnd(assistant(), 61_500);
   assert.equal(s.speedRate, 5);
 });
+
+
+test("NewAPI buffered streams measure request throughput, including TTFT", () => {
+  const model = { ...MODEL, provider: "newapi" };
+  const s = new HudState("/tmp/project", model, 0);
+  s.requestStart(1_000);
+  s.messageStart({ role: "assistant" });
+  s.messageUpdate({ type: "thinking_delta", delta: "buffered" }, 10_900);
+  s.messageUpdate({ type: "text_delta", delta: "answer" }, 10_950);
+  s.messageEnd(assistant({ provider: "newapi", usage: { output: 1_000 } }), 11_000);
+  assert.equal(s.speedRate, 100, "the 100ms flush must not yield 10,000 t/s");
+  assert.equal(s.speedMs, 10_000);
+  assert.equal(s.snapshot().speedBasis, "end-to-end");
+  // A sub-50ms flush is still usable when the request window is long enough.
+  s.requestStart(20_000);
+  s.messageStart({ role: "assistant" });
+  s.messageUpdate({ type: "text_delta", delta: "answer" }, 29_999);
+  s.messageEnd(assistant({ provider: "newapi", usage: { output: 500 } }), 30_000);
+  assert.equal(s.speedRate, 50);
+  s.requestStart(40_000);
+  s.messageStart({ role: "assistant" });
+  s.messageEnd(assistant({ provider: "newapi" }), 50_000);
+  assert.equal(s.speedRate, 50, "missing content deltas retain the previous sample");
+  s.requestStart(60_000);
+  s.messageStart({ role: "assistant" });
+  s.messageUpdate({ type: "text_delta", delta: "partial" }, 65_000);
+  s.messageEnd(assistant({ provider: "newapi", stopReason: "aborted" }), 70_000);
+  assert.equal(s.speedRate, 50, "aborted requests retain the previous sample");
+  s.setModel(MODEL);
+  assert.equal(s.speedRate, null);
+  assert.equal(s.requestStartedAt, null);
+  measured(s, { firstAt: 100_000, endAt: 110_000, output: 500 });
+  assert.equal(s.speedRate, 50);
+  assert.equal(s.speedBasis, "generation");
+});

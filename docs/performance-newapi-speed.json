@@ -1,0 +1,147 @@
+{
+  "generatedAt": "2026-10-14T06:22:04.898Z",
+  "environment": {
+    "node": "v24.18.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "11th Gen Intel(R) Core(TM) i7-11800H @ 2.30GHz"
+  },
+  "methodology": "Local synthetic microbenchmarks, NOT a live Pi/provider/terminal A/B. Timing includes performance.now overhead; cached mean uses a bulk loop. No history traversal or I/O is included in observer hooks. toolPair measures start + end together.",
+  "hooks": {
+    "messageEnd": {
+      "samples": 12000,
+      "meanUs": 0.8021084999999943,
+      "p50Us": 0.6450000000057798,
+      "p95Us": 1.0259999999959746,
+      "p99Us": 1.3669999999876836
+    },
+    "toolPair": {
+      "samples": 12000,
+      "meanUs": 1.5104256666667024,
+      "p50Us": 1.133999999993307,
+      "p95Us": 2.23199999999224,
+      "p99Us": 3.6259999999970205
+    }
+  },
+  "uncachedRender": {
+    "samples": 3000,
+    "meanUs": 24.683045666666896,
+    "p50Us": 16.013000000015154,
+    "p95Us": 31.36299999999892,
+    "p99Us": 37.892999999996846
+  },
+  "uncachedRenderMono": {
+    "samples": 3000,
+    "meanUs": 19.3757126666664,
+    "p50Us": 14.81800000004796,
+    "p95Us": 19.286999999962973,
+    "p99Us": 30.649999999980082
+  },
+  "uncachedRenderNarrow": {
+    "samples": 3000,
+    "meanUs": 15.827657666666337,
+    "p50Us": 11.332000000038533,
+    "p95Us": 17.360999999993965,
+    "p99Us": 33.95399999999427
+  },
+  "uncachedRenderSaturated": {
+    "samples": 3000,
+    "meanUs": 23.444480999999346,
+    "p50Us": 18.822000000000116,
+    "p95Us": 25.971000000026834,
+    "p99Us": 38.150999999970736
+  },
+  "uncachedRenderSaturatedWide": {
+    "samples": 3000,
+    "meanUs": 22.205519333331047,
+    "p50Us": 18.393000000060056,
+    "p95Us": 25.747000000023945,
+    "p99Us": 34.44200000001274
+  },
+  "uncachedRenderConcurrent": {
+    "samples": 3000,
+    "meanUs": 18.939343333333152,
+    "p50Us": 14.478999999937514,
+    "p95Us": 20.493999999985135,
+    "p99Us": 29.34600000003229
+  },
+  "uncachedRenderConcurrentNarrow": {
+    "samples": 3000,
+    "meanUs": 17.072531999999942,
+    "p50Us": 12.205999999991946,
+    "p95Us": 22.575000000074397,
+    "p99Us": 25.00299999996969
+  },
+  "uncachedFooterFull": {
+    "samples": 3000,
+    "meanUs": 35.04303433333293,
+    "p50Us": 29.365999999981796,
+    "p95Us": 46.44600000005994,
+    "p99Us": 129.53300000003765
+  },
+  "uncachedFooterBalanced": {
+    "samples": 3000,
+    "meanUs": 31.262805999997823,
+    "p50Us": 26.917000000139524,
+    "p95Us": 32.3399999999765,
+    "p99Us": 75.64400000001115
+  },
+  "uncachedFooterNarrow": {
+    "samples": 3000,
+    "meanUs": 31.8617200000034,
+    "p50Us": 23.13200000003235,
+    "p95Us": 44.491000000107306,
+    "p99Us": 59.04799999984789
+  },
+  "uncachedFooterNoStatus": {
+    "samples": 3000,
+    "meanUs": 29.710640999997594,
+    "p50Us": 20.972000000028856,
+    "p95Us": 36.212999999861495,
+    "p99Us": 44.31299999987459
+  },
+  "cachedRender": {
+    "frames": 1000000,
+    "identicalCacheHits": 1000000,
+    "meanUs": 0.008781147000000147
+  },
+  "cachedFooterRender": {
+    "frames": 1000000,
+    "identicalCacheHits": 1000000,
+    "statusChecks": 1000002,
+    "statusChanges": 1,
+    "meanUs": 0.221546243
+  },
+  "footerShape": {
+    "bodyRows": {
+      "minimal": 2,
+      "balanced": 3,
+      "full": 4
+    },
+    "statusEntries": 12,
+    "footerFullLines": 6,
+    "footerNarrowLines": 5
+  },
+  "structural": {
+    "perTokenSubscriptions": 0,
+    "runtimeDependencies": 0,
+    "burstToolEvents": 100000,
+    "pendingPublicationTimers": 1,
+    "burstPublications": 1,
+    "idleSyntheticMs": 60000,
+    "idleExtraPublications": 0,
+    "retainedToolsAfterBurst": 0,
+    "retainedRecentIdsAfterBurst": 128,
+    "distinctToolNamesInCategoryFlood": 50000,
+    "retainedCategoriesAfterFlood": 16,
+    "retainedOverflowBucketsAfterFlood": 1,
+    "defaultGitEnabled": false
+  },
+  "gates": {
+    "hookP99Us": 250,
+    "uncachedRenderP99Us": 5000,
+    "cachedRenderMeanUs": 5,
+    "cachedFooterRenderMeanUs": 5
+  },
+  "passed": true
+}

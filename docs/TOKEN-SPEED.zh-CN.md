@@ -4,6 +4,28 @@
 
 状态：已实现（`spd*` 字段，默认开启，`showSpeed: false` 关闭）。
 
+## NewAPI 的缓冲流例外
+
+`provider === "newapi"` 使用 **请求平均吞吐**，显示 `spd(e2e)*`（中文 `吞吐*`）：
+
+```text
+rate = usage.output / ((t_message_end - t_before_provider_request) / 1000)
+```
+
+2026-10-14 的本机短请求确认 NewAPI 内容集中到达：官方 Flash 的 99 个输出 token
+在约 4ms 内到达，DGX 的 100 个 token 几乎同时到达。首 delta 到结束的窗口只能
+测到最后的传输 flush，不能还原上游生成时间。请求窗口包含连接、prefill、TTFT、
+生成和流传输，但不含两条 assistant 消息之间的工具执行；它不声称是纯生成速度。
+即使 NewAPI 改为正常流式推送，仍使用这一稳定口径，不按单次速率阈值猜测是否缓冲。
+
+`before_provider_request` 额外记录一个时间戳（不读取或修改请求 payload）；首内容 delta 的原有熔断桥保持不变。
+仍要求观察到内容 delta，并保留缺 usage、error/abort、模型不匹配和不足 50ms
+等守卫，50ms 对 NewAPI 检查的是完整请求窗口。切换模型会解除旧测量布防。
+`/hud status` 的 `observedUsage.speed.basis` 标明 `end-to-end` 或 `generation`。
+新增状态仅两个标量（请求起点和已发布口径），没有逐 delta 累计、额外定时器或网络请求。
+
+以下生成速度算法适用于其他 provider。
+
 ## 1. 指标定义
 
 HUD 显示的 `spd*` 是**最近一条已完成 assistant 消息的平均生成速率**：
@@ -39,7 +61,7 @@ rate (tokens/s) = usage.output / ((t_end - t_first_token) / 1000)
 | `message_start` | 低频（每条消息一次） | assistant 消息开始时**布防**（arm）一次测量 |
 | `message_update` | 高频（每个流式 delta 一次） | **只记一个时间戳**：第一个携带内容的 delta 到达时刻。此后立即熔断，本条消息内所有后续 delta 都被 O(1) 早退忽略 |
 
-状态机（`HudState` 内 3 个标量：`streamArmed: boolean`、`firstTokenAt: number | null`，加上已发布的 `speedRate/speedTokens/speedMs`）：
+生成窗口状态机（另有上述 NewAPI 请求起点与口径；`HudState` 内 2 个流桥标量：`streamArmed: boolean`、`firstTokenAt: number | null`，加上已发布的 `speedRate/speedTokens/speedMs`）：
 
 ```text
 message_start   role=assistant   → streamArmed=true, firstTokenAt=null   （布防）
@@ -108,7 +130,7 @@ speedRate   = usage.output / (elapsed / 1000)
 | 维度 | 上限 |
 | --- | --- |
 | `message_update` 处理 | 每 delta 一次布尔比较（已熔断时）；首个内容 delta 为 O(1) 记录。不保留字符串、不触发重绘（`changed=false` 不进 coalescer） |
-| 状态 | 5 个标量（armed、firstTokenAt、rate、tokens、ms），不随消息数增长 |
+| 状态 | 7 个标量（armed、firstTokenAt、requestStartedAt、speedBasis、rate、tokens、ms），不随消息数增长 |
 | 定时器 | 零。不存在刷新 interval、动画或 spinner；数值更新走既有 `message_end` 路径的 trailing coalescer |
 | 渲染 | 每 assistant 消息至多一次新帧 |
 

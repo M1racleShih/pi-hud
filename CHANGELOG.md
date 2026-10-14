@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased — Pi 0.99.1 → 1.0.2 compatibility
+## 0.2.2 — 2026-10-14
+
+- Fix NewAPI speed statistics for buffered SSE responses. `newapi` now measures reported output tokens over the complete request window starting at `before_provider_request`, including TTFT, and labels it `spd(e2e)*` / `吞吐*`. Other providers keep the first-content-delta generation window.
+- Preserve discard guards and the fused O(1) stream bridge. Reset/model switches invalidate the pending request clock; missing request events never reuse an earlier request's timestamp. `/hud status` includes the measurement basis.
+- Add buffered-stream, pre-header timing, payload isolation and bilingual footer regressions. Validate both official Flash and DGX through Pi 1.2.0's real stream implementation; these measurements describe request throughput, not upstream generation speed.
+- Align the CI SDK installation with the existing Pi 1.0.2 contract and acceptance scripts; pin regular scrollback and match live-scenario status markers after stripping ANSI styling, consistent with the host acceptance harness.
+
+### Pi 0.99.1 → 1.0.2 compatibility
 
 - Revalidate against Pi 1.0.2 (through the 1.0.0 fullscreen-by-default change): SDK contract type checks, usage oracle, 356 local tests, performance gates, RPC smoke, regular/fullscreen PTY smoke and all 9 real-host acceptance scenarios pass; no HUD runtime API incompatibility. Target pins (`targetPi`, gate scripts, README/SECURITY, upstream lock) updated to 1.0.2.
 - Acceptance harness fixes for the 1.0.x host: pin `--tui-mode regular` (the fullscreen chat viewport paints only visible rows, hiding the long `/hud status` JSON dump from the captured screen) and match JSON markers on ANSI-stripped text (the 1.0.2 status renderer inserts SGR runs inside `"key"` tokens).

@@ -260,3 +260,26 @@ test("session events clear the armed bridge so no late delta can pair with a new
   assert.equal(state.firstTokenAt, null);
   assert.equal(state.speedRate, null, "the observation belongs to the previous epoch");
 });
+
+
+test("NewAPI throughput starts before HTTP headers and never reads or replaces payloads", () => {
+  const f = controllerFixture();
+  f.ctx.model = { ...f.ctx.model, provider: "newapi" };
+  f.emit("model_select", { model: f.ctx.model });
+  f.clock.advance(1_000);
+  const payload = new Proxy({}, { get() { throw new Error("HUD must not read the payload"); } });
+  assert.equal(f.emit("before_provider_request", { payload }), undefined);
+  f.clock.advance(9_900); // The proxy delays headers as well as content.
+  f.emit("message_start", { message: { role: "assistant" } });
+  f.emit("message_update", { assistantMessageEvent: { type: "text_delta", delta: "buffered" } });
+  f.clock.advance(100);
+  f.emit("message_end", { message: assistant({ provider: "newapi", usage: { output: 1_000 } }) });
+  const speed = f.controller.inspect().observedUsage.speed;
+  assert.deepEqual(speed, { rate: 100, tokens: 1_000, ms: 10_000, basis: "end-to-end" });
+  f.emit("message_start", { message: { role: "assistant" } });
+  f.emit("message_update", { assistantMessageEvent: { type: "text_delta", delta: "no request event" } });
+  f.clock.advance(100);
+  f.emit("message_end", { message: assistant({ provider: "newapi", usage: { output: 1_000 } }) });
+  assert.deepEqual(f.controller.inspect().observedUsage.speed, speed, "a missing request event cannot reuse the previous start");
+  f.controller.stop();
+});

@@ -432,3 +432,16 @@ test("the default fixture shows think:max after the model name", () => {
   const wide = rows(state().snapshot(), "balanced", 180)[0];
   assert.match(wide, /\[GLM-5\.3\] · think:max · zai/);
 });
+
+
+test("NewAPI throughput is explicitly labelled on the footer in both languages", () => {
+  const s = new HudState("/tmp/project", { ...MODEL, provider: "newapi" }, 0);
+  s.requestStart(0);
+  s.messageStart({ role: "assistant" });
+  s.messageUpdate({ type: "text_delta", delta: "buffered" }, 9_999);
+  s.messageEnd(assistant({ provider: "newapi", usage: { output: 500 } }), 10_000);
+  for (const [language, label] of [["en", "spd(e2e)*"], ["zh-CN", "吞吐*"]]) {
+    const rows = formatFooter(s.snapshot(), normalizeConfig({ language }), 180, EMPTY_IDENTITY);
+    assert.ok(rows[1].text.includes(`${label} 50.0`), rows[1].text);
+  }
+});

@@ -1,0 +1,105 @@
+{
+  "generatedAt": "2026-10-14T14:26:02+0800",
+  "passed": true,
+  "provenance": {
+    "commit": "4f48d4e0d6e97e17679bc6c20222c3dfa751fe2a",
+    "dirtyFilesSha256": {
+      "github/workflows/ci.yml": "unreadable",
+      "CHANGELOG.md": "81e702f028bb2e1e86f9e7723bfdd402d4f1d88a6bf443771a02ed76eb64ffde",
+      "README.md": "eaac91e53be3b00d74d2e5a8da090e2a1635cb289321d4f4ef87e27795100ed6",
+      "README.zh-CN.md": "37d28dec57ed91c4319df868ebe5fd878ee88cd828a54c2de9c4b85b4f3d5d7d",
+      "docs/ARCHITECTURE.md": "31df00d8dcd4fc11aca27ffa41a15f18bda287c3ee13612faf832edad2974b76",
+      "docs/TOKEN-SPEED.zh-CN.md": "9010f47be1e390e19deb2dd68bfda2d7f19d2207dd0685f2f2b3ce1709aa76a1",
+      "package-lock.json": "6f820591aaaebec7a79fdf20bfedc509ffac039f345c91c72b7352c51c7702f7",
+      "package.json": "5600cd23e255ed471d12cb253db3f8d13ede24c6f1dc9b3a04346ad8d4c3035a",
+      "scripts/pi-live-scenarios.py": "3ecfacd4992035c851be31cdd0bce561a22a187e62608677de14f45e8bffc43a",
+      "src/extension.ts": "7bc507115eadeeff3f96819571dbd5c345dc80b8e8e0beb2e15160adee0903f4",
+      "src/render.ts": "6d3678df127e492f86a6bfe64fdd481ebb8c37245d8928d68379fd4ec1274f51",
+      "src/state.ts": "04cafc11b53c11f006a93993207e37929b5c9232ddd14bfd75324732aeac94f1",
+      "tests/footer.test.mjs": "2c5a5639c06c3f3fb40beb89d540ae851b3ea7be76f00316f31fc84d9fcdbec4",
+      "tests/lifecycle.test.mjs": "2c8784610ea79eadd775433bde888a99928dbd5c0b8bb088174437b1367d9097",
+      "tests/state.test.mjs": "6129b8b9b6fb877bc519c988bdbda11f95f8d44ae0ad9660b5957ec9d1e40967",
+      "docs/newapi-speed-verification.json": "4ced92b79755829fc7f0a1f3f527bc837465d1bb5cf1271013aa637ce824f696",
+      "docs/performance-newapi-speed.json": "7adaeb6581e7d6553f48b60eb5f32ce072fea458adc1a2161f6f6af20a44cf05"
+    },
+    "sdkLockSha256": "20fc2a1c295a9535f6cf47a762c01c468d6ac7880536340870e8162a4f389694",
+    "node": "v24.18.0"
+  },
+  "durationSeconds": 62.4,
+  "environment": {
+    "node": "v24.18.0",
+    "pi": "1.0.2 (isolated .tmp/sdk)",
+    "provider": "deterministic in-process fixture (zero network/billing)"
+  },
+  "results": [
+    {
+      "scenario": "resize-mid-stream-widget",
+      "passed": true,
+      "note": "terminal resized 120->47->92 (4 SIGWINCH) during a measured LONGREPLY stream; stream completed, HUD rows within width, ledger == file oracle",
+      "workingDuringResize": true,
+      "midStreamAlive": true,
+      "midOverflowLines47": [],
+      "settledOverflowLines92": [],
+      "streamSeconds": 5.57,
+      "ledger": {
+        "input": 3596806,
+        "output": 47937,
+        "usageRecords": "99"
+      }
+    },
+    {
+      "scenario": "resize-mid-stream-footer",
+      "passed": true,
+      "note": "terminal resized 120->47->92 (4 SIGWINCH) during a measured LONGREPLY stream; stream completed, HUD rows within width, ledger == file oracle",
+      "workingDuringResize": true,
+      "midStreamAlive": true,
+      "midOverflowLines47": [],
+      "settledOverflowLines92": [],
+      "streamSeconds": 5.56,
+      "ledger": {
+        "input": 3596806,
+        "output": 47937,
+        "usageRecords": "99"
+      }
+    },
+    {
+      "scenario": "compact-mid-measurement",
+      "passed": true,
+      "note": "/compact submitted mid-stream (observed: the host interrupts the running stream and runs the compaction); compaction counted exactly once, ledger == file oracle",
+      "midStreamSubmissionAccepted": true,
+      "streamCompletedAfterSubmission": false,
+      "sessionCompactEventsInFile": 0,
+      "beforeInput": 6512281,
+      "afterInput": 6515299,
+      "rebuilds": "2",
+      "failureReason": "null"
+    },
+    {
+      "scenario": "abort-retry",
+      "passed": true,
+      "note": "Escape aborted a measured stream mid-flight (terminator never reached); ledger == file oracle after the abort and after the full retry",
+      "settledAfterAbort": true,
+      "terminatorSeenDuringAbort": false,
+      "abortedTotals": {
+        "input": 3596806,
+        "usageRecords": "99"
+      },
+      "retriedTotals": {
+        "input": 3597808,
+        "usageRecords": "100"
+      }
+    },
+    {
+      "scenario": "concurrent-widget",
+      "passed": true,
+      "note": "independent second extension widget coexists with the HUD widget; HUD on/off, surface switches and /other-widget off never disturb the other widget",
+      "coexistAtStartup": true,
+      "hudOffIsolatesOther": true,
+      "coexistAfterHudOn": true,
+      "coexistInFooterMode": true,
+      "coexistAfterSurfaceBack": true,
+      "otherOffKeepsHud": true,
+      "overflowLines": []
+    }
+  ]
+}
